@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:telemedicine/auth/auth_screen/sign_in_screen.dart';
+import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
 
 /// Helper to guard actions restricted to authenticated patients and doctors.
 class GuestGuard {

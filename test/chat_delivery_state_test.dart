@@ -1,9 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:telemedicine/data/models/chat_model.dart';
-import 'package:telemedicine/home_widget/chat_call/chat/chat_controller/chat_controller.dart';
-import 'package:telemedicine/offline_db/models/offline_chat_message.dart';
-import 'package:telemedicine/offline_db/offline_converters.dart';
+import 'package:telemedicine/features/chat/presentation/controllers/chat_controller.dart';
+import 'package:telemedicine/data/local/models/offline_chat_message.dart';
+import 'package:telemedicine/data/local/offline_converters.dart';
 
 ChatMessageModel _message({
   String id = 'm1',

@@ -11,7 +11,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const h = require("../password_reset_helpers");
+const h = require("../lib/shared/password_reset_helpers.js");
 
 const PEPPER = "test-pepper-not-a-real-secret";
 

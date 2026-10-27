@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:telemedicine/data/models/appointment_model.dart';
 import 'package:telemedicine/data/models/user_model.dart';
-import 'package:telemedicine/features/appointment/appointment_controller.dart';
+import 'package:telemedicine/features/appointments/presentation/appointment_controller.dart';
 
 /// A doctor document in whatever shape the given keys produce — everything
 /// else falls back to the fields every record has carried forever.

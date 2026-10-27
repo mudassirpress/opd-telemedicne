@@ -12,7 +12,7 @@
 // make it self-repairing instead.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:telemedicine/home_widget/chat_call/chat/chat_controller/chat_controller.dart';
+import 'package:telemedicine/features/chat/presentation/controllers/chat_controller.dart';
 
 void main() {
   group('resolveNextUnreadCount', () {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:telemedicine/core/theme/app_theme.dart';
+import 'package:telemedicine/app/theme/app_theme.dart';
 
 class ToastService {
   static ToastService? _instance;

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
 import 'package:telemedicine/data/models/appointment_model.dart';
-import 'package:telemedicine/features/appointment/appointment_lifecycle_logic.dart';
+import 'package:telemedicine/features/appointments/presentation/appointment_lifecycle_logic.dart';
 
 /// Builds the phase inputs with sane schedule defaults: the slot runs
 /// 10:00–10:30 on 2026-10-05 in the test's local zone.

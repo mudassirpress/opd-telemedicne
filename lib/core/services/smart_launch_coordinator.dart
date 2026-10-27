@@ -6,25 +6,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:telemedicine/admin_portal/admin_bottom_nav/admin_portal_wrapper.dart';
-import 'package:telemedicine/auth/auth_provider/user_provider.dart';
-import 'package:telemedicine/auth/auth_screen/expired_patient_screen.dart';
-import 'package:telemedicine/auth/auth_screen/sign_in_screen.dart';
-import 'package:telemedicine/auth/doctor_profile/update_doctor_profile.dart';
-import 'package:telemedicine/auth/payment/payment_screen.dart';
-import 'package:telemedicine/auth/user_controller/doctor_controller.dart';
-import 'package:telemedicine/auth/user_controller/patient_controller.dart';
+import 'package:telemedicine/features/admin/presentation/admin_bottom_nav/admin_portal_wrapper.dart';
+import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
+import 'package:telemedicine/features/auth/presentation/screens/expired_patient_screen.dart';
+import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
+import 'package:telemedicine/features/doctors/presentation/screens/update_doctor_profile_screen.dart';
+import 'package:telemedicine/features/payments/presentation/screens/payment_screen.dart';
+import 'package:telemedicine/features/auth/presentation/controllers/doctor_controller.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
 import 'package:telemedicine/core/services/auth_routing_service.dart';
 import 'package:telemedicine/core/services/incoming_call_coordinator.dart';
 import 'package:telemedicine/core/services/notification_service.dart';
 import 'package:telemedicine/core/utils/toast_utils.dart';
-import 'package:telemedicine/doctor_portal/bottom_nav/doctor_portal_wrapper.dart';
-import 'package:telemedicine/features/patient/patient_portal_wrapper.dart';
-import 'package:telemedicine/features/splash/splash_screen.dart';
-import 'package:telemedicine/home_widget/chat_call/call/call_screen.dart';
-import 'package:telemedicine/home_widget/chat_call/call/incoming_call.dart';
-import 'package:telemedicine/home_widget/chat_call/chat/chat_screen.dart';
+import 'package:telemedicine/features/doctor_portal/presentation/bottom_nav/doctor_portal_wrapper.dart';
+import 'package:telemedicine/features/patients/presentation/patient_portal_wrapper.dart';
+import 'package:telemedicine/features/splash/presentation/splash_screen.dart';
+import 'package:telemedicine/features/calls/presentation/call_screen.dart';
+import 'package:telemedicine/features/calls/presentation/incoming_call_screen.dart';
+import 'package:telemedicine/features/chat/presentation/chat_screen.dart';
 
 /// The kind of destination target determined at startup.
 enum LaunchTargetType {
@@ -305,11 +304,11 @@ class _SmartDirectLaunchWrapperState
     if (userRole == 'doctor' && doctorUser != null) {
       final needsCompletion = await doctorController.requiresProfileCompletion();
       if (needsCompletion) {
-        debugPrint('🩺 [SMART_LAUNCH] Doctor profile incomplete -> redirecting to UpdateDoctorProfile');
+        debugPrint('🩺 [SMART_LAUNCH] Doctor profile incomplete -> redirecting to UpdateDoctorProfileScreen');
         NotificationService.markAppReady();
         if (mounted) {
           setState(() {
-            _destination = const UpdateDoctorProfile();
+            _destination = const UpdateDoctorProfileScreen();
             _isLoading = false;
           });
         }

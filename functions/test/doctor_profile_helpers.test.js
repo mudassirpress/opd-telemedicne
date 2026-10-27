@@ -6,7 +6,7 @@ const {
   sanitizeDoctorProfilePayload,
   deleteExistingStorageFile,
   handleDoctorProfileUpdate,
-} = require("../doctor_profile_helpers");
+} = require("../lib/doctors/doctor_profile_helpers.js");
 
 describe("Doctor Profile Image Deletion & Sanitization", () => {
   it("sanitizes string 'null' and 'undefined' to literal null", () => {

@@ -1,16 +1,16 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:telemedicine/auth/auth_provider/user_provider.dart';
+import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
 import 'package:telemedicine/data/models/appointment_model.dart';
 import 'package:telemedicine/data/models/user_model.dart';
-import 'package:telemedicine/doctor_portal/prescriptions/prescription_controller.dart';
-import 'package:telemedicine/features/appointment/appointment_controller.dart';
-import 'package:telemedicine/features/complaint/payment_complaint_service.dart';
-import 'package:telemedicine/home_widget/chat_call/chat/chat_controller/chat_controller.dart';
-import 'package:telemedicine/home_widget/reports/report_share_controller/report_share_controller.dart';
-import 'package:telemedicine/offline_db/offline_chat_service.dart';
+import 'package:telemedicine/features/doctor_portal/presentation/prescriptions/prescription_controller.dart';
+import 'package:telemedicine/features/appointments/presentation/appointment_controller.dart';
+import 'package:telemedicine/features/complaints/presentation/payment_complaint_service.dart';
+import 'package:telemedicine/features/chat/presentation/controllers/chat_controller.dart';
+import 'package:telemedicine/features/reports/presentation/report_share_controller/report_share_controller.dart';
+import 'package:telemedicine/data/local/offline_chat_service.dart';
 
 // ─────────────────────────────────────────────────────────────
 // LOCAL PERSISTENCE KEYS FOR VIEWED TIMESTAMPS

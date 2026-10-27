@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:telemedicine/auth/user_controller/doctor_controller.dart';
+import 'package:telemedicine/features/auth/presentation/controllers/doctor_controller.dart';
 import 'package:telemedicine/data/models/user_model.dart';
 
 /// A doctor document in whatever shape the given keys produce — everything

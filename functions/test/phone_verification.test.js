@@ -6,8 +6,8 @@ const {
   normalizePkPhone,
   phoneLookupVariants,
   maskPhone,
-} = require("../phone_helpers");
-const { checkPhoneAvailabilityCore } = require("../phone_verification");
+} = require("../lib/shared/phone_helpers.js");
+const { checkPhoneAvailabilityCore } = require("../lib/auth/phone_verification.js");
 
 describe("Phone Helper E.164 Normalization", () => {
   it("validates strict E.164 formats correctly", () => {

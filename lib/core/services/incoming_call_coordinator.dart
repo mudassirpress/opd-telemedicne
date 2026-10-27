@@ -28,7 +28,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
 import 'package:telemedicine/core/services/audio_service.dart';
 import 'package:telemedicine/core/services/call_ringtone_service.dart';
-import 'package:telemedicine/home_widget/chat_call/call/call_controller/call_controller.dart';
+import 'package:telemedicine/features/calls/presentation/controllers/call_controller.dart';
 
 /// How a particular incoming-call event reached the app. Used only to decide
 /// *what* should happen (show a notification vs. open the screen) — never to

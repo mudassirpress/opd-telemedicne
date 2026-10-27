@@ -1,7 +1,7 @@
 const {describe, it} = require("node:test");
 const assert = require("node:assert/strict");
-const h = require("../password_reset_helpers");
-const {isUnrecoverableTokenError} = require("../fcm_helpers");
+const h = require("../lib/shared/password_reset_helpers.js");
+const {isUnrecoverableTokenError} = require("../lib/shared/fcm_helpers.js");
 
 describe("Patient Password Reset FCM OTP Core Logic", () => {
   it("generates a strictly 6-digit cryptographic numeric OTP", () => {
@@ -103,7 +103,7 @@ describe("Patient Password Reset FCM OTP Core Logic", () => {
   });
 
   it("maps phone number variants to the correct patient account and extracts device FCM token", async () => {
-    const {findAccountByPhone} = require("../patient_password_reset");
+    const {findAccountByPhone} = require("../lib/auth/patient_password_reset.js");
     const mockPatientDoc = {
       id: "patient_uid_123",
       data: () => ({
@@ -141,7 +141,7 @@ describe("Patient Password Reset FCM OTP Core Logic", () => {
   });
 
   it("strictly isolates doctor accounts and prevents targeting doctors for password reset", async () => {
-    const {findAccountByPhone} = require("../patient_password_reset");
+    const {findAccountByPhone} = require("../lib/auth/patient_password_reset.js");
     const mockDoctorDoc = {
       id: "doctor_uid_456",
       data: () => ({
@@ -167,7 +167,7 @@ describe("Patient Password Reset FCM OTP Core Logic", () => {
   });
 
   it("rejects deleted or blocked patient accounts", async () => {
-    const {findAccountByPhone} = require("../patient_password_reset");
+    const {findAccountByPhone} = require("../lib/auth/patient_password_reset.js");
     const mockDeletedDoc = {
       id: "deleted_patient",
       data: () => ({
@@ -213,7 +213,7 @@ describe("Patient Password Reset FCM OTP Core Logic", () => {
   });
 
   it("maps international phone numbers to correct patient accounts across US and UK formats", async () => {
-    const {findAccountByPhone} = require("../patient_password_reset");
+    const {findAccountByPhone} = require("../lib/auth/patient_password_reset.js");
     const mockUsPatientDoc = {
       id: "us_patient_uid",
       data: () => ({

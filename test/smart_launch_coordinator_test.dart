@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
 import 'package:telemedicine/core/services/smart_launch_coordinator.dart';
-import 'package:telemedicine/features/splash/splash_screen.dart';
+import 'package:telemedicine/features/splash/presentation/splash_screen.dart';
 
 void main() {
   group('SmartLaunchCoordinator Target Resolution Tests', () {

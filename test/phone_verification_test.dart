@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:telemedicine/auth/auth_screen/sign_in_screen.dart';
+import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
 import 'package:telemedicine/core/utils/phone_utils.dart';
-import 'package:telemedicine/services/phone_verification_service.dart';
+import 'package:telemedicine/features/auth/data/services/phone_verification_service.dart';
 
 void main() {
   group('PhoneUtils E.164 Normalization Tests', () {

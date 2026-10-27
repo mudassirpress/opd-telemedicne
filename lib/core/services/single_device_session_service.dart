@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:telemedicine/auth/auth_screen/sign_in_screen.dart';
+import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
 import 'package:telemedicine/core/services/device_service.dart';
-import 'package:telemedicine/services/phone_auth_service.dart';
+import 'package:telemedicine/features/auth/data/services/phone_auth_service.dart';
 
 /// Service enforcing strict single-device login per account.
 ///

@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:telemedicine/admin_portal/admin_bottom_nav/admin_portal_wrapper.dart';
-import 'package:telemedicine/auth/auth_provider/user_provider.dart';
-import 'package:telemedicine/auth/auth_screen/expired_patient_screen.dart';
-import 'package:telemedicine/auth/auth_screen/sign_in_screen.dart';
-import 'package:telemedicine/auth/payment/payment_screen.dart';
+import 'package:telemedicine/features/admin/presentation/admin_bottom_nav/admin_portal_wrapper.dart';
+import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
+import 'package:telemedicine/features/auth/presentation/screens/expired_patient_screen.dart';
+import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
+import 'package:telemedicine/features/payments/presentation/screens/payment_screen.dart';
 import 'package:telemedicine/core/utils/toast_utils.dart';
 import 'package:telemedicine/data/models/user_model.dart';
-import 'package:telemedicine/doctor_portal/bottom_nav/doctor_portal_wrapper.dart';
-import 'package:telemedicine/features/patient/patient_portal_wrapper.dart';
+import 'package:telemedicine/features/doctor_portal/presentation/bottom_nav/doctor_portal_wrapper.dart';
+import 'package:telemedicine/features/patients/presentation/patient_portal_wrapper.dart';
 
 /// Destination screens for patient post-login and startup routing.
 enum PatientAuthDestination {

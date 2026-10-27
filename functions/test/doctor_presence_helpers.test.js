@@ -7,7 +7,7 @@ const {
     evaluateDoctorEligibility,
     computeEffectiveStatus,
     buildProbePushPayload,
-} = require("../doctor_presence_helpers");
+} = require("../lib/presence/doctor_presence_helpers.js");
 
 describe("Doctor Presence Helpers", () => {
     it("parseTimestampMillis parses numbers, Dates, Firestore Timestamps and ISO strings", () => {

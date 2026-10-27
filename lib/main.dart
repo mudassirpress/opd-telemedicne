@@ -10,18 +10,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
-import 'package:telemedicine/core/services/fcm_service.dart';
+import 'package:telemedicine/core/services/fcm_token_service.dart';
 import 'package:telemedicine/core/services/incoming_call_coordinator.dart';
 import 'package:telemedicine/core/services/notification_service.dart';
-import 'package:telemedicine/core/theme/app_theme.dart';
-import 'package:telemedicine/features/appointment/appointment_lifecycle_service.dart';
+import 'package:telemedicine/app/theme/app_theme.dart';
+import 'package:telemedicine/features/appointments/presentation/appointment_lifecycle_service.dart';
 import 'package:telemedicine/core/services/smart_launch_coordinator.dart';
 import 'package:workmanager/workmanager.dart';
 import 'firebase_options.dart';
-import 'home_widget/chat_call/call/call_controller/call_controller.dart';
-import 'home_widget/chat_call/chat/chat_controller/chat_controller.dart';
-import 'offline_db/hive_db_service.dart';
-import 'offline_db/offline_chat_service.dart';
+import 'package:telemedicine/features/calls/presentation/controllers/call_controller.dart';
+import 'package:telemedicine/features/chat/presentation/controllers/chat_controller.dart';
+import 'package:telemedicine/data/local/hive_db_service.dart';
+import 'package:telemedicine/data/local/offline_chat_service.dart';
 
 /// Single log funnel for every error handler below, including the ones that
 /// run outside the widget tree (background isolate, Workmanager task).

@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
-import 'package:telemedicine/services/patient_password_reset_service.dart';
+import 'package:telemedicine/features/auth/data/services/patient_password_reset_service.dart';
 
 class PatientRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;

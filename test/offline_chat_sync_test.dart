@@ -11,9 +11,9 @@
 //     account (spec §6 account isolation).
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:telemedicine/home_widget/chat_call/chat/chat_controller/chat_controller.dart';
-import 'package:telemedicine/offline_db/models/offline_chat_message.dart';
-import 'package:telemedicine/offline_db/offline_chat_service.dart';
+import 'package:telemedicine/features/chat/presentation/controllers/chat_controller.dart';
+import 'package:telemedicine/data/local/models/offline_chat_message.dart';
+import 'package:telemedicine/data/local/offline_chat_service.dart';
 
 Map<String, dynamic> _entry({
   required String chatId,

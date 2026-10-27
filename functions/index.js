@@ -9,7 +9,7 @@ const {
     resolveChatNotificationRecipient,
     isUsableImageUrl,
     notificationEventId,
-} = require("./fcm_helpers");
+} = require("./lib/shared/fcm_helpers.js");
 
 admin.initializeApp();
 
@@ -30,11 +30,11 @@ const {
     findAuthorizedAdminRecipients,
     clearStaleFcmToken,
     claimNotificationEvent,
-} = require("./notification_shared");
+} = require("./lib/shared/notification_shared.js");
 const {
     sendIncomingCallNotificationForCall,
     sendCallTerminationNotificationForCall,
-} = require("./call_notification");
+} = require("./lib/calls/call_notification.js");
 
 // True only for failures that are specific to the recipient's registration
 // token. Implementation lives in ./fcm_helpers.js (unit-tested) — in
@@ -2117,13 +2117,13 @@ exports.dispatchNotification = onDocumentCreated("notification_outbox/{id}", asy
 // Secrets bound: OTP_PEPPER (Google Cloud Secret Manager).
 // See patient_password_reset.js for full implementation.
 // ─────────────────────────────────────────────────────────────────────────────
-const patientPasswordReset = require("./patient_password_reset");
+const patientPasswordReset = require("./lib/auth/patient_password_reset.js");
 Object.assign(exports, patientPasswordReset);
-const doctorPresence = require("./doctor_presence");
+const doctorPresence = require("./lib/presence/doctor_presence.js");
 Object.assign(exports, doctorPresence);
-const phoneVerification = require("./phone_verification");
+const phoneVerification = require("./lib/auth/phone_verification.js");
 Object.assign(exports, phoneVerification);
-const doctorProfileHelpers = require("./doctor_profile_helpers");
+const doctorProfileHelpers = require("./lib/doctors/doctor_profile_helpers.js");
 exports.handleDoctorProfileUpdate = doctorProfileHelpers.handleDoctorProfileUpdate;
 exports.sanitizeDoctorProfilePayload = doctorProfileHelpers.sanitizeDoctorProfilePayload;
 

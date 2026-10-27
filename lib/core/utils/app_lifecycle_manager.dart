@@ -1,8 +1,8 @@
 // lib/utils/app_lifecycle_manager.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:telemedicine/auth/auth_provider/user_provider.dart';
-import 'package:telemedicine/auth/user_controller/doctor_controller.dart';
+import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
+import 'package:telemedicine/features/auth/presentation/controllers/doctor_controller.dart';
 
 class AppLifecycleManager extends WidgetsBindingObserver {
   final WidgetRef ref;

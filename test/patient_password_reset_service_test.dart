@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:telemedicine/services/patient_password_reset_service.dart';
+import 'package:telemedicine/features/auth/data/services/patient_password_reset_service.dart';
 
 /// Client-side mirrors of the server rules. The server always re-validates,
 /// so these exist purely for instant UI feedback — they must stay in lockstep

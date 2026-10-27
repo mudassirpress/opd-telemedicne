@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:telemedicine/core/theme/app_theme.dart';
+import 'package:telemedicine/app/theme/app_theme.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 
 // --- ECG Watermark Painter ---

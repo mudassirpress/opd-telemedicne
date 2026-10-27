@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:telemedicine/auth/auth_provider/user_provider.dart';
+import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
 
 /// Helper service to enter and exit guest mode cleanly.
 class GuestModeService {

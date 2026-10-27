@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:telemedicine/core/errors/auth_error_handler.dart';
 import 'package:telemedicine/core/services/notification_service.dart';
-import 'package:telemedicine/core/theme/app_theme.dart';
+import 'package:telemedicine/app/theme/app_theme.dart';
 import 'package:telemedicine/core/utils/toast_utils.dart';
 
 /// Feedback types for standard styling.

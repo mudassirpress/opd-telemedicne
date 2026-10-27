@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:telemedicine/offline_db/offline_doctor_service.dart';
+import 'package:telemedicine/data/local/offline_doctor_service.dart';
 
 void main() {
   group('Bug 1: Hive Doctor Serialization & Timestamp Sanitization', () {

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:telemedicine/data/models/user_model.dart';
 import 'package:telemedicine/shared/widgets/auth_layout.dart';
-import 'package:telemedicine/shared/widgets/custom_textfield.dart';
+import 'package:telemedicine/shared/widgets/custom_text_field.dart';
 
 void main() {
   group('UserModel Gender & copyWith tests', () {
@@ -148,7 +148,7 @@ void main() {
     });
   });
 
-  group('MyTextfield Error Text Placement tests', () {
+  group('CustomTextField Error Text Placement tests', () {
     testWidgets('renders error text outside and below the rounded container',
         (tester) async {
       final formKey = GlobalKey<FormState>();
@@ -159,7 +159,7 @@ void main() {
           home: Scaffold(
             body: Form(
               key: formKey,
-              child: MyTextfield(
+              child: CustomTextField(
                 hintText: 'Enter value',
                 prefixIcon: Icons.edit,
                 controller: controller,

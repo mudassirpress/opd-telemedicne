@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:telemedicine/core/services/doctor_presence_service.dart';
 import 'package:telemedicine/core/utils/firestore_time.dart';
-import 'package:telemedicine/offline_db/offline_doctor_service.dart';
+import 'package:telemedicine/data/local/offline_doctor_service.dart';
 
 /// The serialisation half of the doctor cache, mirrored from
 /// `OfflineDoctorService` so the round-trip can be exercised without booting

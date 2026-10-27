@@ -11,7 +11,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const h = require("../fcm_helpers");
+const h = require("../lib/shared/fcm_helpers.js");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // isUnrecoverableTokenError

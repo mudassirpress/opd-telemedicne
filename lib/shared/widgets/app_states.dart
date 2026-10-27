@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:telemedicine/core/theme/app_theme.dart';
+import 'package:telemedicine/app/theme/app_theme.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 
 /// Consistent loading indicator used across the app.

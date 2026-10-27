@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
-import 'package:telemedicine/services/patient_password_reset_service.dart';
+import 'package:telemedicine/features/auth/data/services/patient_password_reset_service.dart';
 
 /// Value emitted whenever the phone number or country changes.
 class InternationalPhoneValue {

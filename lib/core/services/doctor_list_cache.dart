@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:telemedicine/auth/user_controller/doctor_controller.dart';
-import 'package:telemedicine/offline_db/offline_doctor_service.dart';
+import 'package:telemedicine/features/auth/presentation/controllers/doctor_controller.dart';
+import 'package:telemedicine/data/local/offline_doctor_service.dart';
 
 /// Doctor list served from the local Hive cache, kept current by a background
 /// sync with Firestore.

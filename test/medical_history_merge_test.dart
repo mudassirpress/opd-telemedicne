@@ -8,7 +8,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:telemedicine/data/models/prescription_model.dart';
 import 'package:telemedicine/data/models/report_model.dart';
-import 'package:telemedicine/home_widget/reports/report_history/medical_history_item.dart';
+import 'package:telemedicine/features/reports/presentation/report_history/medical_history_item.dart';
 
 ReportModel report({
   required String id,

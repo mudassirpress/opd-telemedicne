@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:telemedicine/core/utils/firestore_time.dart';
 
 /// Supported payment types across the application.
 abstract class PaymentType {
