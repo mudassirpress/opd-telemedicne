@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "161801385551",
+    "firebase_url": "https://opd-telemedicine-default-rtdb.firebaseio.com",
+    "project_id": "opd-telemedicine",
+    "storage_bucket": "opd-telemedicine.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:161801385551:android:a99b5dbf3ca103b3899c3a",
+        "android_client_info": {
+          "package_name": "com.opdonline.telemedicine"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDHmJtdkQ3BGcpzVpPRVjJfqBMkHLPySDk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

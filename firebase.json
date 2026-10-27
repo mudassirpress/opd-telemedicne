@@ -1,0 +1,23 @@
+{
+  "firestore": {
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "functions": {
+    "source": "functions"
+  },
+  "emulators": {
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": false
+    }
+  },
+  "flutter":{"platforms":{"android":{"default":{"projectId":"opd-telemedicine","appId":"1:161801385551:android:a99b5dbf3ca103b3899c3a","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"opd-telemedicine","configurations":{"android":"1:161801385551:android:a99b5dbf3ca103b3899c3a","ios":"1:161801385551:ios:a629dad57fa470cd899c3a","macos":"1:161801385551:ios:a629dad57fa470cd899c3a","web":"1:161801385551:web:281958674c86abf5899c3a","windows":"1:161801385551:web:28c1c8463d095c3a899c3a"}}}}}
+}

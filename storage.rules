@@ -1,0 +1,119 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' ||
+        firestore.exists(/databases/(default)/documents/telemedicine_admin/$(request.auth.uid))
+      );
+    }
+
+    function isDoctor() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'doctor' ||
+        firestore.exists(/databases/(default)/documents/telemedicine_doctors/$(request.auth.uid))
+      );
+    }
+
+    function isPatient() {
+      return isAuthenticated() && (
+        firestore.exists(/databases/(default)/documents/telemedicine_patient/$(request.auth.uid))
+      );
+    }
+
+    function isValidFileSize(maxMegaBytes) {
+      return request.resource.size < maxMegaBytes * 1024 * 1024;
+    }
+
+    function isImageFile() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function isAudioFile() {
+      return request.resource.contentType.matches('audio/.*');
+    }
+
+    // ── Patient Profiles ─────────────────────────────────────────────────────
+    match /patients/{patientUid}/profile/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if (isOwner(patientUid) || isAdmin()) &&
+                     isImageFile() &&
+                     isValidFileSize(10);
+    }
+
+    // ── Doctor Profiles ──────────────────────────────────────────────────────
+    match /doctors/{doctorUid}/profile/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if (isOwner(doctorUid) || isAdmin()) &&
+                     isImageFile() &&
+                     isValidFileSize(10);
+    }
+
+    // ── Payment Proofs (Account Activation / Reactivation) ───────────────────
+    // Strictly private: readable only by the uploading patient or admin
+    match /payment_proofs/{patientUid}/{paymentId}/{fileName} {
+      allow read: if isOwner(patientUid) || isAdmin();
+      allow create, update: if (isOwner(patientUid) || isAdmin()) &&
+                               isValidFileSize(15);
+      allow delete: if isAdmin();
+    }
+
+    // ── Appointment Payment Proofs ───────────────────────────────────────────
+    match /appointments/{appointmentId}/payment_proofs/{fileName} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isValidFileSize(15);
+      allow delete: if isAdmin();
+    }
+
+    // ── Chat Attachments (Images, Documents, Media) ──────────────────────────
+    match /chat_attachments/{conversationId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isValidFileSize(50);
+      allow delete: if isAuthenticated();
+    }
+
+    // ── Chat Voice Messages ──────────────────────────────────────────────────
+    match /chat_voice/{conversationId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isValidFileSize(25);
+      allow delete: if isAuthenticated();
+    }
+
+    // ── Medical / Lab Reports ────────────────────────────────────────────────
+    match /reports/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow create, update: if (isOwner(userId) || isDoctor() || isAdmin()) &&
+                               isValidFileSize(30);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // ── Call Recordings ──────────────────────────────────────────────────────
+    match /call_recordings/{conversationId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isValidFileSize(50);
+      allow delete: if isAuthenticated();
+    }
+
+    // ── Admin Uploads ────────────────────────────────────────────────────────
+    match /admin_uploads/{adminUid}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Default deny all others
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

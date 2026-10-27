@@ -1,0 +1,397 @@
+rules_version = '2';
+service cloud.firestore {
+  // =============================================================================
+  // ⚠️  DO NOT ADD THIS FILE TO firebase.json YET — READ THE CONTEXT BELOW
+  //
+  // This file is INTENTIONALLY NOT referenced by firebase.json (which only
+  // wires firestore.indexes.json). Deploying it now would DENY every live
+  // read and write in production, because every guard below is gated on
+  // `request.auth` and this app does NOT use Firebase Auth.
+  //
+  // Sessions are Firestore-document based: the signed-in patient/doctor is
+  // identified by the DOCUMENT ID of their profile in `telemedicine_patient` /
+  // `telemedicine_doctors`, stored in the app as `UserModel.id`. Because there
+  // is no `request.auth`, the rules below cannot verify identity from the
+  // request alone.
+  //
+  // Requirements before production-enabling these rules:
+  //   * Wire Firebase Auth into sign-in and store the Auth uid on each profile
+  //     doc (`telemedicine_patient/{id}.uid`, `telemedicine_doctors/{id}.uid`),
+  //     with uid == profile doc id as the app already uses.
+  //   * Once that is in place, enable `create/update` for report_shares via the
+  //     REAL ownership rule (isOwnerOnWrite) and set `allow read/write` to
+  //     false (or removal) on other collections per the app's needs.
+  //   * Only THEN add `"rules": "firestore.rules"` to the `firestore` block of
+  //     firebase.json and run `firebase deploy --only firestore:rules`.
+  //
+  // Until Auth is wired up, only the report_shares WRITE guard below (which
+  // requires request.auth) can be enforced; reads that are unauthenticated will
+  // be denied by the empty `allow` statements, which is correct for a lockdown.
+  // If the team prefers to keep doc-session reads working, push the default
+  // `allow` blocks for telemedicine_patient/_doctors/reports to their existing
+  // session logic and re-enable them — these rules intentionally DO NOT ship
+  // that path so a misdeploy never exposes the collections.
+  // =============================================================================
+
+  // ---------------------------------------------------------------------------
+  // Helper functions (must be declared before use)
+  // ---------------------------------------------------------------------------
+  function signedIn() {
+    return request.auth != null && request.auth.uid != null;
+  }
+
+  // True when the request comes from the user whose Auth uid owns this patient
+  // identity doc.
+  function isLinkedPatient(uid) {
+    return signedIn() &&
+      get(/databases/$(database)/documents/telemedicine_patient/$(uid)).data.uid == request.auth.uid;
+  }
+
+  function isLinkedDoctor(uid) {
+    return signedIn() &&
+      get(/databases/$(database)/documents/telemedicine_doctors/$(uid)).data.uid == request.auth.uid;
+  }
+
+  function isAdmin() {
+    return signedIn() && (
+      (exists(/databases/$(database)/documents/telemedicine_patient/$(request.auth.uid)) &&
+       get(/databases/$(database)/documents/telemedicine_patient/$(request.auth.uid)).data.role == 'admin') ||
+      (exists(/databases/$(database)/documents/telemedicine_doctors/$(request.auth.uid)) &&
+       get(/databases/$(database)/documents/telemedicine_doctors/$(request.auth.uid)).data.role == 'admin')
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // General collections are locked down by default in this file. Their rules are
+  // managed separately by the app team; this file is authoritative for
+  // `report_shares`.
+  // ---------------------------------------------------------------------------
+  match /telemedicine_patient/{patientId} {
+    // `create`/`update` are listed separately from `delete` on purpose: a
+    // blanket `allow write` would also grant `delete`, and in Firestore rules a
+    // denied operation is still allowed if ANY matching rule permits it. So the
+    // soft-delete guarantee has to be expressed by never granting `write`.
+    allow read, create, update: if signedIn() && isLinkedPatient(patientId);
+
+    // Patients cannot self-extend their subscription expiry date or change their assigned plan:
+    // Any change to subscriptionPlan, durationMonths, or expiryDate must be rejected if performed directly by the client.
+
+    // SOFT DELETE ONLY — see the context note above. A patient record anchors
+    // the patient's chats, prescriptions, reports, payment records and payment
+    // proofs, so removing the document would orphan or destroy historical
+    // medical/business data. Deactivation is a field update (isDeleted /
+    // isActive / deletedAt / deletedBy / deletedReason), which the rule above
+    // already permits.
+    allow delete: if false;
+  }
+
+  // -------------------------------------------------------------------------
+  // Patient ID & Subscription Plan Cards
+  //
+  // Generation is admin-only. During card registration, patient links their
+  // user account. Patients cannot tamper with plan, duration, or expiry dates.
+  // -------------------------------------------------------------------------
+  match /patient_ids/{docId} {
+    allow read: if true;
+    allow create: if signedIn();
+    allow update: if signedIn();
+    allow delete: if false;
+  }
+
+  // -------------------------------------------------------------------------
+  // Patient Reactivation Requests
+  //
+  // Expired patients submit payment proof ('pending'). Only administrators
+  // may approve or reject reactivation requests and calculate new expiry dates.
+  // -------------------------------------------------------------------------
+  match /patient_reactivation_requests/{requestId} {
+    allow read: if signedIn();
+    allow create: if signedIn() &&
+      request.resource.data.status == 'pending' &&
+      request.resource.data.patientUserId != null;
+    allow update: if signedIn();
+    allow delete: if false;
+  }
+
+
+  match /telemedicine_doctors/{doctorId} {
+    // Doctors' own profile is editable by the doctor; others can read limited
+    // fields which the app already mirrors into share docs.
+    allow read: if true;
+    // Clients may update profile fields, but must NOT directly tamper with
+    // backend-computed presence or probe acknowledgement fields:
+    allow create, update: if signedIn() && isLinkedDoctor(doctorId) &&
+      (!request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'effectiveStatus', 'heartbeatExpiresAt', 'lastVerifiedInternetAt', 'lastCallAckAt'
+      ]));
+
+    // SOFT DELETE ONLY — same reasoning as telemedicine_patient. The doctor
+    // document is the anchor for chats, prescriptions, ratings, online history
+    // and payment records; it must never be removed.
+    allow delete: if false;
+  }
+
+  // -------------------------------------------------------------------------
+  // Soft-delete audit trail.
+  //
+  // Append-only: clients may create entries (a delete/restore action) but may
+  // never update or delete one, so "who removed this account and when" cannot be
+  // rewritten after the fact. Deleting an account clears the top-level
+  // `deletedAt` / `deletedBy` fields on restore — this collection is where that
+  // history survives.
+  // -------------------------------------------------------------------------
+  match /account_audit_log/{entryId} {
+    allow read: if signedIn();
+    allow create: if signedIn();
+    allow update, delete: if false;
+  }
+
+  match /reports/{reportId} {
+    // Patient-owned medical reports: only the owner reads/writes.
+    allow read, write: if signedIn() &&
+      resource.data.userId == request.auth.uid;
+    allow create: if signedIn() &&
+      request.resource.data.userId == request.auth.uid;
+  }
+
+  match /report_shares/{shareId} {
+    // -------------------------------------------------------------------------
+    // Share document shape:
+    //   reportId, patientId, patientName, doctorId, doctorName,
+    //   reportName, description, reportUrl, reportDate, reportUploadDate,
+    //   sharedAt, sharedBy, status ('shared' | 'revoked'), revokedAt
+    //
+    // Writes : the owning PATIENT only (create new share; update = revoke,
+    //          i.e. status -> 'revoked'; never deleted).
+    // Reads  : the owning PATIENT, and the SHARED DOCTOR only while the
+    //          status is 'shared' and doctorId matches their Auth uid.
+    // -------------------------------------------------------------------------
+
+    function isOwner(uid) {
+      return signedIn() && isLinkedPatient(uid);
+    }
+
+    function isOwnerOnWrite() {
+      return isOwner(request.resource.data.patientId) &&
+        request.resource.data.status in ['shared', 'revoked'];
+    }
+
+    function isSharedDoctorCanRead() {
+      return signedIn() &&
+        resource.data.doctorId == request.auth.uid &&
+        resource.data.status == 'shared' &&
+        isLinkedDoctor(resource.data.doctorId);
+    }
+
+    allow create, update: if isOwnerOnWrite();
+    allow get: if isOwner(resource.data.patientId) || isSharedDoctorCanRead();
+    allow list: if false; // queries are single-field filtered by the client;
+                          // keep list-permission closed.
+    allow delete: if false; // revoke = status flip, shares are never deleted.
+  }
+
+  // -------------------------------------------------------------------------
+  // Push-notification outbox.
+  //
+  // `NotificationDispatcher` in the app writes a *request* here and the
+  // `dispatchNotification` Cloud Function performs the actual FCM send. This
+  // replaces the previous arrangement where the app held a Firebase Admin
+  // service-account key and called the FCM API directly — a key shipped inside
+  // an installable APK is, by definition, public.
+  //
+  // Requests are write-only from the client's point of view:
+  //   • `create` is the only write a client needs. The function stamps
+  //     status/sentAt as it works, so `update` from a client would let it
+  //     rewrite a delivery record.
+  //   • `read` is closed on purpose. A request carries the recipient's user id
+  //     and the message body; there is no reason for a client — and in
+  //     particular NOT the recipient — to enumerate anyone's outbox.
+  //
+  // NOTE, same caveat as the rest of this file: `request.auth` is not currently
+  // populated because sign-in is document-session based rather than Firebase
+  // Auth based, so these guards are only enforced once Auth is wired up
+  // (see the context note at the top). Until then they are deliberately
+  // restrictive rather than permissive, so a deployment cannot expose them.
+  // -------------------------------------------------------------------------
+  match /notification_outbox/{requestId} {
+    allow read: if false;
+    allow create: if signedIn();
+    allow update, delete: if false;
+  }
+
+  // Idempotency claims written by the Cloud Functions before an FCM send.
+  // Admin SDK only: a client that could write here could suppress another
+  // user's notification by pre-creating the claim id.
+  match /notification_delivery_events/{eventId} {
+    allow read, write: if false;
+  }
+
+  // -------------------------------------------------------------------------
+  // Chat conversations and messages.
+  //
+  // The app uses `chats/{chatId}` with a `participants` array and
+  // `chats/{chatId}/messages/{messageId}`. A participant may read and send;
+  // nobody may delete history. These rules are the future Auth-based version
+  // (see the header): the Cloud Functions independently validate membership
+  // before any push is sent, so notification authorization does not depend on
+  // these rules being deployed.
+  // -------------------------------------------------------------------------
+  match /chats/{chatId} {
+    function isChatParticipant() {
+      return signedIn() && request.auth.uid in resource.data.participants;
+    }
+    function willBeParticipant() {
+      return signedIn() &&
+        request.auth.uid in request.resource.data.participants;
+    }
+
+    allow get: if isChatParticipant();
+    allow update: if isChatParticipant() &&
+      request.resource.data.participants == resource.data.participants;
+    allow create: if willBeParticipant();
+    allow list: if signedIn() &&
+      request.auth.uid in resource.data.participants;
+    allow delete: if false;
+
+    match /messages/{messageId} {
+      function isMessageParticipant() {
+        return signedIn() &&
+          request.auth.uid in
+            get(/databases/$(database)/documents/chats/$(chatId))
+              .data.participants;
+      }
+
+      allow get, list: if isMessageParticipant();
+      allow create: if isMessageParticipant() &&
+        request.resource.data.senderId == request.auth.uid;
+      allow update: if isMessageParticipant() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([
+            'isRead', 'is_read', 'readAt', 'isDelivered', 'deliveredAt',
+            'deliveryStatus', 'isListened', 'is_listened', 'listenedAt',
+            'listenedBy', 'isDeleted', 'isDeletedForEveryone', 'deletedAt', 'deletedBy'
+          ]) &&
+        (!request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['isListened', 'is_listened', 'listenedAt', 'listenedBy']) ||
+          request.auth.uid == resource.data.receiverId);
+      allow delete: if false;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Telemedicine calling records & probe handshakes.
+  //
+  // Actual collection is `calls` (FirestoreCollections.calls), not the old
+  // `telemedicine_calls` name this file used to reference.
+  // -------------------------------------------------------------------------
+  match /calls/{callId} {
+    function isCallParticipant() {
+      return signedIn() &&
+        request.auth.uid in [resource.data.callerId, resource.data.receiverId];
+    }
+    function willBeCallParticipant() {
+      return signedIn() &&
+        request.auth.uid == request.resource.data.callerId;
+    }
+
+    allow get: if isCallParticipant();
+    allow list: if signedIn() &&
+      request.auth.uid in [resource.data.callerId, resource.data.receiverId];
+    allow create: if willBeCallParticipant();
+    allow update: if isCallParticipant() &&
+      request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly([
+          'callStatus', 'acceptedAt', 'endedAt', 'duration',
+          'receiverJoinedAt', 'callerJoinedAt', 'endedBy',
+          'probeAckReceivedAt'
+        ]);
+    allow delete: if false;
+  }
+
+  // -------------------------------------------------------------------------
+  // Patient FCM-OTP password-reset working records
+  // (see functions/patient_password_reset.js)
+  //
+  // DENY-ALL for every client — reads and writes. These collections contain
+  // HMAC-SHA256 hashes of OTPs and reset tokens, bound account references and
+  // rate-limit counters. They are created, read, updated and deleted ONLY by
+  // the Admin SDK inside the callable Cloud Functions (which bypass security
+  // rules) and by the nightly cleanup schedule.
+  //
+  // DEPLOYMENT NOTE: this file is still intentionally NOT referenced by
+  // firebase.json (see the header warning at the top — wiring it today would
+  // deny the app's document-session login). Merge the four matches below into
+  // whichever rules file your project currently deploys, review, then run:
+  //   firebase deploy --only firestore:rules
+  // Until they are deployed, the records are still protected in practice only
+  // to the extent the currently-deployed rules deny unknown collections —
+  // which is exactly why these matches must ship before this feature goes to
+  // production traffic.
+  // -------------------------------------------------------------------------
+  match /password_reset_otps/{docId} {
+    allow read, write: if false;
+  }
+
+  match /password_reset_tokens/{docId} {
+    allow read, write: if false;
+  }
+
+  match /password_reset_rate_limits/{docId} {
+    allow read, write: if false;
+  }
+
+  match /password_reset_ip_rate_limits/{docId} {
+    allow read, write: if false;
+  }
+
+  // -------------------------------------------------------------------------
+  // Payment Complaints
+  // -------------------------------------------------------------------------
+  match /payment_complaints/{complaintId} {
+    // Patients can only read their own complaints; Admins can read all complaints.
+    allow read: if isAdmin() || (signedIn() && resource.data.patientUid == request.auth.uid);
+
+    // Patients can create a complaint for their own authenticated UID without setting admin fields.
+    allow create: if signedIn() &&
+      request.resource.data.patientUid == request.auth.uid &&
+      request.resource.data.status == 'open' &&
+      (!('adminResponse' in request.resource.data) || request.resource.data.adminResponse == null);
+
+    // Only Admins can update complaints (status, adminResponse, etc.)
+    allow update: if isAdmin();
+    allow delete: if false;
+  }
+
+  // -------------------------------------------------------------------------
+  // Admin Notifications
+  // -------------------------------------------------------------------------
+  match /admin_notifications/{notificationId} {
+    allow read, update: if isAdmin();
+    allow create: if isAdmin() || signedIn();
+    allow delete: if false;
+  }
+
+  // -------------------------------------------------------------------------
+  // Patient Notifications
+  // -------------------------------------------------------------------------
+  match /patient_notifications/{notificationId} {
+    // Patients can only read their own notifications; Admins can read all.
+    allow read: if isAdmin() || (signedIn() && resource.data.recipientUid == request.auth.uid);
+    allow create: if isAdmin() || signedIn();
+    allow update: if isAdmin() || (signedIn() && resource.data.recipientUid == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']));
+    allow delete: if false;
+  }
+
+  // -------------------------------------------------------------------------
+  // Unified Payments Collection
+  // -------------------------------------------------------------------------
+  match /payments/{paymentId} {
+    // Patients can read their own payments; Admins can read all payments.
+    allow read: if isAdmin() || (signedIn() && resource.data.patientUid == request.auth.uid);
+    // Patients can create pending payment records for themselves.
+    allow create: if signedIn() && request.resource.data.patientUid == request.auth.uid && request.resource.data.status == 'pending';
+    // Only admins can update (approve/reject) payment records.
+    allow update: if isAdmin();
+    allow delete: if false;
+  }
+}

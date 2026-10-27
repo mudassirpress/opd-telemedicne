@@ -1,0 +1,122 @@
+name: telemedicine
+description: OPD Telemedicine - patient/doctor chat, call and report management app.
+publish_to: 'none'
+
+version: 1.0.8+8
+
+environment:
+  sdk: '>=3.9.0 <4.0.0'
+  flutter: '>=3.47.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase
+  firebase_core: 3.15.2
+  firebase_auth: 5.7.0
+  firebase_messaging: 15.2.10
+  cloud_firestore: 5.6.12
+  firebase_storage: ^12.4.10
+
+  # State management
+  flutter_riverpod: 2.6.1
+
+  # Persistent storage
+  shared_preferences: 2.5.5
+  hive: 2.2.3
+  hive_flutter: 1.1.0
+  flutter_secure_storage: 10.3.2
+
+  # Calling
+  #
+  # NOTE: flutter_callkit_incoming was removed. It rendered its own native
+  # incoming-call heads-up notification with its own Accept/Decline buttons,
+  # *in addition to* the app's notification, and those buttons ran a second
+  # independent accept implementation. That was one of the two sources of the
+  # duplicate incoming-call notification and the broken Accept/Decline buttons.
+  # The app now uses exactly one incoming-call notification
+  # (flutter_local_notifications, channel `call_notifications`) and one
+  # Incoming Call screen.
+  zego_express_engine: 3.25.0
+
+  # Voice / audio
+  audioplayers: 6.8.1
+  audio_video_progress_bar: 2.0.3
+  just_audio: 0.10.6
+  flutter_sound: 9.30.0
+  record: 6.2.1
+
+  # Video
+  chewie: 1.13.1
+
+  # UI
+  cached_network_image: 3.4.1
+  shimmer: 3.0.0
+  flutter_screenutil: 5.9.3
+  cupertino_icons: 1.0.9
+  fluttertoast: 9.1.0
+
+  # Picker / files / images
+  image_picker: 1.2.3
+  image_cropper: 12.2.1
+  file_picker: 11.0.3
+  open_file: 3.5.11
+  flutter_pdfview: 1.4.5
+
+  # Network
+  http: 1.6.0
+
+
+  # Utilities
+  uuid: ^4.6.0
+  intl: 0.20.3
+  crypto: ^3.0.7
+  pointycastle: 4.0.0
+  bson: 5.0.8
+  path_provider: 2.1.6
+  device_info_plus: 12.4.0
+  connectivity_plus: 5.0.2
+  permission_handler: 11.4.0
+  workmanager: 0.9.3
+  android_intent_plus: 4.0.3
+  url_launcher: 6.3.2
+  share_plus: 12.0.2
+  package_info_plus: 9.0.1
+  flutter_local_notifications: 20.1.0
+  email_validator: 3.0.0
+
+  # Charts / export
+  syncfusion_flutter_charts: 33.2.15
+  syncfusion_flutter_xlsio: 33.2.13
+
+  # Launcher icons (generation tool config lives below)
+  flutter_launcher_icons: 0.14.4
+
+  # Misc (present in the original resolution)
+  gestures: 1.0.0
+  schedules: 1.3.0
+  gal: ^2.3.3
+  cloud_functions: ^5.6.2
+  intl_phone_number_input: 0.7.5
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: 5.0.0
+  build_runner: 2.4.13
+  hive_generator: 2.0.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/sound/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/app_icon.png"
+  remove_alpha_ios: true
