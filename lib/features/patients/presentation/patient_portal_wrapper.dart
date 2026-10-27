@@ -90,10 +90,7 @@ class _PatientPortalWrapperState extends ConsumerState<PatientPortalWrapper> {
       },
       child: Scaffold(
         backgroundColor: AdminPalette.background,
-        body: IndexedStack(
-          index: currentTab.navIndex,
-          children: _screens,
-        ),
+        body: IndexedStack(index: currentTab.navIndex, children: _screens),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -169,7 +166,8 @@ class _PatientPortalWrapperState extends ConsumerState<PatientPortalWrapper> {
     final isSelected = ref.watch(patientPortalTabProvider) == tab;
 
     return GestureDetector(
-      onTap: onTap ??
+      onTap:
+          onTap ??
           () => ref.read(patientPortalTabProvider.notifier).state = tab,
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
@@ -210,8 +208,7 @@ class _PatientPortalWrapperState extends ConsumerState<PatientPortalWrapper> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: context.fs(11),
-                  fontWeight:
-                      isSelected ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   color: isSelected ? Colors.white : AdminPalette.textMuted,
                 ),
               ),

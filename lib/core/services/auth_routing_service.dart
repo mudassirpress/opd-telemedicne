@@ -94,14 +94,8 @@ class AuthRoutingService {
         break;
 
       case PatientAuthDestination.paymentProof:
-        ToastService.instance.showInfo(
-          'Please complete payment to continue',
-        );
-        _navigate(
-          context,
-          const PaymentScreen(),
-          clearStack: clearStack,
-        );
+        ToastService.instance.showInfo('Please complete payment to continue');
+        _navigate(context, const PaymentScreen(), clearStack: clearStack);
         break;
     }
   }
@@ -117,9 +111,9 @@ class AuthRoutingService {
         (Route<dynamic> route) => false,
       );
     } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => targetScreen),
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => targetScreen));
     }
   }
 }

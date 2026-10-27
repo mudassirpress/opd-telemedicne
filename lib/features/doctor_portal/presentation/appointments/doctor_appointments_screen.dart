@@ -39,10 +39,9 @@ class _DoctorAppointmentsScreenState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(userProvider);
       if (user != null && user.role == UserRoles.doctor) {
-        ref.read(appointmentControllerProvider).finalizeExpiredAppointments(
-              userId: user.id,
-              isDoctor: true,
-            );
+        ref
+            .read(appointmentControllerProvider)
+            .finalizeExpiredAppointments(userId: user.id, isDoctor: true);
       }
     });
   }
@@ -65,8 +64,7 @@ class _DoctorAppointmentsScreenState
       case 'live':
         return AppointmentStatus.isOpen(appointment.appointmentStatus) &&
             (appointment.appointmentStatus == AppointmentStatus.active ||
-                AppointmentPhase.isLive(
-                    appointmentDisplayPhase(appointment)));
+                AppointmentPhase.isLive(appointmentDisplayPhase(appointment)));
       default:
         return appointment.appointmentStatus == _filter;
     }
@@ -95,7 +93,12 @@ class _DoctorAppointmentsScreenState
             child: Column(
               children: [
                 Padding(
-                  padding: EdgeInsets.fromLTRB(context.rsp(20), 14, context.rsp(20), 0),
+                  padding: EdgeInsets.fromLTRB(
+                    context.rsp(20),
+                    14,
+                    context.rsp(20),
+                    0,
+                  ),
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 440),
@@ -171,12 +174,12 @@ class _DoctorAppointmentsScreenState
                                   ..sort((a, b) {
                                     bool isLive(AppointmentModel a) =>
                                         a.appointmentStatus ==
-                                                AppointmentStatus.active ||
-                                            (a.isConfirmed &&
-                                                a.hasSchedule &&
-                                                AppointmentPhase.isLive(
-                                                    appointmentDisplayPhase(
-                                                        a)));
+                                            AppointmentStatus.active ||
+                                        (a.isConfirmed &&
+                                            a.hasSchedule &&
+                                            AppointmentPhase.isLive(
+                                              appointmentDisplayPhase(a),
+                                            ));
                                     final aLive = isLive(a);
                                     final bLive = isLive(b);
                                     if (aLive != bLive) return aLive ? -1 : 1;
@@ -196,12 +199,11 @@ class _DoctorAppointmentsScreenState
                                 title: _filter == AppointmentStatus.requested
                                     ? 'No pending requests'
                                     : 'Nothing here yet',
-                                subtitle: _filter ==
-                                        AppointmentStatus.requested
+                                subtitle: _filter == AppointmentStatus.requested
                                     ? 'New appointment requests from patients '
-                                        'will appear in this list.'
+                                          'will appear in this list.'
                                     : 'Appointments will show up here as they '
-                                        'move through their lifecycle.',
+                                          'move through their lifecycle.',
                               );
                             }
 
@@ -211,9 +213,8 @@ class _DoctorAppointmentsScreenState
                               itemCount: filtered.length,
                               separatorBuilder: (_, __) =>
                                   const SizedBox(height: 12),
-                              itemBuilder: (context, index) => _AppointmentRow(
-                                appointment: filtered[index],
-                              ),
+                              itemBuilder: (context, index) =>
+                                  _AppointmentRow(appointment: filtered[index]),
                             );
                           },
                         ),
@@ -252,13 +253,12 @@ class _AppointmentRow extends ConsumerWidget {
         : appointment.patientName;
     final actionable = appointment.isRequested && !appointment.hasSchedule;
     final phase = appointmentDisplayPhase(appointment);
-    final joinable =
-        showAppointmentJoinAction(appointment, asDoctor: true);
-    final canComplete = appointment.isConfirmed &&
+    final joinable = showAppointmentJoinAction(appointment, asDoctor: true);
+    final canComplete =
+        appointment.isConfirmed &&
         appointment.hasPatientJoined &&
         appointment.hasDoctorJoined;
-    final canCancel =
-        showAppointmentCancelAction(appointment, asDoctor: true);
+    final canCancel = showAppointmentCancelAction(appointment, asDoctor: true);
 
     return OpdCard(
       padding: const EdgeInsets.all(16),
@@ -267,20 +267,19 @@ class _AppointmentRow extends ConsumerWidget {
       // lifecycle actions live.
       onTap: actionable
           ? () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      ConfirmAppointmentScreen(appointment: appointment),
-                ),
-              )
-          : () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AppointmentDetailScreen(
-                    appointmentId: appointment.id,
-                  ),
-                ),
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    ConfirmAppointmentScreen(appointment: appointment),
               ),
+            )
+          : () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    AppointmentDetailScreen(appointmentId: appointment.id),
+              ),
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -289,8 +288,9 @@ class _AppointmentRow extends ConsumerWidget {
               CircleAvatar(
                 radius: 24,
                 backgroundColor: const Color(0xFFF0F4FA),
-                backgroundImage:
-                    image.isNotEmpty ? CachedNetworkImageProvider(image) : null,
+                backgroundImage: image.isNotEmpty
+                    ? CachedNetworkImageProvider(image)
+                    : null,
                 child: image.isEmpty
                     ? Text(
                         name[0].toUpperCase(),
@@ -445,8 +445,10 @@ class _AppointmentRow extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: const Icon(Icons.check_circle_outline_rounded,
-                        size: 16),
+                    icon: const Icon(
+                      Icons.check_circle_outline_rounded,
+                      size: 16,
+                    ),
                     label: Text(
                       'Complete',
                       style: TextStyle(
@@ -490,12 +492,13 @@ class _AppointmentRow extends ConsumerWidget {
     final user = ref.read(userProvider);
     if (user == null) return;
 
-    final error =
-        await ref.read(appointmentControllerProvider).markAppointmentJoined(
-              appointment: appointment,
-              actorId: user.id,
-              asDoctor: true,
-            );
+    final error = await ref
+        .read(appointmentControllerProvider)
+        .markAppointmentJoined(
+          appointment: appointment,
+          actorId: user.id,
+          asDoctor: true,
+        );
     if (error != null) {
       ToastService.instance.showError(error);
       return;
@@ -523,12 +526,13 @@ class _AppointmentRow extends ConsumerWidget {
   Future<void> _complete(BuildContext context, WidgetRef ref) async {
     final user = ref.read(userProvider);
     if (user == null) return;
-    final error =
-        await ref.read(appointmentControllerProvider).completeAppointment(
-              appointment: appointment,
-              actorId: user.id,
-              actorRole: AppointmentActors.doctor,
-            );
+    final error = await ref
+        .read(appointmentControllerProvider)
+        .completeAppointment(
+          appointment: appointment,
+          actorId: user.id,
+          actorRole: AppointmentActors.doctor,
+        );
     if (error != null) {
       ToastService.instance.showError(error);
       return;

@@ -148,13 +148,10 @@ final medicalHistoryProvider =
       // forever with no error and no empty state.
       emit();
 
-      final reportSub = reportController.getUserReports().listen(
-        (items) {
-          reportItems = items;
-          emit();
-        },
-        onError: (Object e, StackTrace s) => onError(e, s, 'reports'),
-      );
+      final reportSub = reportController.getUserReports().listen((items) {
+        reportItems = items;
+        emit();
+      }, onError: (Object e, StackTrace s) => onError(e, s, 'reports'));
 
       final prescriptionSub = prescriptionController
           .streamForPatient(userId)

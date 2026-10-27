@@ -19,17 +19,18 @@ const String _kLastViewedAppointmentsPrefix = 'last_viewed_appointments_';
 const String _kLastViewedReportsPrefix = 'last_viewed_reports_';
 
 /// Local epoch state for viewed appointments to support optimistic badge clearing
-final appointmentsViewedEpochProvider =
-    StateProvider.autoDispose.family<int, String>((ref, userId) => 0);
+final appointmentsViewedEpochProvider = StateProvider.autoDispose
+    .family<int, String>((ref, userId) => 0);
 
 /// Local epoch state for viewed reports to support optimistic badge clearing
-final reportsViewedEpochProvider =
-    StateProvider.autoDispose.family<int, String>((ref, userId) => 0);
+final reportsViewedEpochProvider = StateProvider.autoDispose
+    .family<int, String>((ref, userId) => 0);
 
 /// Set of chat IDs that have been marked read locally/optimistically in the current session.
 /// Enables 0ms reactive badge decrement when a conversation is opened.
-final locallyReadChatIdsProvider =
-    StateProvider.autoDispose<Set<String>>((ref) => <String>{});
+final locallyReadChatIdsProvider = StateProvider.autoDispose<Set<String>>(
+  (ref) => <String>{},
+);
 
 /// Immediately clears the badge count for [chatId] optimistically and triggers sync
 /// without waiting for a server round-trip or full app restart.
@@ -90,8 +91,9 @@ final unreadChatCountProvider = StreamProvider.autoDispose<int>((ref) async* {
 /// For Doctor: counts appointments with status 'requested' (awaiting action)
 ///             or scheduled/created after last view time.
 /// For Patient: counts appointments newly scheduled or updated after last view time.
-final unreadAppointmentsCountProvider =
-    StreamProvider.autoDispose<int>((ref) async* {
+final unreadAppointmentsCountProvider = StreamProvider.autoDispose<int>((
+  ref,
+) async* {
   final user = ref.watch(userProvider);
   if (user == null || user.id.isEmpty) {
     yield 0;
@@ -100,12 +102,14 @@ final unreadAppointmentsCountProvider =
 
   // Load initial stored timestamp from SharedPreferences
   final prefs = await SharedPreferences.getInstance();
-  final storedEpoch = prefs.getInt('$_kLastViewedAppointmentsPrefix${user.id}') ?? 0;
+  final storedEpoch =
+      prefs.getInt('$_kLastViewedAppointmentsPrefix${user.id}') ?? 0;
   final localEpoch = ref.watch(appointmentsViewedEpochProvider(user.id));
   final effectiveEpoch = localEpoch > storedEpoch ? localEpoch : storedEpoch;
 
   final appointmentsAsync = ref.watch(myAppointmentsProvider);
-  final appointments = appointmentsAsync.valueOrNull ?? const <AppointmentModel>[];
+  final appointments =
+      appointmentsAsync.valueOrNull ?? const <AppointmentModel>[];
 
   if (user.role == UserRoles.doctor) {
     // For doctor: pending appointment requests awaiting confirmation,
@@ -115,16 +119,19 @@ final unreadAppointmentsCountProvider =
         return true;
       }
       final createdEpoch = a.createdAt?.millisecondsSinceEpoch ?? 0;
-      return createdEpoch > effectiveEpoch && AppointmentStatus.isOpen(a.appointmentStatus);
+      return createdEpoch > effectiveEpoch &&
+          AppointmentStatus.isOpen(a.appointmentStatus);
     }).length;
     yield pendingActionCount;
   } else {
     // For patient: appointments newly scheduled or created after the last view timestamp.
     final unviewedCount = appointments.where((a) {
-      final updatedEpoch = a.updatedAt?.millisecondsSinceEpoch ??
+      final updatedEpoch =
+          a.updatedAt?.millisecondsSinceEpoch ??
           a.createdAt?.millisecondsSinceEpoch ??
           0;
-      return updatedEpoch > effectiveEpoch && AppointmentStatus.isOpen(a.appointmentStatus);
+      return updatedEpoch > effectiveEpoch &&
+          AppointmentStatus.isOpen(a.appointmentStatus);
     }).length;
     yield unviewedCount;
   }
@@ -148,7 +155,9 @@ Future<void> markAppointmentsAsViewed(WidgetRef ref) async {
 
 /// Unread badge indicating newly shared diagnostic reports, lab results,
 /// or prescription updates.
-final unreadReportsCountProvider = StreamProvider.autoDispose<int>((ref) async* {
+final unreadReportsCountProvider = StreamProvider.autoDispose<int>((
+  ref,
+) async* {
   final user = ref.watch(userProvider);
   if (user == null || user.id.isEmpty) {
     yield 0;
@@ -162,7 +171,9 @@ final unreadReportsCountProvider = StreamProvider.autoDispose<int>((ref) async* 
 
   if (user.role == UserRoles.doctor) {
     // For doctor: watch active shared reports and count those shared after effectiveEpoch
-    final stream = ref.read(reportShareControllerProvider).streamDoctorSharedReports(user.id);
+    final stream = ref
+        .read(reportShareControllerProvider)
+        .streamDoctorSharedReports(user.id);
     await for (final reports in stream) {
       final unviewed = reports.where((r) {
         final sharedEpoch = r.sharedAt.millisecondsSinceEpoch;
@@ -172,7 +183,9 @@ final unreadReportsCountProvider = StreamProvider.autoDispose<int>((ref) async* 
     }
   } else {
     // For patient: watch prescriptions issued to the patient
-    final stream = ref.read(prescriptionControllerProvider).streamForPatient(user.id);
+    final stream = ref
+        .read(prescriptionControllerProvider)
+        .streamForPatient(user.id);
     await for (final prescriptions in stream) {
       final unviewed = prescriptions.where((p) {
         final createdEpoch = p.createdAt.millisecondsSinceEpoch;
@@ -204,11 +217,14 @@ Future<void> markReportsAsViewed(WidgetRef ref) async {
 final adminPendingPaymentsCountProvider = Provider.autoDispose<int>((ref) {
   final appointmentPayments =
       ref.watch(appointmentPaymentsProvider).valueOrNull ??
-          const <AppointmentPaymentModel>[];
-  final pendingAppointmentPayments =
-      appointmentPayments.where((p) => p.isPending).length;
+      const <AppointmentPaymentModel>[];
+  final pendingAppointmentPayments = appointmentPayments
+      .where((p) => p.isPending)
+      .length;
 
-  final accountPaymentsAsync = ref.watch(_adminPendingAccountPaymentsStreamProvider);
+  final accountPaymentsAsync = ref.watch(
+    _adminPendingAccountPaymentsStreamProvider,
+  );
   final pendingAccountPayments = accountPaymentsAsync.valueOrNull?.length ?? 0;
 
   return pendingAppointmentPayments + pendingAccountPayments;
@@ -217,30 +233,37 @@ final adminPendingPaymentsCountProvider = Provider.autoDispose<int>((ref) {
 /// Internal stream for pending account payments
 final _adminPendingAccountPaymentsStreamProvider =
     StreamProvider.autoDispose<List<UserModel>>((ref) {
-  return ref
-      .read(patientControllerProvider)
-      .getFilteredPaymentRequests(PaymentStatus.pending);
-});
+      return ref
+          .read(patientControllerProvider)
+          .getFilteredPaymentRequests(PaymentStatus.pending);
+    });
 
 /// Total appointments booked that are pending confirmation or currently active/incomplete.
 final adminPendingAppointmentsCountProvider = Provider.autoDispose<int>((ref) {
   final appointments =
       ref.watch(allAppointmentsProvider).valueOrNull ??
-          const <AppointmentModel>[];
+      const <AppointmentModel>[];
   return appointments
-      .where((a) =>
-          a.appointmentStatus == AppointmentStatus.requested ||
-          AppointmentStatus.isOpen(a.appointmentStatus))
+      .where(
+        (a) =>
+            a.appointmentStatus == AppointmentStatus.requested ||
+            AppointmentStatus.isOpen(a.appointmentStatus),
+      )
       .length;
 });
+
 /// Total reactivation requests awaiting admin sign-off.
-final adminPendingReactivationsCountProvider =
-    StreamProvider.autoDispose<int>((ref) {
+final adminPendingReactivationsCountProvider = StreamProvider.autoDispose<int>((
+  ref,
+) {
   return ref
       .read(patientControllerProvider)
       .getReactivationRequests()
-      .map((requests) =>
-          requests.where((r) => (r['status'] ?? '').toString() == 'pending').length);
+      .map(
+        (requests) => requests
+            .where((r) => (r['status'] ?? '').toString() == 'pending')
+            .length,
+      );
 });
 
 /// Aggregate pending count for Admin "More" tab (payment proofs + reactivations + complaints).
@@ -252,4 +275,3 @@ final adminMoreMenuBadgeCountProvider = Provider.autoDispose<int>((ref) {
       ref.watch(adminUnreadNotificationsCountProvider).valueOrNull ?? 0;
   return pendingPayments + pendingReactivations + unreadNotifications;
 });
-

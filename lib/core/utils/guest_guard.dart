@@ -56,7 +56,10 @@ class GuestGuard {
             ),
             child: const Text(
               'Sign In',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],

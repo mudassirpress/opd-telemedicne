@@ -16,7 +16,8 @@ class CreateDoctorIdScreen extends ConsumerStatefulWidget {
   const CreateDoctorIdScreen({super.key});
 
   @override
-  ConsumerState<CreateDoctorIdScreen> createState() => _CreateDoctorIdScreenState();
+  ConsumerState<CreateDoctorIdScreen> createState() =>
+      _CreateDoctorIdScreenState();
 }
 
 class _CreateDoctorIdScreenState extends ConsumerState<CreateDoctorIdScreen> {
@@ -160,7 +161,9 @@ class _CreateDoctorIdScreenState extends ConsumerState<CreateDoctorIdScreen> {
         isLoading = false;
       });
       HapticFeedback.heavyImpact();
-      ToastService.instance.showError('Something went wrong. Please try again.');
+      ToastService.instance.showError(
+        'Something went wrong. Please try again.',
+      );
     } finally {
       if (mounted) {
         setState(() => isLoading = false);
@@ -513,10 +516,7 @@ class _CreateDoctorIdScreenState extends ConsumerState<CreateDoctorIdScreen> {
                     color: AdminPalette.success.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(
-                    Icons.share,
-                    color: AdminPalette.success,
-                  ),
+                  child: const Icon(Icons.share, color: AdminPalette.success),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -580,10 +580,7 @@ class _CreateDoctorIdScreenState extends ConsumerState<CreateDoctorIdScreen> {
                     ),
                     child: IconButton(
                       onPressed: copyToClipboard,
-                      icon: const Icon(
-                        Icons.copy,
-                        color: AdminPalette.brand,
-                      ),
+                      icon: const Icon(Icons.copy, color: AdminPalette.brand),
                       tooltip: 'Copy ID',
                     ),
                   ),
@@ -639,9 +636,7 @@ class _CreateDoctorIdScreenState extends ConsumerState<CreateDoctorIdScreen> {
         backgroundColor: color,
         foregroundColor: Colors.white,
         padding: EdgeInsets.symmetric(vertical: context.rsp(12)),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 0,
       ),
     );

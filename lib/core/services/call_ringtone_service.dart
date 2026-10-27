@@ -32,7 +32,9 @@ class CallRingtoneService {
     VoidCallback? onTimeout,
   }) async {
     if (_isPlaying) {
-      debugPrint('📞 [CallRingtone] Ringtone already playing — ignoring duplicate start.');
+      debugPrint(
+        '📞 [CallRingtone] Ringtone already playing — ignoring duplicate start.',
+      );
       return;
     }
 
@@ -71,7 +73,9 @@ class CallRingtoneService {
       // Start safety timeout timer
       _timeoutTimer?.cancel();
       _timeoutTimer = Timer(timeout, () {
-        debugPrint('⏰ [CallRingtone] Incoming call timed out after ${timeout.inSeconds}s.');
+        debugPrint(
+          '⏰ [CallRingtone] Incoming call timed out after ${timeout.inSeconds}s.',
+        );
         stopRingtone();
         onTimeout?.call();
       });

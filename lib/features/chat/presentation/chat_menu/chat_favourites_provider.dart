@@ -5,10 +5,7 @@ import 'package:telemedicine/data/local/offline_chat_service.dart';
 /// Resolves the key used to identify a conversation in the favourites store.
 /// Prefers the canonical `chatId` and falls back to the other user's id so
 /// that entries created before a chat document existed still resolve.
-String chatFavouriteKey({
-  String? chatId,
-  String? otherUserId,
-}) {
+String chatFavouriteKey({String? chatId, String? otherUserId}) {
   final id = (chatId ?? '').trim();
   if (id.isNotEmpty) return id;
   return (otherUserId ?? '').trim();
@@ -50,5 +47,5 @@ class ChatFavouritesNotifier extends Notifier<Set<String>> {
 
 final chatFavouritesProvider =
     NotifierProvider<ChatFavouritesNotifier, Set<String>>(
-  ChatFavouritesNotifier.new,
-);
+      ChatFavouritesNotifier.new,
+    );

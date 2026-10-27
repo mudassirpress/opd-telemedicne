@@ -28,7 +28,10 @@ class PatientRepository {
         });
   }
 
-  Future<void> updatePatientOnlineStatus(String patientId, bool isOnline) async {
+  Future<void> updatePatientOnlineStatus(
+    String patientId,
+    bool isOnline,
+  ) async {
     final updateData = <String, dynamic>{
       'isOnline': isOnline,
       'lastSeen': isOnline ? null : FieldValue.serverTimestamp(),
@@ -53,19 +56,24 @@ class PatientRepository {
   }
 
   Future<DocumentSnapshot?> getPatientByPhone(String phoneNumber) async {
-    final variants = PatientPasswordResetService.phoneLookupVariants(phoneNumber);
+    final variants = PatientPasswordResetService.phoneLookupVariants(
+      phoneNumber,
+    );
     final docCheck = await _firestore
         .collection(FirestoreCollections.patients)
         .where('phoneNumber', whereIn: variants)
         .limit(1)
         .get();
-    
+
     if (docCheck.docs.isEmpty) return null;
     return docCheck.docs.first;
   }
 
   Future<DocumentSnapshot?> getPatientById(String id) async {
-    final doc = await _firestore.collection(FirestoreCollections.patients).doc(id).get();
+    final doc = await _firestore
+        .collection(FirestoreCollections.patients)
+        .doc(id)
+        .get();
     if (!doc.exists) return null;
     return doc;
   }
@@ -106,7 +114,9 @@ class PatientRepository {
   }
 
   Future<List<DocumentSnapshot>> getAllPatients() async {
-    final query = await _firestore.collection(FirestoreCollections.patients).get();
+    final query = await _firestore
+        .collection(FirestoreCollections.patients)
+        .get();
     return query.docs;
   }
 }

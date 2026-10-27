@@ -90,11 +90,7 @@ class BadgeIndicator extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         child!,
-        Positioned(
-          top: offset.dy,
-          right: offset.dx,
-          child: badgeWidget,
-        ),
+        Positioned(top: offset.dy, right: offset.dx, child: badgeWidget),
       ],
     );
   }

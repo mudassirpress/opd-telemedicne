@@ -26,10 +26,12 @@ class AdminChatManagementScreen extends ConsumerStatefulWidget {
   const AdminChatManagementScreen({super.key, this.initialDoctorId});
 
   @override
-  ConsumerState<AdminChatManagementScreen> createState() => _AdminChatManagementScreenState();
+  ConsumerState<AdminChatManagementScreen> createState() =>
+      _AdminChatManagementScreenState();
 }
 
-class _AdminChatManagementScreenState extends ConsumerState<AdminChatManagementScreen> {
+class _AdminChatManagementScreenState
+    extends ConsumerState<AdminChatManagementScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   List<Map<String, dynamic>> _doctorProfiles = [];
@@ -252,7 +254,9 @@ class _AdminChatManagementScreenState extends ConsumerState<AdminChatManagementS
   void _navigateToPatientIdManagement() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const PatientIdManagementScreen()),
+      MaterialPageRoute(
+        builder: (context) => const PatientIdManagementScreen(),
+      ),
     );
     ToastService.instance.showInfo('Opening Patient ID management');
   }
@@ -284,7 +288,9 @@ class _AdminChatManagementScreenState extends ConsumerState<AdminChatManagementS
             final degree = (profile['highestDegree'] ?? '')
                 .toString()
                 .toLowerCase();
-            final doctorId = (profile['doctorId'] ?? '').toString().toLowerCase();
+            final doctorId = (profile['doctorId'] ?? '')
+                .toString()
+                .toLowerCase();
             return fullname.contains(query) ||
                 degree.contains(query) ||
                 doctorId.contains(query);
@@ -301,10 +307,9 @@ class _AdminChatManagementScreenState extends ConsumerState<AdminChatManagementS
   Widget build(BuildContext context) {
     return AdminScreen(
       title: 'Doctor Chats',
-      subtitle:
-          _selectedDoctor != null
-              ? 'Viewing ${_selectedDoctor!['fullname']}\'s patient chats'
-              : 'Select a doctor to view their patient conversations',
+      subtitle: _selectedDoctor != null
+          ? 'Viewing ${_selectedDoctor!['fullname']}\'s patient chats'
+          : 'Select a doctor to view their patient conversations',
       actions: [
         AdminHeaderAction(
           icon: Icons.payment_rounded,
@@ -329,7 +334,12 @@ class _AdminChatManagementScreenState extends ConsumerState<AdminChatManagementS
       body: Column(
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(context.rsp(16), 18, context.rsp(16), 0),
+            padding: EdgeInsets.fromLTRB(
+              context.rsp(16),
+              18,
+              context.rsp(16),
+              0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -385,7 +395,11 @@ class _AdminChatManagementScreenState extends ConsumerState<AdminChatManagementS
       ),
       ('Patient IDs', Icons.badge_rounded, _navigateToPatientIdManagement),
       ('Online History', Icons.history_rounded, _navigateToDoctorOnlineHistory),
-      ('Reactivation', Icons.replay_circle_filled_rounded, _navigateToReactivationRequests),
+      (
+        'Reactivation',
+        Icons.replay_circle_filled_rounded,
+        _navigateToReactivationRequests,
+      ),
     ];
 
     return LayoutBuilder(
@@ -515,9 +529,7 @@ class _AdminChatManagementScreenState extends ConsumerState<AdminChatManagementS
             margin: const EdgeInsets.only(right: 12),
             padding: EdgeInsets.all(context.rsp(12)),
             decoration: BoxDecoration(
-              gradient: isSelected
-                  ? null
-                  : AdminPalette.cardGradient,
+              gradient: isSelected ? null : AdminPalette.cardGradient,
               color: isSelected ? null : null,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
@@ -629,7 +641,9 @@ class _AdminChatManagementScreenState extends ConsumerState<AdminChatManagementS
                         decoration: BoxDecoration(
                           color: isOnline
                               ? AdminPalette.success.withValues(alpha: 0.12)
-                              : AdminPalette.unselectedText.withValues(alpha: 0.08),
+                              : AdminPalette.unselectedText.withValues(
+                                  alpha: 0.08,
+                                ),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isOnline
@@ -811,7 +825,9 @@ class _AdminChatManagementScreenState extends ConsumerState<AdminChatManagementS
     final doctorName = doctor['fullname'] ?? 'Doctor';
 
     if (doctorId == null || doctorId.isEmpty) {
-      ToastService.instance.showError('Cannot delete doctor: Invalid doctor ID');
+      ToastService.instance.showError(
+        'Cannot delete doctor: Invalid doctor ID',
+      );
       return;
     }
 

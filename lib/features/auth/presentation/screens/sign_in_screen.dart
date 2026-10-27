@@ -194,11 +194,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         final currentDeviceId = await DeviceService.getDeviceId();
         final claimResult =
             await SingleDeviceSessionService.validateAndClaimSession(
-          collectionName: 'telemedicine_patient',
-          documentId: user.id,
-          currentDeviceId: currentDeviceId,
-          blockSecondLogin: false, // OTP verified on this phone
-        );
+              collectionName: 'telemedicine_patient',
+              documentId: user.id,
+              currentDeviceId: currentDeviceId,
+              blockSecondLogin: false, // OTP verified on this phone
+            );
 
         if (!mounted) return;
 
@@ -207,7 +207,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           if (!mounted) return;
           setState(() {
             isLoading = false;
-            errorText = claimResult.errorMessage ??
+            errorText =
+                claimResult.errorMessage ??
                 'This account is locked to another device.';
           });
           ToastService.instance.showError(errorText);
@@ -829,7 +830,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       maxLength: maxLength,
       inputFormatters: inputFormatters,
       controller: controller,
-      validator: validator ??
+      validator:
+          validator ??
           (value) {
             if (value == null || value.trim().isEmpty) {
               return 'Required';

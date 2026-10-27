@@ -14,7 +14,8 @@ import 'package:http/http.dart' as http;
 ///  - Zero-balance cellular data packages where ISP blocks external TCP traffic.
 ///  - DNS lookup or backend server outages.
 class NetworkHealthChecker {
-  static final NetworkHealthChecker _instance = NetworkHealthChecker._internal();
+  static final NetworkHealthChecker _instance =
+      NetworkHealthChecker._internal();
   factory NetworkHealthChecker() => _instance;
   NetworkHealthChecker._internal();
 
@@ -57,8 +58,9 @@ class NetworkHealthChecker {
 
       // 2. Fast DNS lookup to verify domain resolution
       try {
-        final hostLookup = await InternetAddress.lookup('clients3.google.com')
-            .timeout(const Duration(milliseconds: 1500));
+        final hostLookup = await InternetAddress.lookup(
+          'clients3.google.com',
+        ).timeout(const Duration(milliseconds: 1500));
         if (hostLookup.isEmpty || hostLookup.first.rawAddress.isEmpty) {
           _cache(false);
           return false;

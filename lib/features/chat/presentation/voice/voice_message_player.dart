@@ -68,7 +68,11 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
   void initState() {
     super.initState();
     _isListened = widget.isListened;
-    _waveformAmplitudes = _generateWaveform(widget.messageId, widget.audioUrl, 38);
+    _waveformAmplitudes = _generateWaveform(
+      widget.messageId,
+      widget.audioUrl,
+      38,
+    );
     _initPlayer();
     _listenToGlobalState();
   }
@@ -109,7 +113,8 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
         }
       }
 
-      _totalDuration = _audioPlayer!.duration ?? Duration(seconds: widget.duration);
+      _totalDuration =
+          _audioPlayer!.duration ?? Duration(seconds: widget.duration);
 
       _positionSubscription = _audioPlayer!.positionStream.listen((pos) {
         if (!mounted) return;
@@ -121,7 +126,9 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
         _checkListeningProgress(pos);
       });
 
-      _playerStateSubscription = _audioPlayer!.playerStateStream.listen((state) {
+      _playerStateSubscription = _audioPlayer!.playerStateStream.listen((
+        state,
+      ) {
         if (!mounted) return;
 
         if (state.processingState == ProcessingState.completed) {
@@ -159,7 +166,9 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
 
   void _accumulatePlayedTime() {
     if (_lastPlayStartTime != null) {
-      _actualPlayedMs += DateTime.now().difference(_lastPlayStartTime!).inMilliseconds;
+      _actualPlayedMs += DateTime.now()
+          .difference(_lastPlayStartTime!)
+          .inMilliseconds;
       _lastPlayStartTime = null;
     }
   }
@@ -175,7 +184,9 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
 
     int currentSessionMs = 0;
     if (_lastPlayStartTime != null) {
-      currentSessionMs = DateTime.now().difference(_lastPlayStartTime!).inMilliseconds;
+      currentSessionMs = DateTime.now()
+          .difference(_lastPlayStartTime!)
+          .inMilliseconds;
     }
     final totalPlayedMs = _actualPlayedMs + currentSessionMs;
     final progress = position.inMilliseconds / totalMs;
@@ -184,8 +195,11 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
     // Mark as listened when playback reaches at least 90% of audio duration while playing,
     // or when playback reaches completion naturally.
     // Seeking alone without playing does not trigger it.
-    final hasMeaningfulPlayback = totalPlayedMs >= (totalMs * 0.40).clamp(500, 10000);
-    if (_isPlaying && (progress >= 0.90 || position.inMilliseconds >= totalMs - 250) && hasMeaningfulPlayback) {
+    final hasMeaningfulPlayback =
+        totalPlayedMs >= (totalMs * 0.40).clamp(500, 10000);
+    if (_isPlaying &&
+        (progress >= 0.90 || position.inMilliseconds >= totalMs - 250) &&
+        hasMeaningfulPlayback) {
       _triggerListened();
     }
   }
@@ -267,7 +281,9 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
   }
 
   String _formatTimestamp(DateTime time) {
-    final hour = time.hour > 12 ? time.hour - 12 : (time.hour == 0 ? 12 : time.hour);
+    final hour = time.hour > 12
+        ? time.hour - 12
+        : (time.hour == 0 ? 12 : time.hour);
     final minute = time.minute.toString().padLeft(2, '0');
     final amPm = time.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $amPm';
@@ -291,7 +307,9 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
 
   @override
   void dispose() {
-    VoiceMessageManager.removePlayingStateListener(_onGlobalPlayingStateChanged);
+    VoiceMessageManager.removePlayingStateListener(
+      _onGlobalPlayingStateChanged,
+    );
     _positionSubscription?.cancel();
     _playerStateSubscription?.cancel();
 
@@ -310,7 +328,9 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
     // Outgoing: soft light green (#E7FFDB / #D9FDD3)
     // Incoming: pure white (#FFFFFF)
     final bubbleColor = widget.isMe ? const Color(0xFFE7FFDB) : Colors.white;
-    final borderColor = widget.isMe ? const Color(0xFFC7EBB8) : const Color(0xFFE2E8F0);
+    final borderColor = widget.isMe
+        ? const Color(0xFFC7EBB8)
+        : const Color(0xFFE2E8F0);
 
     return Container(
       constraints: BoxConstraints(
@@ -474,7 +494,9 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
   Widget _buildAvatarWithMic({required bool isLeft}) {
     // WhatsApp Listen Status:
     // Grey when unlistened, Blue when listened.
-    final Color micColor = _isListened ? const Color(0xFF34B7F1) : const Color(0xFF94A3B8);
+    final Color micColor = _isListened
+        ? const Color(0xFF34B7F1)
+        : const Color(0xFF94A3B8);
 
     final avatarImage = widget.senderAvatarUrl;
     final hasImage = avatarImage != null && avatarImage.isNotEmpty;
@@ -490,7 +512,9 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
             shape: BoxShape.circle,
             color: const Color(0xFFCBD5E1),
             border: Border.all(
-              color: widget.isMe ? const Color(0xFFC7EBB8) : const Color(0xFFE2E8F0),
+              color: widget.isMe
+                  ? const Color(0xFFC7EBB8)
+                  : const Color(0xFFE2E8F0),
               width: 1.0,
             ),
           ),
@@ -512,11 +536,7 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
                       color: Color(0xFF64748B),
                     ),
                   )
-                : const Icon(
-                    Icons.person,
-                    size: 24,
-                    color: Color(0xFF64748B),
-                  ),
+                : const Icon(Icons.person, size: 24, color: Color(0xFF64748B)),
           ),
         ),
 
@@ -543,11 +563,7 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.mic,
-              size: 10,
-              color: Colors.white,
-            ),
+            child: const Icon(Icons.mic, size: 10, color: Colors.white),
           ),
         ),
       ],
@@ -558,7 +574,9 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
   Widget _buildWaveformInteractive() {
     double progress = 0.0;
     if (_totalDuration.inMilliseconds > 0) {
-      progress = (_currentPosition.inMilliseconds / _totalDuration.inMilliseconds).clamp(0.0, 1.0);
+      progress =
+          (_currentPosition.inMilliseconds / _totalDuration.inMilliseconds)
+              .clamp(0.0, 1.0);
     }
 
     // Colors:
@@ -581,11 +599,17 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapDown: (details) {
-            final ratio = (details.localPosition.dx / totalWidth).clamp(0.0, 1.0);
+            final ratio = (details.localPosition.dx / totalWidth).clamp(
+              0.0,
+              1.0,
+            );
             _seekToProgress(ratio);
           },
           onHorizontalDragUpdate: (details) {
-            final ratio = (details.localPosition.dx / totalWidth).clamp(0.0, 1.0);
+            final ratio = (details.localPosition.dx / totalWidth).clamp(
+              0.0,
+              1.0,
+            );
             _seekToProgress(ratio);
           },
           child: SizedBox(
@@ -611,7 +635,10 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
     if (source.isEmpty) return List.filled(targetCount, 0.4);
     final res = <double>[];
     for (int i = 0; i < targetCount; i++) {
-      final index = ((i / targetCount) * source.length).floor().clamp(0, source.length - 1);
+      final index = ((i / targetCount) * source.length).floor().clamp(
+        0,
+        source.length - 1,
+      );
       res.add(source[index]);
     }
     return res;
@@ -698,11 +725,7 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
     }
 
     // Sent: single grey tick
-    return const Icon(
-      Icons.done_rounded,
-      size: 14,
-      color: Color(0xFF667781),
-    );
+    return const Icon(Icons.done_rounded, size: 14, color: Color(0xFF667781));
   }
 }
 
@@ -746,7 +769,10 @@ class _WhatsAppWaveformPainter extends CustomPainter {
     for (int i = 0; i < totalBars; i++) {
       final x = (i * spacing) + (spacing / 2);
       final heightFactor = amplitudes[i];
-      final halfHeight = (maxHalfHeight * heightFactor).clamp(2.5, maxHalfHeight);
+      final halfHeight = (maxHalfHeight * heightFactor).clamp(
+        2.5,
+        maxHalfHeight,
+      );
 
       final isBarPlayed = x <= playedWidth;
       final paint = isBarPlayed ? playedPaint : unplayedPaint;

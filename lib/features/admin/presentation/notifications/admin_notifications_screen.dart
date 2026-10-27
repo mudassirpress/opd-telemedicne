@@ -50,9 +50,8 @@ class _AdminNotificationsScreenState
             child: notificationsAsync.when(
               loading: () =>
                   const AdminLoading(label: 'Loading notifications...'),
-              error: (err, _) => Center(
-                child: Text('Error loading notifications: $err'),
-              ),
+              error: (err, _) =>
+                  Center(child: Text('Error loading notifications: $err')),
               data: (notifications) {
                 var filtered = notifications;
                 if (_selectedFilter == 1) {
@@ -126,9 +125,7 @@ class _AdminNotificationsScreenState
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AdminPalette.brand
-              : Colors.white,
+          color: isSelected ? AdminPalette.brand : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected ? AdminPalette.brand : AdminPalette.divider,
@@ -147,7 +144,9 @@ class _AdminNotificationsScreenState
   }
 
   Widget _buildNotificationCard(
-      BuildContext context, AdminNotificationModel item) {
+    BuildContext context,
+    AdminNotificationModel item,
+  ) {
     final dateStr = DateFormat('MMM d, h:mm a').format(item.createdAt);
 
     return GestureDetector(
@@ -177,7 +176,9 @@ class _AdminNotificationsScreenState
           nav.push(
             MaterialPageRoute(
               builder: (_) => AdminPaymentScreen(
-                focusPatientId: item.patientUid.isNotEmpty ? item.patientUid : item.patientId,
+                focusPatientId: item.patientUid.isNotEmpty
+                    ? item.patientUid
+                    : item.patientId,
                 focusPaymentId: item.paymentId,
                 initialSegment: isAppt
                     ? AdminPaymentSegment.appointment
@@ -263,7 +264,9 @@ class _AdminNotificationsScreenState
                     Container(
                       margin: const EdgeInsets.only(bottom: 4),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: AdminPalette.brand.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(6),
@@ -290,7 +293,8 @@ class _AdminNotificationsScreenState
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (item.paymentStatus != null ||
-                      (item.paymentId != null && item.paymentId!.isNotEmpty)) ...[
+                      (item.paymentId != null &&
+                          item.paymentId!.isNotEmpty)) ...[
                     const SizedBox(height: 6),
                     Row(
                       children: [
@@ -303,8 +307,8 @@ class _AdminNotificationsScreenState
                               color: item.paymentStatus == 'approved'
                                   ? Colors.green[700]
                                   : (item.paymentStatus == 'pending'
-                                      ? Colors.orange[800]
-                                      : Colors.red[700]),
+                                        ? Colors.orange[800]
+                                        : Colors.red[700]),
                             ),
                           ),
                         if (item.paymentId != null &&

@@ -95,9 +95,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildList(),
-        ],
+        children: [_buildList()],
       ),
     );
   }
@@ -177,14 +175,15 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   (IconData, String, String) _describeError(Object error) {
     final text = error.toString();
 
-    final missingIndex = text.contains('FAILED_PRECONDITION') &&
+    final missingIndex =
+        text.contains('FAILED_PRECONDITION') &&
         (text.contains('missing-indexes') || text.contains('no index'));
     if (missingIndex) {
       return (
         Icons.hourglass_empty_rounded,
         'Preparing prescriptions',
         'A Firestore index for this query is still being built. '
-            'This usually finishes within a few minutes - try again shortly.'
+            'This usually finishes within a few minutes - try again shortly.',
       );
     }
     if (text.contains('PERMISSION_DENIED') ||
@@ -192,20 +191,20 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       return (
         Icons.lock_outline_rounded,
         'Access restricted',
-        'You do not have permission to view prescriptions for this patient.'
+        'You do not have permission to view prescriptions for this patient.',
       );
     }
     if (text.contains('UNAVAILABLE') || text.contains('unavailable')) {
       return (
         Icons.wifi_off_rounded,
         'Connection problem',
-        'Could not reach Firestore. Check your connection and try again.'
+        'Could not reach Firestore. Check your connection and try again.',
       );
     }
     return (
       Icons.error_outline_rounded,
       'Could not load prescriptions',
-      'Something went wrong while loading. Tap Retry to try again.'
+      'Something went wrong while loading. Tap Retry to try again.',
     );
   }
 }

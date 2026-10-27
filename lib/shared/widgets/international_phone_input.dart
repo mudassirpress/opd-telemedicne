@@ -136,10 +136,12 @@ class _InternationalPhoneInputState extends State<InternationalPhoneInput> {
     }
 
     // Canonical E.164 normalization
-    final e164 = PatientPasswordResetService.normalizePhone(
-      national,
-      defaultDialCode: dialCode,
-    ) ?? (number.phoneNumber ?? '');
+    final e164 =
+        PatientPasswordResetService.normalizePhone(
+          national,
+          defaultDialCode: dialCode,
+        ) ??
+        (number.phoneNumber ?? '');
 
     // Validate using libphonenumber or fallback length check
     final valid = _isValid || RegExp(r'^\+[1-9]\d{6,14}$').hasMatch(e164);
@@ -168,8 +170,8 @@ class _InternationalPhoneInputState extends State<InternationalPhoneInput> {
       builder: (FormFieldState<String> fieldState) {
         final effectiveError =
             (widget.errorText != null && widget.errorText!.isNotEmpty)
-                ? widget.errorText
-                : fieldState.errorText;
+            ? widget.errorText
+            : fieldState.errorText;
         final hasError = effectiveError != null && effectiveError.isNotEmpty;
 
         return Column(

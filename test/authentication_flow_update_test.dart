@@ -132,7 +132,9 @@ void main() {
         expiryDate: DateTime.now().add(const Duration(days: 90)),
       );
 
-      final destination = AuthRoutingService.evaluatePatientDestination(validCardPatient);
+      final destination = AuthRoutingService.evaluatePatientDestination(
+        validCardPatient,
+      );
       expect(destination, equals(PatientAuthDestination.chatRoom));
     });
 
@@ -146,22 +148,29 @@ void main() {
         expiryDate: DateTime.now().subtract(const Duration(days: 5)),
       );
 
-      final destination = AuthRoutingService.evaluatePatientDestination(expiredCardPatient);
+      final destination = AuthRoutingService.evaluatePatientDestination(
+        expiredCardPatient,
+      );
       expect(destination, equals(PatientAuthDestination.cardExpired));
     });
 
-    test('AuthRoutingService routes Phone Patient without payment proof to paymentProof', () {
-      final phonePatient = createTestUser(
-        id: 'patient_phone_new',
-        fullname: 'Bilal Khan',
-        role: 'patient',
-        loginType: 'phone',
-        paymentImage: null,
-      );
+    test(
+      'AuthRoutingService routes Phone Patient without payment proof to paymentProof',
+      () {
+        final phonePatient = createTestUser(
+          id: 'patient_phone_new',
+          fullname: 'Bilal Khan',
+          role: 'patient',
+          loginType: 'phone',
+          paymentImage: null,
+        );
 
-      final destination = AuthRoutingService.evaluatePatientDestination(phonePatient);
-      expect(destination, equals(PatientAuthDestination.paymentProof));
-    });
+        final destination = AuthRoutingService.evaluatePatientDestination(
+          phonePatient,
+        );
+        expect(destination, equals(PatientAuthDestination.paymentProof));
+      },
+    );
 
     test('AuthRoutingService routes Approved Phone Patient to chatRoom', () {
       final approvedPhonePatient = createTestUser(
@@ -173,7 +182,9 @@ void main() {
         paymentStatus: 'approved',
       );
 
-      final destination = AuthRoutingService.evaluatePatientDestination(approvedPhonePatient);
+      final destination = AuthRoutingService.evaluatePatientDestination(
+        approvedPhonePatient,
+      );
       expect(destination, equals(PatientAuthDestination.chatRoom));
     });
   });

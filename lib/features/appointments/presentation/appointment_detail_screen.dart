@@ -56,10 +56,13 @@ class AppointmentDetailScreen extends ConsumerWidget {
         }
 
         final isDoctor =
-            user != null && user.role == UserRoles.doctor &&
-                user.id == appointment.doctorId;
+            user != null &&
+            user.role == UserRoles.doctor &&
+            user.id == appointment.doctorId;
         final isAdmin = user != null && user.role == UserRoles.admin;
-        final canAct = user != null && !isAdmin &&
+        final canAct =
+            user != null &&
+            !isAdmin &&
             (isDoctor
                 ? user.id == appointment.doctorId
                 : user.id == appointment.patientId);
@@ -70,18 +73,31 @@ class AppointmentDetailScreen extends ConsumerWidget {
               ? 'Consultation with ${isDoctor ? appointment.patientName : 'Dr. ${appointment.doctorName}'}'
               : appointment.subject,
           bottom: canAct
-              ? _buildActions(context, ref, appointment,
-                  asDoctor: isDoctor, user: user)
+              ? _buildActions(
+                  context,
+                  ref,
+                  appointment,
+                  asDoctor: isDoctor,
+                  user: user,
+                )
               : null,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildPartyCard(context, appointment, asDoctor: isDoctor),
               if (canAct &&
-                  showAppointmentCancelAction(appointment, asDoctor: isDoctor)) ...[
+                  showAppointmentCancelAction(
+                    appointment,
+                    asDoctor: isDoctor,
+                  )) ...[
                 const SizedBox(height: 12),
-                _buildCancelTile(context, ref, appointment,
-                    asDoctor: isDoctor, user: user),
+                _buildCancelTile(
+                  context,
+                  ref,
+                  appointment,
+                  asDoctor: isDoctor,
+                  user: user,
+                ),
               ],
               const SizedBox(height: 18),
               const OpdSectionLabel('Audit timeline'),
@@ -105,8 +121,9 @@ class AppointmentDetailScreen extends ConsumerWidget {
     final counterpartName = asDoctor
         ? appointment.patientName
         : 'Dr. ${appointment.doctorName}';
-    final counterpartImage =
-        asDoctor ? appointment.patientImage : appointment.doctorImage;
+    final counterpartImage = asDoctor
+        ? appointment.patientImage
+        : appointment.doctorImage;
     final phase = appointmentDisplayPhase(appointment);
 
     return OpdCard(
@@ -242,8 +259,8 @@ class AppointmentDetailScreen extends ConsumerWidget {
                     value: appointment.noShowBy.isEmpty
                         ? 'Not assigned'
                         : appointment.noShowBy == AppointmentNoShowBy.doctor
-                            ? 'Dr. ${appointment.doctorName} did not join'
-                            : '${appointment.patientName} did not join',
+                        ? 'Dr. ${appointment.doctorName} did not join'
+                        : '${appointment.patientName} did not join',
                   ),
               ],
             ),
@@ -288,8 +305,13 @@ class AppointmentDetailScreen extends ConsumerWidget {
             if (joinable) ...[
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: () => _join(context, ref, appointment,
-                      asDoctor: asDoctor, user: user),
+                  onPressed: () => _join(
+                    context,
+                    ref,
+                    appointment,
+                    asDoctor: asDoctor,
+                    user: user,
+                  ),
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF0E7C86),
                     padding: const EdgeInsets.symmetric(vertical: 13),
@@ -300,10 +322,7 @@ class AppointmentDetailScreen extends ConsumerWidget {
                   icon: const Icon(Icons.video_call_rounded, size: 18),
                   label: Text(
                     'Join appointment',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -330,10 +349,7 @@ class AppointmentDetailScreen extends ConsumerWidget {
               icon: const Icon(Icons.chat_bubble_outline_rounded, size: 17),
               label: Text(
                 'Chat',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -351,8 +367,8 @@ class AppointmentDetailScreen extends ConsumerWidget {
   }) {
     return OpdCard(
       padding: const EdgeInsets.all(14),
-      onTap: () => _cancel(context, ref, appointment,
-          asDoctor: asDoctor, user: user),
+      onTap: () =>
+          _cancel(context, ref, appointment, asDoctor: asDoctor, user: user),
       child: Row(
         children: [
           const Icon(Icons.event_busy_rounded, color: Color(0xFFD64545)),
@@ -433,7 +449,9 @@ class AppointmentDetailScreen extends ConsumerWidget {
     final error = await controller.cancelAppointment(
       appointment: appointment,
       actorId: user.id,
-      actorRole: asDoctor ? AppointmentActors.doctor : AppointmentActors.patient,
+      actorRole: asDoctor
+          ? AppointmentActors.doctor
+          : AppointmentActors.patient,
       reason: result.reason,
     );
     if (error != null) {
@@ -455,8 +473,9 @@ class AppointmentDetailScreen extends ConsumerWidget {
         builder: (_) => ChatScreen(
           otherUserId: asDoctor ? appointment.patientId : appointment.doctorId,
           otherUserName: name,
-          otherUserImage:
-              asDoctor ? appointment.patientImage : appointment.doctorImage,
+          otherUserImage: asDoctor
+              ? appointment.patientImage
+              : appointment.doctorImage,
           currentUserRole: asDoctor ? UserRoles.doctor : UserRoles.patient,
           otherUserType: asDoctor ? UserRoles.patient : UserRoles.doctor,
           otherUserRole: asDoctor ? UserRoles.patient : UserRoles.doctor,
@@ -464,5 +483,4 @@ class AppointmentDetailScreen extends ConsumerWidget {
       ),
     );
   }
-
 }

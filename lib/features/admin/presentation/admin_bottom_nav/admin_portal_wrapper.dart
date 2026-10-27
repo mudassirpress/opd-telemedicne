@@ -15,8 +15,7 @@ class AdminPortalWrapper extends ConsumerStatefulWidget {
   const AdminPortalWrapper({super.key});
 
   @override
-  ConsumerState<AdminPortalWrapper> createState() =>
-      _AdminPortalWrapperState();
+  ConsumerState<AdminPortalWrapper> createState() => _AdminPortalWrapperState();
 }
 
 class _AdminPortalWrapperState extends ConsumerState<AdminPortalWrapper> {
@@ -43,14 +42,13 @@ class _AdminPortalWrapperState extends ConsumerState<AdminPortalWrapper> {
 
     return Scaffold(
       backgroundColor: AdminPalette.background,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border(top: BorderSide(color: AdminPalette.divider.withValues(alpha: 0.4))),
+          border: Border(
+            top: BorderSide(color: AdminPalette.divider.withValues(alpha: 0.4)),
+          ),
           boxShadow: [
             BoxShadow(
               color: AdminPalette.cardShadow.withValues(alpha: 0.12),
@@ -65,16 +63,22 @@ class _AdminPortalWrapperState extends ConsumerState<AdminPortalWrapper> {
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
             child: Row(
               children: [
-                Expanded(child: _buildNavItem(0, Icons.dashboard_rounded, 'Dashboard')),
+                Expanded(
+                  child: _buildNavItem(0, Icons.dashboard_rounded, 'Dashboard'),
+                ),
                 Expanded(
                   child: _buildNavItem(
                     1,
                     Icons.event_note_rounded,
                     'Appointments',
-                    badgeCount: ref.watch(adminPendingAppointmentsCountProvider),
+                    badgeCount: ref.watch(
+                      adminPendingAppointmentsCountProvider,
+                    ),
                   ),
                 ),
-                Expanded(child: _buildNavItem(2, Icons.people_rounded, 'Users')),
+                Expanded(
+                  child: _buildNavItem(2, Icons.people_rounded, 'Users'),
+                ),
                 Expanded(
                   child: _buildNavItem(
                     3,
@@ -140,7 +144,9 @@ class _AdminPortalWrapperState extends ConsumerState<AdminPortalWrapper> {
                   color: AdminPalette.brand,
                   onPressed: () => Navigator.pushAndRemoveUntil(
                     context,
-                    MaterialPageRoute(builder: (context) => const SignInScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const SignInScreen(),
+                    ),
                     (route) => false,
                   ),
                 ),

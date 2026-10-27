@@ -53,14 +53,13 @@ class PatientPhoneAuthService {
   final FirebaseAuth? _customAuth;
   final FirebaseFirestore? _customFirestore;
 
-  PatientPhoneAuthService({
-    FirebaseAuth? auth,
-    FirebaseFirestore? firestore,
-  })  : _customAuth = auth,
-        _customFirestore = firestore;
+  PatientPhoneAuthService({FirebaseAuth? auth, FirebaseFirestore? firestore})
+    : _customAuth = auth,
+      _customFirestore = firestore;
 
   FirebaseAuth get _auth => _customAuth ?? FirebaseAuth.instance;
-  FirebaseFirestore get _firestore => _customFirestore ?? FirebaseFirestore.instance;
+  FirebaseFirestore get _firestore =>
+      _customFirestore ?? FirebaseFirestore.instance;
 
   String? _verificationId;
   int? _resendToken;
@@ -104,11 +103,14 @@ class PatientPhoneAuthService {
     }
 
     // Normalize phone number to canonical E.164
-    final normalized = PatientPasswordResetService.normalizePhone(
+    final normalized =
+        PatientPasswordResetService.normalizePhone(
           clean,
           defaultDialCode: defaultDialCode,
         ) ??
-        (clean.startsWith('+') ? clean : '$defaultDialCode${clean.replaceAll(RegExp(r'^0+'), '')}');
+        (clean.startsWith('+')
+            ? clean
+            : '$defaultDialCode${clean.replaceAll(RegExp(r'^0+'), '')}');
 
     // Enforce in-flight lock to prevent duplicate simultaneous verifyPhoneNumber calls
     if (_isSending) {
@@ -170,14 +172,18 @@ class PatientPhoneAuthService {
     final completer = Completer<PhoneOtpSendResult>();
 
     try {
-      debugPrint('📲 [PatientPhoneAuthService] Dispatching OTP to ${maskPhone(normalized)}');
+      debugPrint(
+        '📲 [PatientPhoneAuthService] Dispatching OTP to ${maskPhone(normalized)}',
+      );
 
       await _auth.verifyPhoneNumber(
         phoneNumber: normalized,
         timeout: const Duration(seconds: 60),
         forceResendingToken: _resendToken,
         verificationCompleted: (PhoneAuthCredential credential) {
-          debugPrint('✅ [PatientPhoneAuthService] SMS Retriever / instant verification completed');
+          debugPrint(
+            '✅ [PatientPhoneAuthService] SMS Retriever / instant verification completed',
+          );
           _autoRetrievedCredential = credential;
           if (onAutoVerified != null) {
             onAutoVerified(credential);
@@ -185,7 +191,9 @@ class PatientPhoneAuthService {
         },
         verificationFailed: (FirebaseAuthException error) {
           _isSending = false;
-          debugPrint('❌ [PatientPhoneAuthService] Verification failed: ${error.code} - ${error.message}');
+          debugPrint(
+            '❌ [PatientPhoneAuthService] Verification failed: ${error.code} - ${error.message}',
+          );
           final userFriendlyMessage = _mapFirebaseSendError(error);
           if (!completer.isCompleted) {
             completer.completeError(
@@ -204,27 +212,36 @@ class PatientPhoneAuthService {
           _lastSendTime = DateTime.now();
 
           // Persist timestamp and attempt count
-          SharedPreferences.getInstance().then((prefs) {
-            final nowMs = DateTime.now().millisecondsSinceEpoch;
-            prefs.setInt('patient_otp_last_send_$normalized', nowMs);
-            final hourlyKey = 'patient_otp_attempts_$normalized';
-            final history = prefs.getStringList(hourlyKey) ?? [];
-            final oneHourAgo = nowMs - (3600 * 1000);
-            final recent = history
-                .map((e) => int.tryParse(e) ?? 0)
-                .where((ts) => ts > oneHourAgo)
-                .toList()
-              ..add(nowMs);
-            prefs.setStringList(hourlyKey, recent.map((e) => e.toString()).toList());
-          }).catchError((_) {});
+          SharedPreferences.getInstance()
+              .then((prefs) {
+                final nowMs = DateTime.now().millisecondsSinceEpoch;
+                prefs.setInt('patient_otp_last_send_$normalized', nowMs);
+                final hourlyKey = 'patient_otp_attempts_$normalized';
+                final history = prefs.getStringList(hourlyKey) ?? [];
+                final oneHourAgo = nowMs - (3600 * 1000);
+                final recent =
+                    history
+                        .map((e) => int.tryParse(e) ?? 0)
+                        .where((ts) => ts > oneHourAgo)
+                        .toList()
+                      ..add(nowMs);
+                prefs.setStringList(
+                  hourlyKey,
+                  recent.map((e) => e.toString()).toList(),
+                );
+              })
+              .catchError((_) {});
 
-          debugPrint('📨 [PatientPhoneAuthService] Code sent. verificationId: $verificationId');
+          debugPrint(
+            '📨 [PatientPhoneAuthService] Code sent. verificationId: $verificationId',
+          );
 
           if (!completer.isCompleted) {
             completer.complete(
               PhoneOtpSendResult(
                 normalizedPhone: normalized,
-                message: 'Verification code sent to ${maskPhone(normalized)} via SMS.',
+                message:
+                    'Verification code sent to ${maskPhone(normalized)} via SMS.',
                 resendInSeconds: resendCooldownSeconds,
                 verificationId: verificationId,
               ),
@@ -232,7 +249,9 @@ class PatientPhoneAuthService {
           }
         },
         codeAutoRetrievalTimeout: (String verificationId) {
-          debugPrint('⏱️ [PatientPhoneAuthService] Auto-retrieval timeout for $verificationId');
+          debugPrint(
+            '⏱️ [PatientPhoneAuthService] Auto-retrieval timeout for $verificationId',
+          );
           _verificationId = verificationId;
         },
       );
@@ -289,7 +308,9 @@ class PatientPhoneAuthService {
     }
 
     try {
-      debugPrint('🔑 [PatientPhoneAuthService] Authenticating with PhoneAuthCredential...');
+      debugPrint(
+        '🔑 [PatientPhoneAuthService] Authenticating with PhoneAuthCredential...',
+      );
 
       final userCredential = await _auth.signInWithCredential(authCred);
       final firebaseUser = userCredential.user;
@@ -301,7 +322,9 @@ class PatientPhoneAuthService {
         );
       }
 
-      debugPrint('🎉 [PatientPhoneAuthService] Verified UID: ${firebaseUser.uid}');
+      debugPrint(
+        '🎉 [PatientPhoneAuthService] Verified UID: ${firebaseUser.uid}',
+      );
 
       // Look up existing patient document in telemedicine_patient
       UserModel? existingPatient;
@@ -326,13 +349,12 @@ class PatientPhoneAuthService {
 
         if (authUidSnap.docs.isNotEmpty) {
           final doc = authUidSnap.docs.first;
-          existingPatient = UserModel.fromMap({
-            ...doc.data(),
-            'id': doc.id,
-          });
+          existingPatient = UserModel.fromMap({...doc.data(), 'id': doc.id});
         } else {
           // Search by phone variants
-          final variants = PatientPasswordResetService.phoneLookupVariants(normalizedPhone);
+          final variants = PatientPasswordResetService.phoneLookupVariants(
+            normalizedPhone,
+          );
           final phoneSnap = await _firestore
               .collection('telemedicine_patient')
               .where('phoneNumber', whereIn: variants)
@@ -341,10 +363,7 @@ class PatientPhoneAuthService {
 
           if (phoneSnap.docs.isNotEmpty) {
             final doc = phoneSnap.docs.first;
-            existingPatient = UserModel.fromMap({
-              ...doc.data(),
-              'id': doc.id,
-            });
+            existingPatient = UserModel.fromMap({...doc.data(), 'id': doc.id});
 
             // Link authUid to the existing account doc
             await doc.reference.update({
@@ -372,7 +391,9 @@ class PatientPhoneAuthService {
         );
       }
     } on FirebaseAuthException catch (e) {
-      debugPrint('❌ [PatientPhoneAuthService] OTP verify error: ${e.code} - ${e.message}');
+      debugPrint(
+        '❌ [PatientPhoneAuthService] OTP verify error: ${e.code} - ${e.message}',
+      );
       throw PatientPhoneAuthException(
         _mapFirebaseVerifyError(e),
         code: e.code,
@@ -404,7 +425,8 @@ class PatientPhoneAuthService {
       case 'network-request-failed':
         return 'Network connection error. Please check your internet connection and try again.';
       default:
-        return e.message ?? 'Failed to send SMS verification code. Please try again.';
+        return e.message ??
+            'Failed to send SMS verification code. Please try again.';
     }
   }
 
@@ -418,7 +440,8 @@ class PatientPhoneAuthService {
       case 'invalid-verification-id':
         return 'Invalid verification session. Please request a new verification code.';
       default:
-        return e.message ?? 'Verification failed. Please check the code and try again.';
+        return e.message ??
+            'Verification failed. Please check the code and try again.';
     }
   }
 }

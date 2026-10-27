@@ -135,7 +135,6 @@ abstract class ZegoConfig {
       'ff91b4090d669ea3ec9919a526c06fb63e1c14902e84fa585db07f423bb0dcf8';
 }
 
-
 /// App-wide timeout and limit constants.
 abstract class AppLimits {
   AppLimits._();

@@ -20,14 +20,15 @@ class AdminAppointmentsScreen extends ConsumerWidget {
       showBack: true,
       body: appointmentsAsync.when(
         loading: () => const AdminLoading(label: 'Loading appointments...'),
-        error: (_, __) => const AdminErrorState(
-          message: 'Could not load appointments.',
-        ),
+        error: (_, __) =>
+            const AdminErrorState(message: 'Could not load appointments.'),
         data: (appointments) {
-          final sorted = [...appointments]..sort(
+          final sorted = [...appointments]
+            ..sort(
               (a, b) => (b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0))
                   .compareTo(
-                      a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0)),
+                    a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0),
+                  ),
             );
           if (sorted.isEmpty) {
             return const AdminEmptyState(
@@ -53,7 +54,8 @@ class AdminAppointmentsScreen extends ConsumerWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AdminTextStyles.heading(
-                                size: context.fs(13.5)),
+                              size: context.fs(13.5),
+                            ),
                           ),
                         ),
                         AppointmentStatusPill(status: a.appointmentStatus),

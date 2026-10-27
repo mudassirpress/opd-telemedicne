@@ -14,35 +14,35 @@ void main() {
       expect(result, now.toIso8601String());
     });
 
-    test('sanitizeForStorage recursively cleans nested maps and lists with Timestamps', () {
-      final ts1 = Timestamp.fromDate(DateTime(2026, 1, 1));
-      final ts2 = Timestamp.fromDate(DateTime(2026, 6, 1));
+    test(
+      'sanitizeForStorage recursively cleans nested maps and lists with Timestamps',
+      () {
+        final ts1 = Timestamp.fromDate(DateTime(2026, 1, 1));
+        final ts2 = Timestamp.fromDate(DateTime(2026, 6, 1));
 
-      final rawDoctorMap = <String, dynamic>{
-        'id': 'doc_123',
-        'fullname': 'Dr. Test',
-        'createdAt': ts1,
-        'activityLogs': [
-          {'timestamp': ts2, 'action': 'login'},
-        ],
-        'nested': {
-          'lastSeen': ts1,
-          'count': 5,
-        },
-      };
+        final rawDoctorMap = <String, dynamic>{
+          'id': 'doc_123',
+          'fullname': 'Dr. Test',
+          'createdAt': ts1,
+          'activityLogs': [
+            {'timestamp': ts2, 'action': 'login'},
+          ],
+          'nested': {'lastSeen': ts1, 'count': 5},
+        };
 
-      final sanitized = OfflineDoctorService.sanitizeForStorage(rawDoctorMap);
+        final sanitized = OfflineDoctorService.sanitizeForStorage(rawDoctorMap);
 
-      // Verify that jsonEncode succeeds without throwing
-      // "Converting object to an encodable object failed: Instance of 'Timestamp'"
-      expect(() => jsonEncode(sanitized), returnsNormally);
+        // Verify that jsonEncode succeeds without throwing
+        // "Converting object to an encodable object failed: Instance of 'Timestamp'"
+        expect(() => jsonEncode(sanitized), returnsNormally);
 
-      final jsonStr = jsonEncode(sanitized);
-      final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
+        final jsonStr = jsonEncode(sanitized);
+        final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
 
-      expect(decoded['createdAt'], isA<String>());
-      expect(decoded['activityLogs'][0]['timestamp'], isA<String>());
-      expect(decoded['nested']['lastSeen'], isA<String>());
-    });
+        expect(decoded['createdAt'], isA<String>());
+        expect(decoded['activityLogs'][0]['timestamp'], isA<String>());
+        expect(decoded['nested']['lastSeen'], isA<String>());
+      },
+    );
   });
 }

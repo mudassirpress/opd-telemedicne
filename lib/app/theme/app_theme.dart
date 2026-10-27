@@ -112,8 +112,12 @@ class AppTheme {
   static TextTheme compactTextTheme([TextTheme? base]) {
     final t = base ?? const TextTheme();
 
-    TextStyle? style(TextStyle? s, double size,
-        {FontWeight? weight, double? height}) {
+    TextStyle? style(
+      TextStyle? s,
+      double size, {
+      FontWeight? weight,
+      double? height,
+    }) {
       if (s == null) return null;
       return s.copyWith(
         fontSize: size,
@@ -129,17 +133,28 @@ class AppTheme {
       headlineLarge: style(t.headlineLarge, 22, height: 1.2),
       headlineMedium: style(t.headlineMedium, 20, height: 1.25),
       headlineSmall: style(t.headlineSmall, 18, height: 1.3),
-      titleLarge: style(t.titleLarge, 17,
-          weight: FontWeight.w600, height: 1.3),
-      titleMedium: style(t.titleMedium, 14.5,
-          weight: FontWeight.w600, height: 1.35),
-      titleSmall: style(t.titleSmall, 13,
-          weight: FontWeight.w600, height: 1.35),
+      titleLarge: style(t.titleLarge, 17, weight: FontWeight.w600, height: 1.3),
+      titleMedium: style(
+        t.titleMedium,
+        14.5,
+        weight: FontWeight.w600,
+        height: 1.35,
+      ),
+      titleSmall: style(
+        t.titleSmall,
+        13,
+        weight: FontWeight.w600,
+        height: 1.35,
+      ),
       bodyLarge: style(t.bodyLarge, 14, height: 1.45),
       bodyMedium: style(t.bodyMedium, 13, height: 1.45),
       bodySmall: style(t.bodySmall, 11.5, height: 1.4),
-      labelLarge: style(t.labelLarge, 13.5,
-          weight: FontWeight.w600, height: 1.3),
+      labelLarge: style(
+        t.labelLarge,
+        13.5,
+        weight: FontWeight.w600,
+        height: 1.3,
+      ),
       labelMedium: style(t.labelMedium, 11.5, height: 1.3),
       labelSmall: style(t.labelSmall, 10.5, height: 1.25),
     );

@@ -528,7 +528,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           }
         },
         onError: (Object e) {
-          final isIndexError = e is FirebaseException &&
+          final isIndexError =
+              e is FirebaseException &&
               (e.code == 'failed-precondition' ||
                   (e.message?.toLowerCase().contains('index') ?? false));
 

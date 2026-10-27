@@ -100,7 +100,9 @@ class _DoctorDetailsState extends ConsumerState<_DoctorDetails> {
       return;
     }
     setState(() => _marking = true);
-    final ok = await ref.read(appointmentControllerProvider).markVideoWatched(
+    final ok = await ref
+        .read(appointmentControllerProvider)
+        .markVideoWatched(
           patientId: user.id,
           doctorId: (doctor['id'] ?? '').toString(),
           patientName: user.fullname,
@@ -144,7 +146,8 @@ class _DoctorDetailsState extends ConsumerState<_DoctorDetails> {
       return;
     }
 
-    final isRestrictedPatient = user.role == 'patient' &&
+    final isRestrictedPatient =
+        user.role == 'patient' &&
         !user.isPatientIdUser &&
         user.paymentStatus != 'approved' &&
         user.paymentStatus != 'completed';
@@ -157,7 +160,9 @@ class _DoctorDetailsState extends ConsumerState<_DoctorDetails> {
     }
 
     setState(() => _checking = true);
-    final block = await ref.read(appointmentControllerProvider).bookingBlockMessageFor(
+    final block = await ref
+        .read(appointmentControllerProvider)
+        .bookingBlockMessageFor(
           patientId: user.id,
           doctorId: (doctor['id'] ?? '').toString(),
         );
@@ -181,8 +186,12 @@ class _DoctorDetailsState extends ConsumerState<_DoctorDetails> {
   @override
   Widget build(BuildContext context) {
     final watched =
-        ref.watch(appointmentVideoWatchedProvider((doctor['id'] ?? '').toString())).valueOrNull ??
-            false;
+        ref
+            .watch(
+              appointmentVideoWatchedProvider((doctor['id'] ?? '').toString()),
+            )
+            .valueOrNull ??
+        false;
     final pricing = AppointmentController.pricingFor(
       doctor: doctor,
       videoWatched: watched,
@@ -198,7 +207,8 @@ class _DoctorDetailsState extends ConsumerState<_DoctorDetails> {
     final doctorDocId = (doctor['id'] ?? '').toString();
     final isOnline = ref.watch(doctorOnlineProvider(doctorDocId));
     final rating =
-        ratingAsync.valueOrNull?.average ?? (doctor['averageRating'] ?? 0.0).toDouble();
+        ratingAsync.valueOrNull?.average ??
+        (doctor['averageRating'] ?? 0.0).toDouble();
     final totalRatings =
         ratingAsync.valueOrNull?.total ?? (doctor['totalRatings'] ?? 0).toInt();
     final hasRating = totalRatings > 0;
@@ -265,7 +275,9 @@ class _DoctorDetailsState extends ConsumerState<_DoctorDetails> {
                     OpdPill(
                       icon: isOnline ? Icons.circle : Icons.circle_outlined,
                       label: isOnline ? 'Online • Ready for calls' : 'Offline',
-                      color: isOnline ? const Color(0xFF2E7D32) : const Color(0xFF757575),
+                      color: isOnline
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFF757575),
                     ),
                     OpdPill(
                       icon: Icons.medical_services_rounded,
@@ -414,9 +426,8 @@ class _DoctorDetailsState extends ConsumerState<_DoctorDetails> {
                             imageUrl:
                                 'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
                             fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color: const Color(0xFFF0F4FA),
-                            ),
+                            placeholder: (context, url) =>
+                                Container(color: const Color(0xFFF0F4FA)),
                             errorWidget: (context, url, error) =>
                                 Container(color: const Color(0xFF0F2445)),
                           ),
@@ -442,7 +453,7 @@ class _DoctorDetailsState extends ConsumerState<_DoctorDetails> {
               watched
                   ? 'Video watched — your discount is unlocked.'
                   : 'Watch the full introduction video to unlock a '
-                      '${pricingPercentLabel()} discount on this consultation.',
+                        '${pricingPercentLabel()} discount on this consultation.',
               style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w500,
@@ -503,17 +514,12 @@ class _DoctorDetailsState extends ConsumerState<_DoctorDetails> {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        primary,
-        const SizedBox(height: 10),
-        secondary,
-      ],
+      children: [primary, const SizedBox(height: 10), secondary],
     );
   }
 
   String pricingPercentLabel() {
-    final percent =
-        appointmentDiscountPercentFor(doctor['discountPercentage']);
+    final percent = appointmentDiscountPercentFor(doctor['discountPercentage']);
     return '${percent.toStringAsFixed(0)}%';
   }
 }

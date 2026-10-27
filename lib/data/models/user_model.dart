@@ -26,16 +26,20 @@ class UserModel {
   final String? paymentId;
   final String? gender;
   final int? age;
-  final DateTime? expiryDate; // 6-month or plan-based expiry from activation/reactivation
+  final DateTime?
+  expiryDate; // 6-month or plan-based expiry from activation/reactivation
   final String? cardStatus; // Card status (e.g. 'Active', 'Expired', 'Blocked')
   // Persisted authentication source: 'patientId' for Patient ID users,
   // 'normal' for normal signup/login patients. Stored in Firestore + local
   // session so the bypass survives navigation and app restarts.
   final String? loginType;
+
   /// Subscription plan ID ('one_month', 'six_months', 'one_year').
   final String? subscriptionPlan;
+
   /// Subscription duration in whole months (1, 6, 12).
   final int? durationMonths;
+
   /// The timestamp the subscription was activated/started.
   final DateTime? subscriptionStartDate;
   final String? authUid;
@@ -48,6 +52,7 @@ class UserModel {
 
   /// Effective duration in whole months.
   int get effectiveDurationMonths => durationMonths ?? plan.durationMonths;
+
   /// Languages a doctor consults in. Always a non-null list — empty means the
   /// doctor has not declared any, which the UI renders as an empty state
   /// rather than an error. See [DoctorLanguages].
@@ -205,8 +210,8 @@ class UserModel {
       durationMonths: map['durationMonths'] is int
           ? map['durationMonths']
           : (map['durationMonths'] is num
-              ? (map['durationMonths'] as num).toInt()
-              : int.tryParse(map['durationMonths']?.toString() ?? '')),
+                ? (map['durationMonths'] as num).toInt()
+                : int.tryParse(map['durationMonths']?.toString() ?? '')),
       subscriptionStartDate: parseFirestoreTimestamp(
         map['subscriptionStartDate'] ?? map['assignedAt'] ?? map['startDate'],
       ),
@@ -225,8 +230,8 @@ class UserModel {
       // throwing inside the parser every screen runs.
       consultationFee:
           _positive(_toDouble(map['price'])) ??
-              _toDouble(map['consultationFee']) ??
-              0,
+          _toDouble(map['consultationFee']) ??
+          0,
       videoConsultationFee: _toDouble(map['videoConsultationFee']),
       discountPercentage: _toDouble(map['discountPercentage']),
       description: _asString(map['description']),

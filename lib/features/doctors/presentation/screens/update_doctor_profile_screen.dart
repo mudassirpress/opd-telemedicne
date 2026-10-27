@@ -30,7 +30,8 @@ class UpdateDoctorProfileScreen extends ConsumerStatefulWidget {
       _UpdateDoctorProfileScreenState();
 }
 
-class _UpdateDoctorProfileScreenState extends ConsumerState<UpdateDoctorProfileScreen> {
+class _UpdateDoctorProfileScreenState
+    extends ConsumerState<UpdateDoctorProfileScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController degreeController = TextEditingController();
 

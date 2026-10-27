@@ -30,20 +30,19 @@ class _DoctorCodec {
   static List<Map<String, dynamic>> decode(String raw) {
     final decoded = jsonDecode(raw);
     if (decoded is! List) return const <Map<String, dynamic>>[];
-    return decoded
-        .map((item) => Map<String, dynamic>.from(item as Map))
-        .map((map) {
-          for (final field in dateFields) {
-            final value = map[field];
-            if (value is String && value.isNotEmpty) {
-              map[field] = DateTime.tryParse(value);
-            } else if (value != null && value is! DateTime) {
-              map[field] = parseFirestoreTimestamp(value);
-            }
-          }
-          return map;
-        })
-        .toList();
+    return decoded.map((item) => Map<String, dynamic>.from(item as Map)).map((
+      map,
+    ) {
+      for (final field in dateFields) {
+        final value = map[field];
+        if (value is String && value.isNotEmpty) {
+          map[field] = DateTime.tryParse(value);
+        } else if (value != null && value is! DateTime) {
+          map[field] = parseFirestoreTimestamp(value);
+        }
+      }
+      return map;
+    }).toList();
   }
 }
 
@@ -70,20 +69,23 @@ Map<String, dynamic> _live(
 
 void main() {
   group('doctor cache serialisation', () {
-    test('survives a round trip with Firestore Timestamp and DateTime fields', () {
-      final since = DateTime(2026, 1, 1, 10, 5);
-      final original = [_live('a', onlineSince: since, isOnline: true)];
+    test(
+      'survives a round trip with Firestore Timestamp and DateTime fields',
+      () {
+        final since = DateTime(2026, 1, 1, 10, 5);
+        final original = [_live('a', onlineSince: since, isOnline: true)];
 
-      // `jsonEncode` throws outright on a DateTime, so a successful encode is
-      // itself the assertion that the date fields were normalised.
-      final restored = _DoctorCodec.decode(_DoctorCodec.encode(original));
+        // `jsonEncode` throws outright on a DateTime, so a successful encode is
+        // itself the assertion that the date fields were normalised.
+        final restored = _DoctorCodec.decode(_DoctorCodec.encode(original));
 
-      expect(restored.length, 1);
-      expect(restored.first['id'], 'a');
-      expect(restored.first['fullname'], 'Dr. a');
-      expect(restored.first['lastSeen'], DateTime(2026, 1, 1, 9));
-      expect(restored.first['onlineSince'], since);
-    });
+        expect(restored.length, 1);
+        expect(restored.first['id'], 'a');
+        expect(restored.first['fullname'], 'Dr. a');
+        expect(restored.first['lastSeen'], DateTime(2026, 1, 1, 9));
+        expect(restored.first['onlineSince'], since);
+      },
+    );
 
     test('a restored cache is usable for presence ordering', () {
       // A cached list must be indistinguishable from a live one downstream, or
@@ -121,9 +123,9 @@ void main() {
 
   group('isEquivalent (should the cache be rewritten?)', () {
     List<Map<String, dynamic>> live() => [
-          _live('a'),
-          _live('b', name: 'Dr. Bee'),
-        ];
+      _live('a'),
+      _live('b', name: 'Dr. Bee'),
+    ];
 
     test('the 15s online-status re-emission is treated as unchanged', () {
       // The shared stream re-emits every 15s just to refresh presence. If that

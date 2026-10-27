@@ -8,11 +8,8 @@ class _Doc {
   const _Doc(this.id);
 }
 
-DoctorPresenceData _online(DateTime since) => DoctorPresenceData(
-      isOnline: true,
-      lastSeen: since,
-      onlineSince: since,
-    );
+DoctorPresenceData _online(DateTime since) =>
+    DoctorPresenceData(isOnline: true, lastSeen: since, onlineSince: since);
 
 DoctorPresenceData _offline() => const DoctorPresenceData(isOnline: false);
 
@@ -21,10 +18,7 @@ void main() {
     test('puts online doctors before offline doctors', () {
       final result = sortDoctorsByPresence<_Doc>(
         const [_Doc('a'), _Doc('b')],
-        {
-          'a': _offline(),
-          'b': _online(DateTime(2026, 1, 1, 10)),
-        },
+        {'a': _offline(), 'b': _online(DateTime(2026, 1, 1, 10))},
         (d) => d.id,
       );
       expect(result.map((d) => d.id), ['b', 'a']);
@@ -47,10 +41,7 @@ void main() {
       // A was online at 10:00, B at 10:05, then A drops offline.
       final result = sortDoctorsByPresence<_Doc>(
         const [_Doc('a'), _Doc('b')],
-        {
-          'a': _offline(),
-          'b': _online(DateTime(2026, 1, 1, 10, 5)),
-        },
+        {'a': _offline(), 'b': _online(DateTime(2026, 1, 1, 10, 5))},
         (d) => d.id,
       );
       expect(result.map((d) => d.id), ['b', 'a']);
@@ -93,14 +84,10 @@ void main() {
 
     test('does not mutate the input list', () {
       final input = <_Doc>[const _Doc('a'), const _Doc('b')];
-      sortDoctorsByPresence<_Doc>(
-        input,
-        {
-          'a': _offline(),
-          'b': _online(DateTime(2026, 1, 1, 12)),
-        },
-        (d) => d.id,
-      );
+      sortDoctorsByPresence<_Doc>(input, {
+        'a': _offline(),
+        'b': _online(DateTime(2026, 1, 1, 12)),
+      }, (d) => d.id);
       expect(input.map((d) => d.id), ['a', 'b']);
     });
 
@@ -135,11 +122,7 @@ void main() {
     test('accepts a Timestamp for onlineSince too', () {
       final since = DateTime(2026, 1, 1, 9);
       final presence = presenceFromDoctorList([
-        {
-          'id': 'a',
-          'isOnline': true,
-          'onlineSince': Timestamp.fromDate(since),
-        },
+        {'id': 'a', 'isOnline': true, 'onlineSince': Timestamp.fromDate(since)},
       ]);
       expect(presence['a']!.onlineSince, since);
     });
@@ -164,30 +147,33 @@ void main() {
       expect(presence.keys, ['c']);
     });
 
-    test('doctor maps straight from streamAllDoctors order without throwing', () {
-      final result = sortDoctorsByPresence<Map<String, dynamic>>(
-        [
-          {'id': 'off', 'isOnline': false, 'lastSeen': Timestamp.now()},
-          {
-            'id': 'on',
-            'isOnline': true,
-            'lastSeen': Timestamp.now(),
-            'onlineSince': DateTime(2026, 1, 1, 12),
-          },
-        ],
-        presenceFromDoctorList([
-          {
-            'id': 'on',
-            'isOnline': true,
-            'lastSeen': Timestamp.now(),
-            'onlineSince': DateTime(2026, 1, 1, 12),
-          },
-          {'id': 'off', 'isOnline': false, 'lastSeen': Timestamp.now()},
-        ]),
-        (d) => (d['id'] ?? '').toString(),
-      );
-      expect(result.first['id'], 'on');
-    });
+    test(
+      'doctor maps straight from streamAllDoctors order without throwing',
+      () {
+        final result = sortDoctorsByPresence<Map<String, dynamic>>(
+          [
+            {'id': 'off', 'isOnline': false, 'lastSeen': Timestamp.now()},
+            {
+              'id': 'on',
+              'isOnline': true,
+              'lastSeen': Timestamp.now(),
+              'onlineSince': DateTime(2026, 1, 1, 12),
+            },
+          ],
+          presenceFromDoctorList([
+            {
+              'id': 'on',
+              'isOnline': true,
+              'lastSeen': Timestamp.now(),
+              'onlineSince': DateTime(2026, 1, 1, 12),
+            },
+            {'id': 'off', 'isOnline': false, 'lastSeen': Timestamp.now()},
+          ]),
+          (d) => (d['id'] ?? '').toString(),
+        );
+        expect(result.first['id'], 'on');
+      },
+    );
   });
 
   group('presenceForDoctorList', () {
@@ -210,16 +196,9 @@ void main() {
     });
 
     test('falls back to the list-derived entry when the service has none', () {
-      final merged = presenceForDoctorList(
-        [
-          {
-            'id': 'a',
-            'isOnline': true,
-            'onlineSince': DateTime(2026, 1, 1, 10),
-          },
-        ],
-        const <String, DoctorPresenceData>{},
-      );
+      final merged = presenceForDoctorList([
+        {'id': 'a', 'isOnline': true, 'onlineSince': DateTime(2026, 1, 1, 10)},
+      ], const <String, DoctorPresenceData>{});
 
       expect(merged['a']!.isOnline, isTrue);
       expect(merged['a']!.onlineSince, DateTime(2026, 1, 1, 10));

@@ -21,20 +21,53 @@ void main() {
       expect(PhoneUtils.isValidE164(null), isFalse);
     });
 
-    test('normalizePhone converts various Pakistani phone formats to +92 E.164', () {
-      expect(PhoneUtils.normalizePhone('03001234567'), equals('+923001234567'));
-      expect(PhoneUtils.normalizePhone('0300-1234567'), equals('+923001234567'));
-      expect(PhoneUtils.normalizePhone('0300 1234567'), equals('+923001234567'));
-      expect(PhoneUtils.normalizePhone('+92 300 1234567'), equals('+923001234567'));
-      expect(PhoneUtils.normalizePhone('923001234567'), equals('+923001234567'));
-      expect(PhoneUtils.normalizePhone('00923001234567'), equals('+923001234567'));
-      expect(PhoneUtils.normalizePhone('3001234567'), equals('+923001234567'));
-    });
+    test(
+      'normalizePhone converts various Pakistani phone formats to +92 E.164',
+      () {
+        expect(
+          PhoneUtils.normalizePhone('03001234567'),
+          equals('+923001234567'),
+        );
+        expect(
+          PhoneUtils.normalizePhone('0300-1234567'),
+          equals('+923001234567'),
+        );
+        expect(
+          PhoneUtils.normalizePhone('0300 1234567'),
+          equals('+923001234567'),
+        );
+        expect(
+          PhoneUtils.normalizePhone('+92 300 1234567'),
+          equals('+923001234567'),
+        );
+        expect(
+          PhoneUtils.normalizePhone('923001234567'),
+          equals('+923001234567'),
+        );
+        expect(
+          PhoneUtils.normalizePhone('00923001234567'),
+          equals('+923001234567'),
+        );
+        expect(
+          PhoneUtils.normalizePhone('3001234567'),
+          equals('+923001234567'),
+        );
+      },
+    );
 
     test('normalizePhone converts international phone numbers to E.164', () {
-      expect(PhoneUtils.normalizePhone('+1 (202) 555-0123'), equals('+12025550123'));
-      expect(PhoneUtils.normalizePhone('0012025550123'), equals('+12025550123'));
-      expect(PhoneUtils.normalizePhone('+44 7911 123456'), equals('+447911123456'));
+      expect(
+        PhoneUtils.normalizePhone('+1 (202) 555-0123'),
+        equals('+12025550123'),
+      );
+      expect(
+        PhoneUtils.normalizePhone('0012025550123'),
+        equals('+12025550123'),
+      );
+      expect(
+        PhoneUtils.normalizePhone('+44 7911 123456'),
+        equals('+447911123456'),
+      );
       expect(
         PhoneUtils.normalizePhone('07911123456', defaultDialCode: '+44'),
         equals('+447911123456'),
@@ -81,7 +114,9 @@ void main() {
   });
 
   group('SignInScreen pre-filled phone test', () {
-    testWidgets('pre-fills phoneController when initialPhone is provided', (tester) async {
+    testWidgets('pre-fills phoneController when initialPhone is provided', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const ProviderScope(
           child: MaterialApp(

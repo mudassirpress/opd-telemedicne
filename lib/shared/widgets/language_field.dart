@@ -28,9 +28,7 @@ class DoctorLanguageSelector extends StatelessWidget {
 
   /// Values in [selected] that [DoctorLanguages.options] no longer offers.
   List<String> get _unknownSelected {
-    final known = DoctorLanguages.options
-        .map((e) => e.toLowerCase())
-        .toSet();
+    final known = DoctorLanguages.options.map((e) => e.toLowerCase()).toSet();
     return selected
         .where((value) => !known.contains(value.toLowerCase()))
         .toList(growable: false);
@@ -53,10 +51,7 @@ class DoctorLanguageSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final options = <String>[
-      ...DoctorLanguages.options,
-      ..._unknownSelected,
-    ];
+    final options = <String>[...DoctorLanguages.options, ..._unknownSelected];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,11 +130,7 @@ class _LanguageChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (isSelected) ...[
-                const Icon(
-                  Icons.check_rounded,
-                  size: 14,
-                  color: Colors.white,
-                ),
+                const Icon(Icons.check_rounded, size: 14, color: Colors.white),
                 const SizedBox(width: 6),
               ],
               Text(
@@ -149,9 +140,7 @@ class _LanguageChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: context.fs(13),
                   fontWeight: FontWeight.w500,
-                  color: isSelected
-                      ? Colors.white
-                      : const Color(0xFF1F2F44),
+                  color: isSelected ? Colors.white : const Color(0xFF1F2F44),
                 ),
               ),
             ],

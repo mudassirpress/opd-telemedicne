@@ -4,15 +4,15 @@ import 'package:telemedicine/data/models/appointment_model.dart';
 
 /// A document exactly as this feature found it: every new key absent.
 Map<String, dynamic> legacyDocument() => const {
-      'patientId': 'p1',
-      'patientName': 'Sara',
-      'doctorId': 'd1',
-      'doctorName': 'Amina',
-      'appointmentStatus': AppointmentStatus.confirmed,
-      'scheduledDate': '2026-10-05',
-      'scheduledStartTime': '10:00 AM',
-      'scheduledEndTime': '10:30 AM',
-    };
+  'patientId': 'p1',
+  'patientName': 'Sara',
+  'doctorId': 'd1',
+  'doctorName': 'Amina',
+  'appointmentStatus': AppointmentStatus.confirmed,
+  'scheduledDate': '2026-10-05',
+  'scheduledStartTime': '10:00 AM',
+  'scheduledEndTime': '10:30 AM',
+};
 
 void main() {
   group('appointment status contract', () {
@@ -23,40 +23,41 @@ void main() {
     });
 
     test('the open set is untouched by this feature', () {
-      expect(
-        AppointmentStatus.open,
-        {
-          AppointmentStatus.requested,
-          AppointmentStatus.confirmed,
-          AppointmentStatus.active,
-        },
-        reason: 'functions/index.js and the booking guard both depend on it',
-      );
+      expect(AppointmentStatus.open, {
+        AppointmentStatus.requested,
+        AppointmentStatus.confirmed,
+        AppointmentStatus.active,
+      }, reason: 'functions/index.js and the booking guard both depend on it');
     });
 
-    test('every lifecycle push type routes through the appointment handler',
-        () {
-      const types = <String>[
-        FcmMessageType.appointmentPaymentSubmitted,
-        FcmMessageType.appointmentPaymentApproved,
-        FcmMessageType.appointmentPaymentRejected,
-        FcmMessageType.newAppointmentRequest,
-        FcmMessageType.appointmentConfirmed,
-        FcmMessageType.appointmentStart,
-        FcmMessageType.appointmentReminder,
-        FcmMessageType.appointmentJoined,
-        FcmMessageType.appointmentDoctorLate,
-        FcmMessageType.appointmentPatientLate,
-        FcmMessageType.appointmentGraceEnding,
-        FcmMessageType.appointmentCancelled,
-        FcmMessageType.appointmentNoShow,
-      ];
-      for (final type in types) {
-        expect(FcmMessageType.isAppointment(type), isTrue, reason: type);
-      }
-      expect(FcmMessageType.isAppointment(FcmMessageType.call), isFalse);
-      expect(FcmMessageType.isAppointment(FcmMessageType.chatMessage), isFalse);
-    });
+    test(
+      'every lifecycle push type routes through the appointment handler',
+      () {
+        const types = <String>[
+          FcmMessageType.appointmentPaymentSubmitted,
+          FcmMessageType.appointmentPaymentApproved,
+          FcmMessageType.appointmentPaymentRejected,
+          FcmMessageType.newAppointmentRequest,
+          FcmMessageType.appointmentConfirmed,
+          FcmMessageType.appointmentStart,
+          FcmMessageType.appointmentReminder,
+          FcmMessageType.appointmentJoined,
+          FcmMessageType.appointmentDoctorLate,
+          FcmMessageType.appointmentPatientLate,
+          FcmMessageType.appointmentGraceEnding,
+          FcmMessageType.appointmentCancelled,
+          FcmMessageType.appointmentNoShow,
+        ];
+        for (final type in types) {
+          expect(FcmMessageType.isAppointment(type), isTrue, reason: type);
+        }
+        expect(FcmMessageType.isAppointment(FcmMessageType.call), isFalse);
+        expect(
+          FcmMessageType.isAppointment(FcmMessageType.chatMessage),
+          isFalse,
+        );
+      },
+    );
   });
 
   group('backward compatibility', () {
@@ -177,10 +178,7 @@ void main() {
       });
       expect(appointment.isNoShow, isTrue);
       expect(appointment.isConfirmed, isFalse);
-      expect(
-        AppointmentStatus.isOpen(appointment.appointmentStatus),
-        isFalse,
-      );
+      expect(AppointmentStatus.isOpen(appointment.appointmentStatus), isFalse);
       expect(appointment.hasLivePhase, isFalse);
     });
 
@@ -211,56 +209,54 @@ extension on AppointmentModel {
     bool? doctorLateNoticeSent,
     bool? patientLateNoticeSent,
     bool? graceNoticeSent,
-  }) =>
-      AppointmentModel(
-        id: id,
-        patientId: patientId,
-        patientName: patientName,
-        patientImage: patientImage,
-        doctorId: doctorId,
-        doctorName: doctorName,
-        doctorImage: doctorImage,
-        doctorSpecialization: doctorSpecialization,
-        subject: subject,
-        message: message,
-        price: price,
-        consultationFee: consultationFee,
-        discountPercentage: discountPercentage,
-        discountAmount: discountAmount,
-        payableAmount: payableAmount,
-        videoWatched: videoWatched,
-        youtubeVideoUrl: youtubeVideoUrl,
-        paymentId: paymentId,
-        paymentStatus: paymentStatus,
-        appointmentStatus: appointmentStatus,
-        requestedAt: requestedAt,
-        confirmedAt: confirmedAt,
-        createdAt: createdAt,
-        updatedAt: updatedAt,
-        scheduledDate: scheduledDate,
-        scheduledStartTime: scheduledStartTime,
-        scheduledEndTime: scheduledEndTime,
-        scheduledStartAt: scheduledStartAt,
-        scheduledEndAt: scheduledEndAt,
-        appointmentStartNotificationSent: appointmentStartNotificationSent,
-        doctorResponse: doctorResponse,
-        pinnedMessageId: pinnedMessageId,
-        appointmentPhase: appointmentPhase ?? this.appointmentPhase,
-        patientJoinedAt: patientJoinedAt ?? this.patientJoinedAt,
-        doctorJoinedAt: doctorJoinedAt ?? this.doctorJoinedAt,
-        cancelledBy: cancelledBy ?? this.cancelledBy,
-        cancelReason: cancelReason ?? this.cancelReason,
-        cancelledAt: cancelledAt ?? this.cancelledAt,
-        noShowBy: noShowBy ?? this.noShowBy,
-        noShowAt: noShowAt ?? this.noShowAt,
-        completedAt: completedAt ?? this.completedAt,
-        reminderSent: reminderSent ?? this.reminderSent,
-        reminder24hSent: reminder24hSent,
-        reminder60mSent: reminder60mSent,
-        reminder10mSent: reminder10mSent,
-        doctorLateNoticeSent: doctorLateNoticeSent ?? this.doctorLateNoticeSent,
-        patientLateNoticeSent:
-            patientLateNoticeSent ?? this.patientLateNoticeSent,
-        graceNoticeSent: graceNoticeSent ?? this.graceNoticeSent,
-      );
+  }) => AppointmentModel(
+    id: id,
+    patientId: patientId,
+    patientName: patientName,
+    patientImage: patientImage,
+    doctorId: doctorId,
+    doctorName: doctorName,
+    doctorImage: doctorImage,
+    doctorSpecialization: doctorSpecialization,
+    subject: subject,
+    message: message,
+    price: price,
+    consultationFee: consultationFee,
+    discountPercentage: discountPercentage,
+    discountAmount: discountAmount,
+    payableAmount: payableAmount,
+    videoWatched: videoWatched,
+    youtubeVideoUrl: youtubeVideoUrl,
+    paymentId: paymentId,
+    paymentStatus: paymentStatus,
+    appointmentStatus: appointmentStatus,
+    requestedAt: requestedAt,
+    confirmedAt: confirmedAt,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    scheduledDate: scheduledDate,
+    scheduledStartTime: scheduledStartTime,
+    scheduledEndTime: scheduledEndTime,
+    scheduledStartAt: scheduledStartAt,
+    scheduledEndAt: scheduledEndAt,
+    appointmentStartNotificationSent: appointmentStartNotificationSent,
+    doctorResponse: doctorResponse,
+    pinnedMessageId: pinnedMessageId,
+    appointmentPhase: appointmentPhase ?? this.appointmentPhase,
+    patientJoinedAt: patientJoinedAt ?? this.patientJoinedAt,
+    doctorJoinedAt: doctorJoinedAt ?? this.doctorJoinedAt,
+    cancelledBy: cancelledBy ?? this.cancelledBy,
+    cancelReason: cancelReason ?? this.cancelReason,
+    cancelledAt: cancelledAt ?? this.cancelledAt,
+    noShowBy: noShowBy ?? this.noShowBy,
+    noShowAt: noShowAt ?? this.noShowAt,
+    completedAt: completedAt ?? this.completedAt,
+    reminderSent: reminderSent ?? this.reminderSent,
+    reminder24hSent: reminder24hSent,
+    reminder60mSent: reminder60mSent,
+    reminder10mSent: reminder10mSent,
+    doctorLateNoticeSent: doctorLateNoticeSent ?? this.doctorLateNoticeSent,
+    patientLateNoticeSent: patientLateNoticeSent ?? this.patientLateNoticeSent,
+    graceNoticeSent: graceNoticeSent ?? this.graceNoticeSent,
+  );
 }

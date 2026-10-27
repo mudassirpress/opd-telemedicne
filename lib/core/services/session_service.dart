@@ -6,7 +6,7 @@ import 'package:telemedicine/core/services/device_service.dart';
 class SessionService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static const String _collection = 'active_sessions';
-  
+
   /// Create a new session for a user and return the sessionId
   static Future<String> createSession({
     required String userId,
@@ -14,7 +14,7 @@ class SessionService {
   }) async {
     final sessionId = const Uuid().v4();
     final deviceId = await DeviceService.getDeviceId();
-    
+
     // Determine platform
     String platform = 'Unknown';
     if (Platform.isAndroid) platform = 'Android';
@@ -29,7 +29,7 @@ class SessionService {
         .where('deviceId', isEqualTo: deviceId)
         .where('sessionStatus', isEqualTo: 'active')
         .get();
-        
+
     for (var doc in oldSessions.docs) {
       await doc.reference.update({'sessionStatus': 'terminated'});
     }
@@ -49,7 +49,10 @@ class SessionService {
   }
 
   /// End a specific session (or all active sessions for a user if sessionId is null)
-  static Future<void> endSession({required String userId, String? sessionId}) async {
+  static Future<void> endSession({
+    required String userId,
+    String? sessionId,
+  }) async {
     if (sessionId != null) {
       await _firestore.collection(_collection).doc(sessionId).update({
         'sessionStatus': 'terminated',
@@ -61,7 +64,7 @@ class SessionService {
           .where('userId', isEqualTo: userId)
           .where('sessionStatus', isEqualTo: 'active')
           .get();
-      
+
       if (snapshot.docs.isEmpty) return;
 
       final batch = _firestore.batch();
@@ -88,7 +91,7 @@ class SessionService {
   /// Returns true if there is an active session on ANOTHER device that is less than 2 minutes old.
   static Future<bool> hasActiveSessionOnOtherDevice(String userId) async {
     final currentDeviceId = await DeviceService.getDeviceId();
-    
+
     final snapshot = await _firestore
         .collection(_collection)
         .where('userId', isEqualTo: userId)
@@ -98,13 +101,13 @@ class SessionService {
     for (var doc in snapshot.docs) {
       final data = doc.data();
       final deviceId = data['deviceId'] ?? '';
-      
+
       // If the active session is on THIS device, it's fine (maybe a previous login without logout).
       // We will terminate it when creating the new one.
       if (deviceId == currentDeviceId) {
         continue;
       }
-      
+
       // If it's on a different device, check if it's stale (lastSeen > 2 mins ago)
       final lastSeen = data['lastSeen'] as Timestamp?;
       if (lastSeen != null) {
@@ -117,13 +120,13 @@ class SessionService {
           // We can terminate it to clean up.
           try {
             await doc.reference.update({'sessionStatus': 'terminated'});
-          } catch(e) {
+          } catch (e) {
             print('Error terminating stale session: $e');
           }
         }
       }
     }
-    
+
     return false;
   }
 }

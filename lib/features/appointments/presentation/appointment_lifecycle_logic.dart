@@ -71,14 +71,20 @@ String resolveAppointmentPhase({
   );
 
   if (patientIn && !doctorIn) {
-    return doctorLateBy ? AppointmentPhase.doctorLate : AppointmentPhase.waitingForDoctor;
+    return doctorLateBy
+        ? AppointmentPhase.doctorLate
+        : AppointmentPhase.waitingForDoctor;
   }
   if (doctorIn && !patientIn) {
-    return patientLateBy ? AppointmentPhase.patientLate : AppointmentPhase.waitingForPatient;
+    return patientLateBy
+        ? AppointmentPhase.patientLate
+        : AppointmentPhase.waitingForPatient;
   }
   // Nobody in yet: the doctor is expected first, so an empty slot ages into
   // `doctor_late` rather than blaming a patient who may simply be early.
-  return doctorLateBy ? AppointmentPhase.doctorLate : AppointmentPhase.waitingForDoctor;
+  return doctorLateBy
+      ? AppointmentPhase.doctorLate
+      : AppointmentPhase.waitingForDoctor;
 }
 
 /// The status an open appointment takes the moment its slot ends.
@@ -302,10 +308,7 @@ String? bookingFreezeMessage({
 /// [AppointmentPhase.patientLate] / [AppointmentPhase.graceEnding] and the
 /// corresponding claim flag is still free. The caller claims the flag in a
 /// transaction, so this only answers "is this the moment for it?".
-bool isAttendanceNoticeDue({
-  required String phase,
-  required bool alreadySent,
-}) {
+bool isAttendanceNoticeDue({required String phase, required bool alreadySent}) {
   if (alreadySent) return false;
   return phase == AppointmentPhase.doctorLate ||
       phase == AppointmentPhase.patientLate ||

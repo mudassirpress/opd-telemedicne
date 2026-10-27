@@ -83,7 +83,9 @@ class CenteredContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth ?? context.contentMaxWidth),
+        constraints: BoxConstraints(
+          maxWidth: maxWidth ?? context.contentMaxWidth,
+        ),
         child: child,
       ),
     );

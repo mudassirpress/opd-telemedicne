@@ -6,29 +6,33 @@ import 'package:telemedicine/core/constants/app_constants.dart';
 import 'package:telemedicine/data/models/doctor_rating_model.dart';
 import 'package:telemedicine/data/models/prescription_model.dart';
 
-final doctorRatingControllerProvider =
-    Provider<DoctorRatingController>((ref) => DoctorRatingController());
+final doctorRatingControllerProvider = Provider<DoctorRatingController>(
+  (ref) => DoctorRatingController(),
+);
 
 /// Realtime rating of this doctor by this patient for this prescription, or
 /// null while unrated. Used by the prescription card in the chat, so the card
 /// automatically switches to "Your Rating" after a submission without the
 /// chat being reloaded.
-final prescriptionRatingProvider =
-    StreamProvider.autoDispose.family<DoctorRatingModel?, ({String doctorId, String patientId, String prescriptionId})>(
-  (ref, args) {
-    return ref.read(doctorRatingControllerProvider).watchRating(
-          doctorId: args.doctorId,
-          patientId: args.patientId,
-          prescriptionId: args.prescriptionId,
-        );
-  },
-);
+final prescriptionRatingProvider = StreamProvider.autoDispose
+    .family<
+      DoctorRatingModel?,
+      ({String doctorId, String patientId, String prescriptionId})
+    >((ref, args) {
+      return ref
+          .read(doctorRatingControllerProvider)
+          .watchRating(
+            doctorId: args.doctorId,
+            patientId: args.patientId,
+            prescriptionId: args.prescriptionId,
+          );
+    });
 
 /// Average rating + total count for a doctor, for their profile.
-final doctorRatingSummaryProvider =
-    StreamProvider.autoDispose.family<DoctorRatingSummary, String>((ref, doctorId) {
-  return ref.read(doctorRatingControllerProvider).watchSummary(doctorId);
-});
+final doctorRatingSummaryProvider = StreamProvider.autoDispose
+    .family<DoctorRatingSummary, String>((ref, doctorId) {
+      return ref.read(doctorRatingControllerProvider).watchSummary(doctorId);
+    });
 
 /// Why a rating submission was refused.
 enum RatingFailure {
@@ -71,7 +75,7 @@ class DoctorRatingController {
   final FirebaseFirestore _firestore;
 
   DoctorRatingController({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _collection =>
       _firestore.collection(FirestoreCollections.doctorRatings);
@@ -163,13 +167,10 @@ class DoctorRatingController {
       await _firestore
           .collection(FirestoreCollections.doctors)
           .doc(doctorId)
-          .set(
-        {
-          'averageRating': summary.average,
-          'totalRatings': summary.total,
-        },
-        SetOptions(merge: true),
-      );
+          .set({
+            'averageRating': summary.average,
+            'totalRatings': summary.total,
+          }, SetOptions(merge: true));
       return summary;
     } catch (e) {
       return DoctorRatingSummary.empty;

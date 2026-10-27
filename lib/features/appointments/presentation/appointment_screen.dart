@@ -47,10 +47,9 @@ class _AppointmentScreenState extends ConsumerState<AppointmentScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(userProvider);
       if (user != null && user.role != UserRoles.doctor) {
-        ref.read(appointmentControllerProvider).finalizeExpiredAppointments(
-              userId: user.id,
-              isDoctor: false,
-            );
+        ref
+            .read(appointmentControllerProvider)
+            .finalizeExpiredAppointments(userId: user.id, isDoctor: false);
       }
     });
   }
@@ -76,7 +75,12 @@ class _AppointmentScreenState extends ConsumerState<AppointmentScreen> {
             child: Column(
               children: [
                 Padding(
-                  padding: EdgeInsets.fromLTRB(context.rsp(20), 14, context.rsp(20), 0),
+                  padding: EdgeInsets.fromLTRB(
+                    context.rsp(20),
+                    14,
+                    context.rsp(20),
+                    0,
+                  ),
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 440),
@@ -177,8 +181,8 @@ class _AppointmentScreenState extends ConsumerState<AppointmentScreen> {
                 if (_query.isEmpty) return true;
                 final haystack =
                     '${d['fullname'] ?? ''} ${d['specialization'] ?? ''} '
-                        '${d['highestDegree'] ?? ''}'
-                    .toLowerCase();
+                            '${d['highestDegree'] ?? ''}'
+                        .toLowerCase();
                 return haystack.contains(_query.toLowerCase());
               }).toList();
 
@@ -290,12 +294,8 @@ class _AppointmentScreenState extends ConsumerState<AppointmentScreen> {
                       final aLive = _isLive(a);
                       final bLive = _isLive(b);
                       if (aLive != bLive) return aLive ? -1 : 1;
-                      final aTime = a.startAt ??
-                          a.confirmedAt ??
-                          a.createdAt;
-                      final bTime = b.startAt ??
-                          b.confirmedAt ??
-                          b.createdAt;
+                      final aTime = a.startAt ?? a.confirmedAt ?? a.createdAt;
+                      final bTime = b.startAt ?? b.confirmedAt ?? b.createdAt;
                       if (aTime == null && bTime == null) return 0;
                       if (aTime == null) return 1;
                       if (bTime == null) return -1;
@@ -308,13 +308,13 @@ class _AppointmentScreenState extends ConsumerState<AppointmentScreen> {
                   title: filter == 'history'
                       ? 'No past appointments'
                       : filter == 'live'
-                          ? 'Nothing running right now'
-                          : 'No upcoming appointments',
+                      ? 'Nothing running right now'
+                      : 'No upcoming appointments',
                   subtitle: filter == 'history'
                       ? 'Completed, expired and cancelled appointments are '
-                          'kept here.'
+                            'kept here.'
                       : 'Booked consultations show up here as soon as a '
-                          'doctor confirms them.',
+                            'doctor confirms them.',
                 );
               }
 
@@ -380,7 +380,8 @@ class _DoctorCard extends ConsumerWidget {
     // while the live stream is still loading.
     final ratingAsync = ref.watch(doctorRatingSummaryProvider(doctorId));
     final rating =
-        ratingAsync.valueOrNull?.average ?? (doctor['averageRating'] ?? 0.0).toDouble();
+        ratingAsync.valueOrNull?.average ??
+        (doctor['averageRating'] ?? 0.0).toDouble();
     final totalRatings =
         ratingAsync.valueOrNull?.total ?? (doctor['totalRatings'] ?? 0).toInt();
     final hasRating = totalRatings > 0;
@@ -390,7 +391,8 @@ class _DoctorCard extends ConsumerWidget {
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => DoctorDetailsScreen(doctorId: (doctor['id'] ?? '').toString()),
+          builder: (_) =>
+              DoctorDetailsScreen(doctorId: (doctor['id'] ?? '').toString()),
         ),
       ),
       child: Row(
@@ -398,8 +400,9 @@ class _DoctorCard extends ConsumerWidget {
           CircleAvatar(
             radius: 26,
             backgroundColor: const Color(0xFFF0F4FA),
-            backgroundImage:
-                image.isNotEmpty ? CachedNetworkImageProvider(image) : null,
+            backgroundImage: image.isNotEmpty
+                ? CachedNetworkImageProvider(image)
+                : null,
             child: image.isEmpty
                 ? Text(
                     _name.isNotEmpty ? _name[0].toUpperCase() : '?',
@@ -499,11 +502,10 @@ class _AppointmentCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final phase = appointmentDisplayPhase(appointment);
-    final joinable =
-        showAppointmentJoinAction(appointment, asDoctor: false);
-    final showPaymentFlow =
-        appointment.isApproved && appointment.isRequested;
-    final isScheduled = appointment.isConfirmed &&
+    final joinable = showAppointmentJoinAction(appointment, asDoctor: false);
+    final showPaymentFlow = appointment.isApproved && appointment.isRequested;
+    final isScheduled =
+        appointment.isConfirmed &&
         appointment.hasSchedule &&
         !appointment.isCompleted;
 
@@ -511,21 +513,19 @@ class _AppointmentCard extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       onTap: showPaymentFlow
           ? () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AppointmentPaymentScreen(
-                    doctorId: appointment.doctorId,
-                  ),
-                ),
-              )
-          : () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AppointmentDetailScreen(
-                    appointmentId: appointment.id,
-                  ),
-                ),
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    AppointmentPaymentScreen(doctorId: appointment.doctorId),
               ),
+            )
+          : () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    AppointmentDetailScreen(appointmentId: appointment.id),
+              ),
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -602,8 +602,7 @@ class _AppointmentCard extends ConsumerWidget {
                         '${appointment.scheduledStartTime} - '
                         '${appointment.scheduledEndTime}',
                   ),
-                ] else if (appointment.isNoShow &&
-                    appointment.hasSchedule) ...[
+                ] else if (appointment.isNoShow && appointment.hasSchedule) ...[
                   OpdDetailRow(
                     icon: Icons.person_off_rounded,
                     label: 'No-show',
@@ -618,9 +617,7 @@ class _AppointmentCard extends ConsumerWidget {
                     label: 'Status',
                     value: appointment.isRequested
                         ? 'Waiting for the doctor to pick a date and time'
-                        : appointmentStatusLabel(
-                            appointment.appointmentStatus,
-                          ),
+                        : appointmentStatusLabel(appointment.appointmentStatus),
                   ),
                 ],
                 OpdDetailRow(
@@ -647,10 +644,7 @@ class _AppointmentCard extends ConsumerWidget {
                 icon: const Icon(Icons.video_call_rounded, size: 18),
                 label: Text(
                   'Join appointment',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -675,7 +669,9 @@ class _AppointmentCard extends ConsumerWidget {
     final user = ref.read(userProvider);
     if (user == null) return;
 
-    final error = await ref.read(appointmentControllerProvider).markAppointmentJoined(
+    final error = await ref
+        .read(appointmentControllerProvider)
+        .markAppointmentJoined(
           appointment: appointment,
           actorId: user.id,
           asDoctor: false,

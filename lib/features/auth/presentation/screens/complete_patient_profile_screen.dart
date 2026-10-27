@@ -89,7 +89,8 @@ class _CompletePatientProfileScreenState
 
   void _initSessionAndPhone() {
     // 1. Resolve phone number
-    final initialPhone = widget.verifiedPhone ??
+    final initialPhone =
+        widget.verifiedPhone ??
         widget.prefilledPhone ??
         FirebaseAuth.instance.currentUser?.phoneNumber ??
         ref.read(patientControllerProvider).currentUser?.phoneNumber;
@@ -102,8 +103,12 @@ class _CompletePatientProfileScreenState
     final resolvedUid = _resolveActiveUid();
     debugPrint('🔍 [CompleteProfile.initState] Session Status:');
     debugPrint('   - widget.patientUid: ${widget.patientUid}');
-    debugPrint('   - FirebaseAuth.currentUser: ${FirebaseAuth.instance.currentUser?.uid}');
-    debugPrint('   - Controller currentUser: ${ref.read(patientControllerProvider).currentUser?.id}');
+    debugPrint(
+      '   - FirebaseAuth.currentUser: ${FirebaseAuth.instance.currentUser?.uid}',
+    );
+    debugPrint(
+      '   - Controller currentUser: ${ref.read(patientControllerProvider).currentUser?.id}',
+    );
     debugPrint('   - Resolved UID: $resolvedUid');
     debugPrint('   - isPhoneAuth: $_isPhoneAuth');
     debugPrint('   - Initial Phone: $initialPhone');
@@ -145,7 +150,9 @@ class _CompletePatientProfileScreenState
       if (doc.exists && mounted) {
         final user = UserModel.fromMap({...doc.data()!, 'id': doc.id});
         ref.read(patientControllerProvider).setCurrentUser(user);
-        debugPrint('✅ [CompleteProfile] Hydrated patient session for UID: $uid');
+        debugPrint(
+          '✅ [CompleteProfile] Hydrated patient session for UID: $uid',
+        );
       }
     } catch (e) {
       debugPrint('⚠️ [CompleteProfile] Hydrate session notice: $e');
@@ -176,7 +183,8 @@ class _CompletePatientProfileScreenState
     String phoneToSave = '';
     if (_isPhoneAuth) {
       // Case A (Phone Auth): Use authenticated phone number, field is hidden
-      phoneToSave = widget.verifiedPhone ??
+      phoneToSave =
+          widget.verifiedPhone ??
           widget.prefilledPhone ??
           FirebaseAuth.instance.currentUser?.phoneNumber ??
           ref.read(patientControllerProvider).currentUser?.phoneNumber ??
@@ -201,18 +209,21 @@ class _CompletePatientProfileScreenState
         AppFeedback.showError(context, 'Please enter a valid mobile number');
         return;
       }
-      phoneToSave = _phoneValue?.isValid == true &&
+      phoneToSave =
+          _phoneValue?.isValid == true &&
               (_phoneValue?.e164.isNotEmpty ?? false)
           ? _phoneValue!.e164
           : PhoneUtils.normalizePhone(
-                rawPhone,
-                defaultDialCode: _selectedDialCode,
-              ) ??
-              rawPhone;
+                  rawPhone,
+                  defaultDialCode: _selectedDialCode,
+                ) ??
+                rawPhone;
     }
 
     final resolvedUid = _resolveActiveUid();
-    debugPrint('🚀 [CompleteProfile._submitProfile] Executing registration completion:');
+    debugPrint(
+      '🚀 [CompleteProfile._submitProfile] Executing registration completion:',
+    );
     debugPrint('   - resolvedUid: $resolvedUid');
     debugPrint('   - isPhoneAuth: $_isPhoneAuth');
     debugPrint('   - phoneToSave: $phoneToSave');
@@ -221,7 +232,9 @@ class _CompletePatientProfileScreenState
     // Null session check
     if (widget.patientIdModel == null &&
         (resolvedUid == null || resolvedUid.isEmpty)) {
-      debugPrint('❌ [CompleteProfile._submitProfile] Auth session check failed: No active patient session found.');
+      debugPrint(
+        '❌ [CompleteProfile._submitProfile] Auth session check failed: No active patient session found.',
+      );
       AppFeedback.showError(
         context,
         'No active patient session found. Please log in again.',
@@ -398,8 +411,8 @@ class _CompletePatientProfileScreenState
                               controller: _nameController,
                               validator: (val) =>
                                   (val == null || val.trim().isEmpty)
-                                      ? 'Please enter your full name'
-                                      : null,
+                                  ? 'Please enter your full name'
+                                  : null,
                             ),
                             const SizedBox(height: 16),
 
@@ -415,10 +428,9 @@ class _CompletePatientProfileScreenState
                                   _selectedGender = val ?? '';
                                 });
                               },
-                              validator: (val) =>
-                                  (val == null || val.isEmpty)
-                                      ? 'Please select your gender'
-                                      : null,
+                              validator: (val) => (val == null || val.isEmpty)
+                                  ? 'Please select your gender'
+                                  : null,
                             ),
                             const SizedBox(height: 16),
 

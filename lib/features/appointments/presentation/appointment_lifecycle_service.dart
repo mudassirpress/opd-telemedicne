@@ -43,7 +43,7 @@ class AppointmentLifecycleService with WidgetsBindingObserver {
 
   final Map<String, AppointmentModel> _appointments = {};
   final List<StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>
-      _subscriptions = [];
+  _subscriptions = [];
 
   Timer? _timer;
   bool _watching = false;
@@ -96,11 +96,11 @@ class AppointmentLifecycleService with WidgetsBindingObserver {
     try {
       final query = isDoctor
           ? FirebaseFirestore.instance
-              .collection(FirestoreCollections.appointments)
-              .where('doctorId', isEqualTo: _userId)
+                .collection(FirestoreCollections.appointments)
+                .where('doctorId', isEqualTo: _userId)
           : FirebaseFirestore.instance
-              .collection(FirestoreCollections.appointments)
-              .where('patientId', isEqualTo: _userId);
+                .collection(FirestoreCollections.appointments)
+                .where('patientId', isEqualTo: _userId);
 
       _subscriptions.add(
         query.snapshots().listen(
@@ -141,8 +141,9 @@ class AppointmentLifecycleService with WidgetsBindingObserver {
 
     _passRunning = true;
     try {
-      await _controller
-          .evaluateAppointments(_appointments.values.toList(growable: false));
+      await _controller.evaluateAppointments(
+        _appointments.values.toList(growable: false),
+      );
     } catch (_) {
       // Housekeeping never surfaces an error to the UI.
     } finally {
@@ -170,7 +171,8 @@ class AppointmentLifecycleService with WidgetsBindingObserver {
           if (id.isEmpty) continue;
           return (
             id: id,
-            isDoctor: key == 'current_doctor' ||
+            isDoctor:
+                key == 'current_doctor' ||
                 map['role']?.toString() == UserRoles.doctor,
           );
         } catch (_) {

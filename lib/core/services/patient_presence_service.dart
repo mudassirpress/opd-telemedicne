@@ -10,9 +10,7 @@ import 'package:telemedicine/core/services/session_service.dart';
 /// user – it communicates with the owning [PatientController] through the
 /// supplied [PatientPresenceDelegate] so that state remains in a single place.
 class PatientPresenceService {
-  PatientPresenceService({
-    required this.delegate,
-  });
+  PatientPresenceService({required this.delegate});
 
   final PatientPresenceDelegate delegate;
 
@@ -27,7 +25,8 @@ class PatientPresenceService {
   /// Initialize presence: mark online, start heartbeat, listen for
   /// connectivity changes.
   Future<void> initializePatientPresence() async {
-    if (delegate.currentUserId == null || delegate.currentUserRole != 'patient') {
+    if (delegate.currentUserId == null ||
+        delegate.currentUserRole != 'patient') {
       return;
     }
 
@@ -75,7 +74,7 @@ class PatientPresenceService {
                 'lastSeen': FieldValue.serverTimestamp(),
                 'lastHeartbeat': FieldValue.serverTimestamp(),
               });
-              
+
           final sessionId = delegate.currentSessionId;
           if (sessionId != null) {
             await SessionService.heartbeatSession(sessionId);

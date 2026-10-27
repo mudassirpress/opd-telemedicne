@@ -43,9 +43,7 @@ class DoctorContactScreen extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const OpdInlineLoader(
-              label: 'Loading doctor details...',
-            );
+            return const OpdInlineLoader(label: 'Loading doctor details...');
           }
 
           if (snapshot.hasError) {
@@ -100,10 +98,7 @@ class _DoctorContactBody extends StatelessWidget {
       profile?['imageUrl'],
       fallback: _text(profile?['image'], fallback: fallbackImage),
     );
-    final degree = _text(
-      profile?['highestDegree'],
-      fallback: 'Not specified',
-    );
+    final degree = _text(profile?['highestDegree'], fallback: 'Not specified');
     // `DoctorLanguages.parse` absorbs the missing-field case, so a doctor who
     // has never declared a language renders an empty list rather than throwing.
     final languages = DoctorLanguages.parse(
@@ -123,12 +118,8 @@ class _DoctorContactBody extends StatelessWidget {
               CircleAvatar(
                 radius: 46,
                 backgroundColor: const Color(0xFFF0F4FA),
-                backgroundImage: image.isNotEmpty
-                    ? NetworkImage(image)
-                    : null,
-                onBackgroundImageError: image.isEmpty
-                    ? null
-                    : (_, __) {},
+                backgroundImage: image.isNotEmpty ? NetworkImage(image) : null,
+                onBackgroundImageError: image.isEmpty ? null : (_, __) {},
                 child: image.isEmpty
                     ? Text(
                         name.isNotEmpty ? name[0].toUpperCase() : '?',

@@ -84,6 +84,7 @@ class AppointmentController {
     _configFetchedAt = DateTime.now();
     return _configCache;
   }
+
   static String videoWatchId({
     required String patientId,
     required String doctorId,
@@ -114,9 +115,11 @@ class AppointmentController {
     required String patientId,
     required String doctorId,
   }) async {
-    if (patientId.isEmpty || doctorId.isEmpty) return const <AppointmentModel>[];
-    final snap =
-        await _appointments.where('patientId', isEqualTo: patientId).get();
+    if (patientId.isEmpty || doctorId.isEmpty)
+      return const <AppointmentModel>[];
+    final snap = await _appointments
+        .where('patientId', isEqualTo: patientId)
+        .get();
     return snap.docs
         .map((d) => AppointmentModel.fromMap(d.id, d.data()))
         .where((a) => a.doctorId == doctorId)
@@ -247,9 +250,9 @@ class AppointmentController {
       return;
     }
     try {
-      await for (final snap in _eventsOf(appointmentId)
-          .orderBy('at', descending: true)
-          .snapshots()) {
+      await for (final snap in _eventsOf(
+        appointmentId,
+      ).orderBy('at', descending: true).snapshots()) {
         yield snap.docs
             .map((d) => AppointmentEvent.fromMap(d.id, d.data()))
             .toList();
@@ -298,7 +301,8 @@ class AppointmentController {
   /// admins' changes.
   Stream<AppointmentConfig> watchConfig() async* {
     try {
-      await for (final snap in _settings.doc(AppointmentConfig.docId).snapshots()) {
+      await for (final snap
+          in _settings.doc(AppointmentConfig.docId).snapshots()) {
         final config = AppointmentConfig.fromMap(snap.data());
         _configCache = config;
         _configFetchedAt = DateTime.now();
@@ -379,9 +383,10 @@ class AppointmentController {
       return;
     }
     try {
-      await for (final doc in _videoWatches
-          .doc(videoWatchId(patientId: patientId, doctorId: doctorId))
-          .snapshots()) {
+      await for (final doc
+          in _videoWatches
+              .doc(videoWatchId(patientId: patientId, doctorId: doctorId))
+              .snapshots()) {
         yield (doc.data()?['videoWatched'] ?? false) == true;
       }
     } catch (_) {
@@ -420,15 +425,15 @@ class AppointmentController {
           .collection(FirestoreCollections.doctorVideoWatches)
           .doc('${patientId}_$doctorId')
           .set({
-        'patientId': patientId,
-        'doctorId': doctorId,
-        'videoAssignmentId': videoAssignmentId,
-        'youtubeVideoId': youtubeVideoId,
-        'watchProgress': 1.0,
-        'completed': true,
-        'completedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+            'patientId': patientId,
+            'doctorId': doctorId,
+            'videoAssignmentId': videoAssignmentId,
+            'youtubeVideoId': youtubeVideoId,
+            'watchProgress': 1.0,
+            'completed': true,
+            'completedAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
       await _videoWatches
           .doc(videoWatchId(patientId: patientId, doctorId: doctorId))
           .set({
@@ -520,19 +525,19 @@ class AppointmentController {
       return;
     }
     try {
-      await for (final snap in _payments
-          .where('patientId', isEqualTo: patientId)
-          .snapshots()) {
-        final candidates = snap.docs
-            .map((d) => AppointmentPaymentModel.fromMap(d.id, d.data()))
-            .where((p) => p.doctorId == doctorId)
-            .toList()
-          ..sort((a, b) {
-            final aAt = a.submittedAt ?? a.updatedAt;
-            final bAt = b.submittedAt ?? b.updatedAt;
-            return (bAt ?? DateTime.fromMillisecondsSinceEpoch(0))
-                .compareTo(aAt ?? DateTime.fromMillisecondsSinceEpoch(0));
-          });
+      await for (final snap
+          in _payments.where('patientId', isEqualTo: patientId).snapshots()) {
+        final candidates =
+            snap.docs
+                .map((d) => AppointmentPaymentModel.fromMap(d.id, d.data()))
+                .where((p) => p.doctorId == doctorId)
+                .toList()
+              ..sort((a, b) {
+                final aAt = a.submittedAt ?? a.updatedAt;
+                final bAt = b.submittedAt ?? b.updatedAt;
+                return (bAt ?? DateTime.fromMillisecondsSinceEpoch(0))
+                    .compareTo(aAt ?? DateTime.fromMillisecondsSinceEpoch(0));
+              });
 
         AppointmentPaymentModel? current;
         for (final candidate in candidates) {
@@ -547,10 +552,14 @@ class AppointmentController {
             patientId: patientId,
             doctorId: doctorId,
           );
-          final linked = appointments.where((a) =>
-              (candidate.appointmentId.isNotEmpty &&
-                  a.id == candidate.appointmentId) ||
-              a.paymentId == (candidate.paymentId ?? candidate.id)).toList();
+          final linked = appointments
+              .where(
+                (a) =>
+                    (candidate.appointmentId.isNotEmpty &&
+                        a.id == candidate.appointmentId) ||
+                    a.paymentId == (candidate.paymentId ?? candidate.id),
+              )
+              .toList();
           final isOpen = linked.any(
             (a) =>
                 AppointmentStatus.isOpen(a.appointmentStatus) &&
@@ -570,9 +579,8 @@ class AppointmentController {
 
   Stream<List<AppointmentPaymentModel>> watchAllPayments() async* {
     try {
-      await for (final snap in _payments
-          .orderBy('submittedAt', descending: true)
-          .snapshots()) {
+      await for (final snap
+          in _payments.orderBy('submittedAt', descending: true).snapshots()) {
         yield snap.docs
             .map((d) => AppointmentPaymentModel.fromMap(d.id, d.data()))
             .toList();
@@ -613,16 +621,18 @@ class AppointmentController {
     final pairPayments = await _payments
         .where('patientId', isEqualTo: patient.id)
         .get();
-    final latestForDoctor = pairPayments.docs
-        .map((d) => AppointmentPaymentModel.fromMap(d.id, d.data()))
-        .where((p) => p.doctorId == doctorId)
-        .toList()
-      ..sort((a, b) {
-        final aAt = a.submittedAt ?? a.updatedAt;
-        final bAt = b.submittedAt ?? b.updatedAt;
-        return (bAt ?? DateTime.fromMillisecondsSinceEpoch(0))
-            .compareTo(aAt ?? DateTime.fromMillisecondsSinceEpoch(0));
-      });
+    final latestForDoctor =
+        pairPayments.docs
+            .map((d) => AppointmentPaymentModel.fromMap(d.id, d.data()))
+            .where((p) => p.doctorId == doctorId)
+            .toList()
+          ..sort((a, b) {
+            final aAt = a.submittedAt ?? a.updatedAt;
+            final bAt = b.submittedAt ?? b.updatedAt;
+            return (bAt ?? DateTime.fromMillisecondsSinceEpoch(0)).compareTo(
+              aAt ?? DateTime.fromMillisecondsSinceEpoch(0),
+            );
+          });
     final live = latestForDoctor.isEmpty ? null : latestForDoctor.first;
     if (live != null && live.isPending) {
       return 'Your appointment payment is currently under review. '
@@ -640,15 +650,12 @@ class AppointmentController {
 
     // A rejected attempt is retried in place (same payment record, same
     // paymentId) — the rejected proof is replaced, never reused as approved.
-    final retrying =
-        (live != null && live.isRejected) ? live : null;
+    final retrying = (live != null && live.isRejected) ? live : null;
     final paymentId = retrying?.paymentId?.isNotEmpty == true
         ? retrying!.paymentId!
         : const Uuid().v4();
     final notificationId = const Uuid().v4();
-    final docId = retrying != null
-        ? retrying.id
-        : paymentId;
+    final docId = retrying != null ? retrying.id : paymentId;
 
     try {
       final blocked = await _firestore.runTransaction<bool>((tx) async {
@@ -658,44 +665,41 @@ class AppointmentController {
             snap.data()?['paymentStatus'] == PaymentStatus.approved) {
           return true;
         }
-        tx.set(
-          ref,
-          {
-            'id': docId,
-            'patientId': patient.id,
-            'patientName': patient.fullname,
-            'patientImage': patient.image ?? '',
-            'patientPhone': patient.phoneNumber,
-            'doctorId': doctorId,
-            'doctorName': doctorName,
-            'doctorImage': (doctor['imageUrl'] ?? '').toString(),
-            'doctorSpecialization':
-                (doctor['specialization'] ?? doctor['highestDegree'] ?? '')
-                    .toString(),
-            'videoWatched': pricing.videoWatched,
-            // The doctor's own price, copied onto the payment so the record
-            // still shows what was charged if the doctor changes it later.
-            'price': pricing.consultationFee,
-            'consultationFee': pricing.consultationFee,
-            'discountPercentage':
-                pricing.discountApplied ? pricing.discountPercent : 0.0,
-            'discountAmount': pricing.discountAmount,
-            'payableAmount': pricing.payableAmount,
-            'paymentStatus': PaymentStatus.pending,
-            'paymentType': 'appointment_booking',
-            'paymentImage': proofUrl,
-            'paymentId': paymentId,
-            'notificationId': notificationId,
-            'appointmentCreated': retrying?.appointmentCreated ?? false,
-            if (retrying != null && retrying.appointmentId.isNotEmpty)
-              'appointmentId': retrying.appointmentId,
-            'rejectionReason': FieldValue.delete(),
-            'reviewedAt': FieldValue.delete(),
-            'submittedAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
+        tx.set(ref, {
+          'id': docId,
+          'patientId': patient.id,
+          'patientName': patient.fullname,
+          'patientImage': patient.image ?? '',
+          'patientPhone': patient.phoneNumber,
+          'doctorId': doctorId,
+          'doctorName': doctorName,
+          'doctorImage': (doctor['imageUrl'] ?? '').toString(),
+          'doctorSpecialization':
+              (doctor['specialization'] ?? doctor['highestDegree'] ?? '')
+                  .toString(),
+          'videoWatched': pricing.videoWatched,
+          // The doctor's own price, copied onto the payment so the record
+          // still shows what was charged if the doctor changes it later.
+          'price': pricing.consultationFee,
+          'consultationFee': pricing.consultationFee,
+          'discountPercentage': pricing.discountApplied
+              ? pricing.discountPercent
+              : 0.0,
+          'discountAmount': pricing.discountAmount,
+          'payableAmount': pricing.payableAmount,
+          'paymentStatus': PaymentStatus.pending,
+          'paymentType': 'appointment_booking',
+          'paymentImage': proofUrl,
+          'paymentId': paymentId,
+          'notificationId': notificationId,
+          'appointmentCreated': retrying?.appointmentCreated ?? false,
+          if (retrying != null && retrying.appointmentId.isNotEmpty)
+            'appointmentId': retrying.appointmentId,
+          'rejectionReason': FieldValue.delete(),
+          'reviewedAt': FieldValue.delete(),
+          'submittedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
         return false;
       });
 
@@ -713,7 +717,9 @@ class AppointmentController {
           'currency': 'PKR',
           'proofReference': proofUrl,
           'status': 'pending',
-          'relatedAppointmentId': retrying?.appointmentId.isNotEmpty == true ? retrying!.appointmentId : null,
+          'relatedAppointmentId': retrying?.appointmentId.isNotEmpty == true
+              ? retrying!.appointmentId
+              : null,
           'doctorId': doctorId,
           'doctorName': doctorName,
           'createdAt': FieldValue.serverTimestamp(),
@@ -737,7 +743,8 @@ class AppointmentController {
   }
 
   Future<String?> approveAppointmentPayment(
-      AppointmentPaymentModel payment) async {
+    AppointmentPaymentModel payment,
+  ) async {
     if (payment.isApproved) return null;
 
     // Consistency guard: a payment whose appointment is already known must
@@ -779,7 +786,8 @@ class AppointmentController {
         'recipientUid': payment.patientId,
         'type': FcmMessageType.appointmentPaymentApproved,
         'title': 'Appointment Payment Approved',
-        'body': 'Your appointment payment with Dr. ${payment.doctorName} has been approved.',
+        'body':
+            'Your appointment payment with Dr. ${payment.doctorName} has been approved.',
         'senderName': 'OPD Telemedicine Admin',
         'paymentId': resolvedPid,
         'paymentType': 'appointment_booking',
@@ -829,7 +837,9 @@ class AppointmentController {
         'recipientUid': payment.patientId,
         'type': FcmMessageType.appointmentPaymentRejected,
         'title': 'Payment Proof Rejected',
-        'body': reason.isNotEmpty ? reason : 'Your appointment payment with Dr. ${payment.doctorName} was rejected.',
+        'body': reason.isNotEmpty
+            ? reason
+            : 'Your appointment payment with Dr. ${payment.doctorName} was rejected.',
         'senderName': 'OPD Telemedicine Admin',
         'paymentId': resolvedPid,
         'paymentType': 'appointment_booking',
@@ -860,9 +870,10 @@ class AppointmentController {
       return;
     }
     try {
-      await for (final snap in _appointments
-          .where('patientId', isEqualTo: patientId)
-          .snapshots()) {
+      await for (final snap
+          in _appointments
+              .where('patientId', isEqualTo: patientId)
+              .snapshots()) {
         yield snap.docs
             .map((d) => AppointmentModel.fromMap(d.id, d.data()))
             .toList();
@@ -880,9 +891,8 @@ class AppointmentController {
       return;
     }
     try {
-      await for (final snap in _appointments
-          .where('doctorId', isEqualTo: doctorId)
-          .snapshots()) {
+      await for (final snap
+          in _appointments.where('doctorId', isEqualTo: doctorId).snapshots()) {
         yield snap.docs
             .map((d) => AppointmentModel.fromMap(d.id, d.data()))
             .toList();
@@ -938,7 +948,8 @@ class AppointmentController {
       return AppointmentDefaults.activeAppointmentMessage;
     }
 
-    final appointmentId = blocking?.id ??
+    final appointmentId =
+        blocking?.id ??
         _nextAppointmentId(
           patientId: patient.id,
           doctorId: doctorId,
@@ -1091,7 +1102,8 @@ class AppointmentController {
         });
       });
     } catch (e) {
-      if (e is StateError && e.message == 'This appointment has already expired') {
+      if (e is StateError &&
+          e.message == 'This appointment has already expired') {
         return 'This appointment has expired. Ask the patient to book a new one.';
       }
       return 'Could not confirm the appointment: $e';
@@ -1153,7 +1165,8 @@ class AppointmentController {
       );
       final messageId = const Uuid().v4();
       final displayDate = appointmentFormatDisplayDate(scheduledDate);
-      final body = '📌 Appointment Scheduled\n\n'
+      final body =
+          '📌 Appointment Scheduled\n\n'
           '${appointment.doctorName} is available for your appointment.\n\n'
           'Date: $displayDate\n'
           'Time: $scheduledStartTime - $scheduledEndTime';
@@ -1178,16 +1191,13 @@ class AppointmentController {
 
       // Refresh the conversation preview without touching unread counters —
       // a system message must not manufacture a badge.
-      await _firestore
-          .collection(FirestoreCollections.chats)
-          .doc(chatId)
-          .set({
-            'lastMessage': body,
-            'lastMessageTime': FieldValue.serverTimestamp(),
-            'lastMessageSenderId': appointment.doctorId,
-            'lastMessageId': messageId,
-            'participants': [appointment.patientId, appointment.doctorId],
-          }, SetOptions(merge: true));
+      await _firestore.collection(FirestoreCollections.chats).doc(chatId).set({
+        'lastMessage': body,
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'lastMessageSenderId': appointment.doctorId,
+        'lastMessageId': messageId,
+        'participants': [appointment.patientId, appointment.doctorId],
+      }, SetOptions(merge: true));
 
       return messageId;
     } catch (_) {
@@ -1239,9 +1249,7 @@ class AppointmentController {
       if (snap.docs.isEmpty) return;
 
       await evaluateAppointments(
-        snap.docs
-            .map((d) => AppointmentModel.fromMap(d.id, d.data()))
-            .toList(),
+        snap.docs.map((d) => AppointmentModel.fromMap(d.id, d.data())).toList(),
       );
     } catch (_) {
       // Background housekeeping never surfaces an error to the UI.
@@ -1266,9 +1274,7 @@ class AppointmentController {
   ///   4. otherwise       → derive the phase, send whatever reminders are due,
   ///                        activate at the start, fire the start alarm, and
   ///                        push the late / grace notices exactly once.
-  Future<void> evaluateAppointments(
-    List<AppointmentModel> appointments,
-  ) async {
+  Future<void> evaluateAppointments(List<AppointmentModel> appointments) async {
     if (appointments.isEmpty) return;
     final now = DateTime.now();
     final config = await this.config();
@@ -1487,7 +1493,8 @@ class AppointmentController {
     DateTime start,
   ) async {
     final chatId = _chat.getChatId(appointment.patientId, appointment.doctorId);
-    final notificationId = 'start:${appointment.id}:'
+    final notificationId =
+        'start:${appointment.id}:'
         '${start.millisecondsSinceEpoch}';
 
     var delivered = false;
@@ -1497,20 +1504,22 @@ class AppointmentController {
       appointment.patientId,
     );
     if (patientToken.isNotEmpty) {
-      delivered = await _fcm.sendAppointmentStartNotification(
-        toUserId: appointment.patientId,
-        appointmentId: appointment.id,
-        patientId: appointment.patientId,
-        patientName: appointment.patientName,
-        patientImage: appointment.patientImage,
-        doctorId: appointment.doctorId,
-        doctorName: appointment.doctorName,
-        doctorImage: appointment.doctorImage,
-        chatId: chatId,
-        forPatient: true,
-        scheduledStartAt: start.millisecondsSinceEpoch,
-        notificationId: notificationId,
-      ) || delivered;
+      delivered =
+          await _fcm.sendAppointmentStartNotification(
+            toUserId: appointment.patientId,
+            appointmentId: appointment.id,
+            patientId: appointment.patientId,
+            patientName: appointment.patientName,
+            patientImage: appointment.patientImage,
+            doctorId: appointment.doctorId,
+            doctorName: appointment.doctorName,
+            doctorImage: appointment.doctorImage,
+            chatId: chatId,
+            forPatient: true,
+            scheduledStartAt: start.millisecondsSinceEpoch,
+            notificationId: notificationId,
+          ) ||
+          delivered;
     }
 
     final doctorToken = await _fcmTokenFor(
@@ -1518,20 +1527,22 @@ class AppointmentController {
       appointment.doctorId,
     );
     if (doctorToken.isNotEmpty) {
-      delivered = await _fcm.sendAppointmentStartNotification(
-        toUserId: appointment.doctorId,
-        appointmentId: appointment.id,
-        patientId: appointment.patientId,
-        patientName: appointment.patientName,
-        patientImage: appointment.patientImage,
-        doctorId: appointment.doctorId,
-        doctorName: appointment.doctorName,
-        doctorImage: appointment.doctorImage,
-        chatId: chatId,
-        forPatient: false,
-        scheduledStartAt: start.millisecondsSinceEpoch,
-        notificationId: notificationId,
-      ) || delivered;
+      delivered =
+          await _fcm.sendAppointmentStartNotification(
+            toUserId: appointment.doctorId,
+            appointmentId: appointment.id,
+            patientId: appointment.patientId,
+            patientName: appointment.patientName,
+            patientImage: appointment.patientImage,
+            doctorId: appointment.doctorId,
+            doctorName: appointment.doctorName,
+            doctorImage: appointment.doctorImage,
+            chatId: chatId,
+            forPatient: false,
+            scheduledStartAt: start.millisecondsSinceEpoch,
+            notificationId: notificationId,
+          ) ||
+          delivered;
     }
 
     return delivered;
@@ -1610,27 +1621,29 @@ class AppointmentController {
       appointment.patientId,
     );
     if (patientToken.isNotEmpty) {
-      delivered = await _fcm.sendAppointmentLifecycleNotification(
-        toUserId: appointment.patientId,
-        type: FcmMessageType.appointmentReminder,
-        appointmentId: appointment.id,
-        patientId: appointment.patientId,
-        patientName: appointment.patientName,
-        doctorId: appointment.doctorId,
-        doctorName: appointment.doctorName,
-        chatId: chatId,
-        title: AppointmentDefaults.reminderTitle,
-        body: AppointmentDefaults.reminderBody(
-          'Dr. ${appointment.doctorName}',
-          when,
-        ),
-        notificationId: notificationId,
-        extra: {
-          AppointmentPayloadKeys.offsetMinutes: offsetMinutes.toString(),
-          AppointmentPayloadKeys.scheduledStartAt:
-              (appointment.startAt?.millisecondsSinceEpoch ?? 0).toString(),
-        },
-      ) || delivered;
+      delivered =
+          await _fcm.sendAppointmentLifecycleNotification(
+            toUserId: appointment.patientId,
+            type: FcmMessageType.appointmentReminder,
+            appointmentId: appointment.id,
+            patientId: appointment.patientId,
+            patientName: appointment.patientName,
+            doctorId: appointment.doctorId,
+            doctorName: appointment.doctorName,
+            chatId: chatId,
+            title: AppointmentDefaults.reminderTitle,
+            body: AppointmentDefaults.reminderBody(
+              'Dr. ${appointment.doctorName}',
+              when,
+            ),
+            notificationId: notificationId,
+            extra: {
+              AppointmentPayloadKeys.offsetMinutes: offsetMinutes.toString(),
+              AppointmentPayloadKeys.scheduledStartAt:
+                  (appointment.startAt?.millisecondsSinceEpoch ?? 0).toString(),
+            },
+          ) ||
+          delivered;
     }
 
     final doctorToken = await _fcmTokenFor(
@@ -1638,27 +1651,29 @@ class AppointmentController {
       appointment.doctorId,
     );
     if (doctorToken.isNotEmpty) {
-      delivered = await _fcm.sendAppointmentLifecycleNotification(
-        toUserId: appointment.doctorId,
-        type: FcmMessageType.appointmentReminder,
-        appointmentId: appointment.id,
-        patientId: appointment.patientId,
-        patientName: appointment.patientName,
-        doctorId: appointment.doctorId,
-        doctorName: appointment.doctorName,
-        chatId: chatId,
-        title: AppointmentDefaults.reminderTitle,
-        body: AppointmentDefaults.reminderBody(
-          appointment.patientName,
-          when,
-        ),
-        notificationId: notificationId,
-        extra: {
-          AppointmentPayloadKeys.offsetMinutes: offsetMinutes.toString(),
-          AppointmentPayloadKeys.scheduledStartAt:
-              (appointment.startAt?.millisecondsSinceEpoch ?? 0).toString(),
-        },
-      ) || delivered;
+      delivered =
+          await _fcm.sendAppointmentLifecycleNotification(
+            toUserId: appointment.doctorId,
+            type: FcmMessageType.appointmentReminder,
+            appointmentId: appointment.id,
+            patientId: appointment.patientId,
+            patientName: appointment.patientName,
+            doctorId: appointment.doctorId,
+            doctorName: appointment.doctorName,
+            chatId: chatId,
+            title: AppointmentDefaults.reminderTitle,
+            body: AppointmentDefaults.reminderBody(
+              appointment.patientName,
+              when,
+            ),
+            notificationId: notificationId,
+            extra: {
+              AppointmentPayloadKeys.offsetMinutes: offsetMinutes.toString(),
+              AppointmentPayloadKeys.scheduledStartAt:
+                  (appointment.startAt?.millisecondsSinceEpoch ?? 0).toString(),
+            },
+          ) ||
+          delivered;
     }
 
     return delivered;
@@ -1732,38 +1747,31 @@ class AppointmentController {
     String phase,
   ) async {
     final start = appointment.startAt;
-    final raw = start == null
-        ? 0
-        : DateTime.now().difference(start).inMinutes;
+    final raw = start == null ? 0 : DateTime.now().difference(start).inMinutes;
     final minutes = raw < 0 ? 0 : (raw > 999 ? 999 : raw);
 
     final (type, title, patientBody, doctorBody) = switch (phase) {
       AppointmentPhase.doctorLate => (
-          FcmMessageType.appointmentDoctorLate,
-          AppointmentDefaults.lateTitle,
-          AppointmentDefaults.lateBody(
-            'Dr. ${appointment.doctorName}',
-            minutes,
-          ),
-          AppointmentDefaults.lateSelfBody(appointment.patientName, minutes),
-        ),
+        FcmMessageType.appointmentDoctorLate,
+        AppointmentDefaults.lateTitle,
+        AppointmentDefaults.lateBody('Dr. ${appointment.doctorName}', minutes),
+        AppointmentDefaults.lateSelfBody(appointment.patientName, minutes),
+      ),
       AppointmentPhase.patientLate => (
-          FcmMessageType.appointmentPatientLate,
-          AppointmentDefaults.lateTitle,
-          AppointmentDefaults.lateSelfBody(
-            'Dr. ${appointment.doctorName}',
-            minutes,
-          ),
-          AppointmentDefaults.lateBody(appointment.patientName, minutes),
+        FcmMessageType.appointmentPatientLate,
+        AppointmentDefaults.lateTitle,
+        AppointmentDefaults.lateSelfBody(
+          'Dr. ${appointment.doctorName}',
+          minutes,
         ),
+        AppointmentDefaults.lateBody(appointment.patientName, minutes),
+      ),
       _ => (
-          FcmMessageType.appointmentGraceEnding,
-          AppointmentDefaults.graceEndingTitle,
-          AppointmentDefaults.graceEndingBody(
-            'Dr. ${appointment.doctorName}',
-          ),
-          AppointmentDefaults.graceEndingBody(appointment.patientName),
-        ),
+        FcmMessageType.appointmentGraceEnding,
+        AppointmentDefaults.graceEndingTitle,
+        AppointmentDefaults.graceEndingBody('Dr. ${appointment.doctorName}'),
+        AppointmentDefaults.graceEndingBody(appointment.patientName),
+      ),
     };
 
     return _pushToBothSides(
@@ -1800,20 +1808,22 @@ class AppointmentController {
       appointment.patientId,
     );
     if (patientToken.isNotEmpty) {
-      delivered = await _fcm.sendAppointmentLifecycleNotification(
-        toUserId: appointment.patientId,
-        type: type,
-        appointmentId: appointment.id,
-        patientId: appointment.patientId,
-        patientName: appointment.patientName,
-        doctorId: appointment.doctorId,
-        doctorName: appointment.doctorName,
-        chatId: chatId,
-        title: title,
-        body: patientBody,
-        notificationId: notificationId,
-        extra: extra,
-      ) || delivered;
+      delivered =
+          await _fcm.sendAppointmentLifecycleNotification(
+            toUserId: appointment.patientId,
+            type: type,
+            appointmentId: appointment.id,
+            patientId: appointment.patientId,
+            patientName: appointment.patientName,
+            doctorId: appointment.doctorId,
+            doctorName: appointment.doctorName,
+            chatId: chatId,
+            title: title,
+            body: patientBody,
+            notificationId: notificationId,
+            extra: extra,
+          ) ||
+          delivered;
     }
 
     final doctorToken = await _fcmTokenFor(
@@ -1821,20 +1831,22 @@ class AppointmentController {
       appointment.doctorId,
     );
     if (doctorToken.isNotEmpty) {
-      delivered = await _fcm.sendAppointmentLifecycleNotification(
-        toUserId: appointment.doctorId,
-        type: type,
-        appointmentId: appointment.id,
-        patientId: appointment.patientId,
-        patientName: appointment.patientName,
-        doctorId: appointment.doctorId,
-        doctorName: appointment.doctorName,
-        chatId: chatId,
-        title: title,
-        body: doctorBody,
-        notificationId: notificationId,
-        extra: extra,
-      ) || delivered;
+      delivered =
+          await _fcm.sendAppointmentLifecycleNotification(
+            toUserId: appointment.doctorId,
+            type: type,
+            appointmentId: appointment.id,
+            patientId: appointment.patientId,
+            patientName: appointment.patientName,
+            doctorId: appointment.doctorId,
+            doctorName: appointment.doctorName,
+            chatId: chatId,
+            title: title,
+            body: doctorBody,
+            notificationId: notificationId,
+            extra: extra,
+          ) ||
+          delivered;
     }
 
     return delivered;
@@ -1971,8 +1983,9 @@ class AppointmentController {
 
     if (!joinedNow) {
       final refreshed = await _loadAppointment(ref) ?? appointment;
-      final alreadyIn =
-          asDoctor ? refreshed.hasDoctorJoined : refreshed.hasPatientJoined;
+      final alreadyIn = asDoctor
+          ? refreshed.hasDoctorJoined
+          : refreshed.hasPatientJoined;
       // Already in = nothing left to do (success); anything else means the
       // appointment is no longer joinable.
       return alreadyIn ? null : 'This appointment is not running right now.';
@@ -1984,7 +1997,9 @@ class AppointmentController {
           ? AppointmentEventTypes.doctorJoined
           : AppointmentEventTypes.patientJoined,
       actorId: actorId,
-      actorRole: asDoctor ? AppointmentActors.doctor : AppointmentActors.patient,
+      actorRole: asDoctor
+          ? AppointmentActors.doctor
+          : AppointmentActors.patient,
     );
     await _notifyCounterpartOfJoin(appointment, joinedAsDoctor: asDoctor);
     return null;
@@ -2003,8 +2018,9 @@ class AppointmentController {
       final counterpartCollection = joinedAsDoctor
           ? FirestoreCollections.patients
           : FirestoreCollections.doctors;
-      final counterpartId =
-          joinedAsDoctor ? appointment.patientId : appointment.doctorId;
+      final counterpartId = joinedAsDoctor
+          ? appointment.patientId
+          : appointment.doctorId;
       final token = await _fcmTokenFor(counterpartCollection, counterpartId);
       if (token.isEmpty) return;
 
@@ -2019,7 +2035,8 @@ class AppointmentController {
         chatId: _chat.getChatId(appointment.patientId, appointment.doctorId),
         title: AppointmentDefaults.joinedTitle,
         body: AppointmentDefaults.joinedBody(joinerName),
-        notificationId: 'join:${appointment.id}:'
+        notificationId:
+            'join:${appointment.id}:'
             '${joinedAsDoctor ? 'doctor' : 'patient'}',
         extra: {
           AppointmentPayloadKeys.actorRole: joinedAsDoctor
@@ -2059,8 +2076,7 @@ class AppointmentController {
       await _firestore.runTransaction<void>((tx) async {
         final snap = await tx.get(ref);
         if (!snap.exists) throw StateError('Appointment no longer exists');
-        final status =
-            (snap.data()?['appointmentStatus'] ?? '').toString();
+        final status = (snap.data()?['appointmentStatus'] ?? '').toString();
         if (status == AppointmentStatus.completed) return;
         if (!AppointmentStatus.isOpen(status)) {
           throw StateError('This appointment is already finished');
@@ -2096,7 +2112,8 @@ class AppointmentController {
       title: 'Appointment Completed',
       patientBody:
           'Your appointment with Dr. ${appointment.doctorName} is complete.',
-      doctorBody: 'Your appointment with ${appointment.patientName} is '
+      doctorBody:
+          'Your appointment with ${appointment.patientName} is '
           'complete.',
       notificationId: 'done:${appointment.id}',
     );
@@ -2196,13 +2213,12 @@ class AppointmentController {
     required AppointmentModel appointment,
     required String adminId,
     String reason = '',
-  }) =>
-      cancelAppointment(
-        appointment: appointment,
-        actorId: adminId,
-        actorRole: AppointmentActors.admin,
-        reason: reason,
-      );
+  }) => cancelAppointment(
+    appointment: appointment,
+    actorId: adminId,
+    actorRole: AppointmentActors.admin,
+    reason: reason,
+  );
 
   /// Marks a finished-but-unresolved slot as a no-show, naming the absent
   /// side. Used by the admin override and available to the doctor for the
@@ -2252,9 +2268,7 @@ class AppointmentController {
       type: AppointmentEventTypes.noShow,
       actorId: actorId,
       actorRole: actorRole,
-      detail: reason.trim().isEmpty
-          ? '$noShowBy did not join'
-          : reason.trim(),
+      detail: reason.trim().isEmpty ? '$noShowBy did not join' : reason.trim(),
     );
     await unpinMessage(
       patientId: appointment.patientId,
@@ -2285,30 +2299,30 @@ class AppointmentController {
     var count = 0;
     DateTime? frozenUntil;
     try {
-      final result =
-          await _firestore.runTransaction<({int count, DateTime? frozenUntil})>(
-        (tx) async {
-          final snap = await tx.get(ref);
-          final data = snap.data() ?? <String, dynamic>{};
-          final current = (data['cancellationWarningCount'] as num?)?.round() ?? 0;
-          final next = current + 1;
-          final until = freezeUntilFor(
-            freezeAfter: next >= config.cancellationWarningLimit,
-            freezeDurationDays: config.freezeDurationDays,
-            now: DateTime.now(),
-          );
-          tx.set(ref, {
-            'cancellationWarningCount': next,
-            'lastCancellationWarningAt': FieldValue.serverTimestamp(),
-            if (until != null) 'bookingFrozenUntil': Timestamp.fromDate(until),
-            if (until != null)
-              'bookingFrozenReason': 'Repeated appointment cancellations',
-            if (until != null) 'bookingFrozenBy': userId,
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-          return (count: next, frozenUntil: until);
-        },
-      );
+      final result = await _firestore
+          .runTransaction<({int count, DateTime? frozenUntil})>((tx) async {
+            final snap = await tx.get(ref);
+            final data = snap.data() ?? <String, dynamic>{};
+            final current =
+                (data['cancellationWarningCount'] as num?)?.round() ?? 0;
+            final next = current + 1;
+            final until = freezeUntilFor(
+              freezeAfter: next >= config.cancellationWarningLimit,
+              freezeDurationDays: config.freezeDurationDays,
+              now: DateTime.now(),
+            );
+            tx.set(ref, {
+              'cancellationWarningCount': next,
+              'lastCancellationWarningAt': FieldValue.serverTimestamp(),
+              if (until != null)
+                'bookingFrozenUntil': Timestamp.fromDate(until),
+              if (until != null)
+                'bookingFrozenReason': 'Repeated appointment cancellations',
+              if (until != null) 'bookingFrozenBy': userId,
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+            return (count: next, frozenUntil: until);
+          });
       count = result.count;
       frozenUntil = result.frozenUntil;
     } catch (_) {
@@ -2346,8 +2360,9 @@ class AppointmentController {
 
   Future<int> _warningCountFor(String userId, String actorRole) async {
     if (userId.isEmpty) return 0;
-    final collection =
-        actorRole == AppointmentActors.doctor ? _doctors : _patients;
+    final collection = actorRole == AppointmentActors.doctor
+        ? _doctors
+        : _patients;
     try {
       final snap = await collection.doc(userId).get();
       return (snap.data()?['cancellationWarningCount'] as num?)?.round() ?? 0;
@@ -2378,8 +2393,9 @@ class AppointmentController {
     try {
       await collection.doc(userId).set({
         'bookingFrozenUntil': Timestamp.fromDate(until),
-        'bookingFrozenReason':
-            reason.trim().isEmpty ? 'Paused by an admin' : reason.trim(),
+        'bookingFrozenReason': reason.trim().isEmpty
+            ? 'Paused by an admin'
+            : reason.trim(),
         'bookingFrozenBy': adminId,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -2474,8 +2490,7 @@ class AppointmentController {
       return (
         frozen: until != null && until.isAfter(DateTime.now()),
         until: until,
-        warnings:
-            (data['cancellationWarningCount'] as num?)?.round() ?? 0,
+        warnings: (data['cancellationWarningCount'] as num?)?.round() ?? 0,
       );
     } catch (_) {
       return (frozen: false, until: null, warnings: 0);
@@ -2514,9 +2529,7 @@ class AppointmentController {
     required String detail,
   }) async {
     try {
-      await _firestore
-          .collection(FirestoreCollections.accountAuditLog)
-          .add({
+      await _firestore.collection(FirestoreCollections.accountAuditLog).add({
         'action': action,
         'userId': userId,
         'deletedBy': adminId,
@@ -2535,13 +2548,10 @@ class AppointmentController {
 
   Future<String?> uploadProof(File file, {String? appointmentId}) async {
     try {
-      final apptId = appointmentId ??
-          'appt_${DateTime.now().millisecondsSinceEpoch}';
+      final apptId =
+          appointmentId ?? 'appt_${DateTime.now().millisecondsSinceEpoch}';
       final result = await FirebaseStorageService.instance
-          .uploadAppointmentPaymentProof(
-        appointmentId: apptId,
-        file: file,
-      );
+          .uploadAppointmentPaymentProof(appointmentId: apptId, file: file);
       return result.downloadUrl;
     } catch (e) {
       debugPrint('[AppointmentController] uploadProof error: $e');
@@ -2572,7 +2582,8 @@ class AppointmentController {
         'type': 'payment_proof_submitted',
         'paymentType': 'appointment_booking',
         'title': 'New Appointment Payment',
-        'body': '${patient.fullname} submitted payment proof for an appointment with Dr. $doctorName.',
+        'body':
+            '${patient.fullname} submitted payment proof for an appointment with Dr. $doctorName.',
         'patientUid': patient.id,
         'patientId': patient.patientId,
         'patientName': patient.fullname,
@@ -2823,8 +2834,7 @@ class AppointmentController {
           patientName: appointment.patientName,
           doctorId: appointment.doctorId,
           doctorName: appointment.doctorName,
-          chatId:
-              _chat.getChatId(appointment.patientId, appointment.doctorId),
+          chatId: _chat.getChatId(appointment.patientId, appointment.doctorId),
           title: title,
           body: body,
           notificationId: notificationId,
@@ -2847,10 +2857,9 @@ class AppointmentController {
     required DateTime frozenUntil,
   }) async {
     try {
-      final collection =
-          actorRole == AppointmentActors.doctor
-              ? FirestoreCollections.doctors
-              : FirestoreCollections.patients;
+      final collection = actorRole == AppointmentActors.doctor
+          ? FirestoreCollections.doctors
+          : FirestoreCollections.patients;
       final token = await _fcmTokenFor(collection, userId);
       if (token.isNotEmpty) {
         await _fcm.sendAppointmentLifecycleNotification(
@@ -2868,8 +2877,9 @@ class AppointmentController {
           extra: {
             AppointmentPayloadKeys.warningCount: count.toString(),
             AppointmentPayloadKeys.warningLimit: limit.toString(),
-            AppointmentPayloadKeys.frozenUntil:
-                frozenUntil.millisecondsSinceEpoch.toString(),
+            AppointmentPayloadKeys.frozenUntil: frozenUntil
+                .millisecondsSinceEpoch
+                .toString(),
           },
         );
       }
@@ -2890,8 +2900,9 @@ class AppointmentController {
           extra: {
             AppointmentPayloadKeys.warningCount: count.toString(),
             AppointmentPayloadKeys.warningLimit: limit.toString(),
-            AppointmentPayloadKeys.frozenUntil:
-                frozenUntil.millisecondsSinceEpoch.toString(),
+            AppointmentPayloadKeys.frozenUntil: frozenUntil
+                .millisecondsSinceEpoch
+                .toString(),
           },
         );
       }
@@ -2918,8 +2929,18 @@ String appointmentFormatDisplayDate(String isoDate) {
   final parsed = DateTime.tryParse(isoDate);
   if (parsed == null) return isoDate;
   const months = <String>[
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   return '${parsed.day} ${months[parsed.month - 1]} ${parsed.year}';
 }
@@ -2974,45 +2995,43 @@ final appointmentControllerProvider = Provider<AppointmentController>((ref) {
 });
 
 /// Persisted `videoWatched` flag for the signed-in patient + doctor.
-final appointmentVideoWatchedProvider =
-    StreamProvider.autoDispose.family<bool, String>((ref, doctorId) {
-  final user = ref.watch(userProvider);
-  if (user == null) return Stream<bool>.value(false);
-  return ref.read(appointmentControllerProvider).watchVideoWatched(
-        patientId: user.id,
-        doctorId: doctorId,
-      );
-});
+final appointmentVideoWatchedProvider = StreamProvider.autoDispose
+    .family<bool, String>((ref, doctorId) {
+      final user = ref.watch(userProvider);
+      if (user == null) return Stream<bool>.value(false);
+      return ref
+          .read(appointmentControllerProvider)
+          .watchVideoWatched(patientId: user.id, doctorId: doctorId);
+    });
 
 /// The patient's payment record for this doctor, or `null` when none exists.
 final appointmentPaymentProvider = StreamProvider.autoDispose
     .family<AppointmentPaymentModel?, String>((ref, doctorId) {
-  final user = ref.watch(userProvider);
-  if (user == null) return Stream<AppointmentPaymentModel?>.value(null);
-  return ref.read(appointmentControllerProvider).watchPayment(
-        patientId: user.id,
-        doctorId: doctorId,
-      );
-});
+      final user = ref.watch(userProvider);
+      if (user == null) return Stream<AppointmentPaymentModel?>.value(null);
+      return ref
+          .read(appointmentControllerProvider)
+          .watchPayment(patientId: user.id, doctorId: doctorId);
+    });
 
 /// Every appointment the signed-in user participates in; which side of the
 /// record is used follows the session role, so the doctor portal and the
 /// patient tab share one provider.
 final myAppointmentsProvider =
     StreamProvider.autoDispose<List<AppointmentModel>>((ref) {
-  final user = ref.watch(userProvider);
-  if (user == null) return Stream<List<AppointmentModel>>.value(const []);
-  final controller = ref.read(appointmentControllerProvider);
-  return user.role == UserRoles.doctor
-      ? controller.watchDoctorAppointments(user.id)
-      : controller.watchPatientAppointments(user.id);
-});
+      final user = ref.watch(userProvider);
+      if (user == null) return Stream<List<AppointmentModel>>.value(const []);
+      final controller = ref.read(appointmentControllerProvider);
+      return user.role == UserRoles.doctor
+          ? controller.watchDoctorAppointments(user.id)
+          : controller.watchPatientAppointments(user.id);
+    });
 
 /// Live appointment payments for the admin review screen.
 final appointmentPaymentsProvider =
     StreamProvider.autoDispose<List<AppointmentPaymentModel>>((ref) {
-  return ref.read(appointmentControllerProvider).watchAllPayments();
-});
+      return ref.read(appointmentControllerProvider).watchAllPayments();
+    });
 
 /// Every active doctor, as raw maps — the booking flow is the only place that
 /// reads `price`, `consultationFee`, `description` and `youtubeVideoUrl`.
@@ -3021,48 +3040,48 @@ final appointmentPaymentsProvider =
 /// `role` field still shows up; `isActive == false` is the only exclusion.
 final doctorsForBookingProvider =
     StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) async* {
-  // Errors are intentionally NOT swallowed: `appointment_screen.dart` has a
-  // real "Could not load doctors" branch. Catching and yielding `[]` made
-  // every failure (offline, permission) render as the empty state
-  // "No doctors found", which is indistinguishable from a genuinely empty
-  // clinic.
-  await for (final snap
-      in FirebaseFirestore.instance
-          .collection(FirestoreCollections.doctors)
-          .snapshots()) {
-    final doctors = snap.docs
-        .map((d) => d.data())
-        .where((d) => d['isActive'] != false)
-        .toList();
-    doctors.sort(
-      (a, b) => (a['fullname'] ?? '')
-          .toString()
-          .toLowerCase()
-          .compareTo((b['fullname'] ?? '').toString().toLowerCase()),
-    );
-    yield doctors;
-  }
-});
+      // Errors are intentionally NOT swallowed: `appointment_screen.dart` has a
+      // real "Could not load doctors" branch. Catching and yielding `[]` made
+      // every failure (offline, permission) render as the empty state
+      // "No doctors found", which is indistinguishable from a genuinely empty
+      // clinic.
+      await for (final snap
+          in FirebaseFirestore.instance
+              .collection(FirestoreCollections.doctors)
+              .snapshots()) {
+        final doctors = snap.docs
+            .map((d) => d.data())
+            .where((d) => d['isActive'] != false)
+            .toList();
+        doctors.sort(
+          (a, b) => (a['fullname'] ?? '').toString().toLowerCase().compareTo(
+            (b['fullname'] ?? '').toString().toLowerCase(),
+          ),
+        );
+        yield doctors;
+      }
+    });
 
 /// One doctor's document, kept live so a fee or video URL edited by the
 /// doctor is picked up before the patient pays.
 final doctorBookingProvider = StreamProvider.autoDispose
     .family<Map<String, dynamic>?, String>((ref, doctorId) async* {
-  if (doctorId.isEmpty) {
-    yield null;
-    return;
-  }
-  // Errors surface to the payment screen (see its `hasError` branch): catching
-  // and yielding `null` used to make a failed read render as the permanent
-  // "Loading payment details…" spinner, because `null` is also the legitimate
-  // value for a doctor document that does not exist.
-  await for (final snap in FirebaseFirestore.instance
-      .collection(FirestoreCollections.doctors)
-      .doc(doctorId)
-      .snapshots()) {
-    yield snap.exists ? snap.data() : null;
-  }
-});
+      if (doctorId.isEmpty) {
+        yield null;
+        return;
+      }
+      // Errors surface to the payment screen (see its `hasError` branch): catching
+      // and yielding `null` used to make a failed read render as the permanent
+      // "Loading payment details…" spinner, because `null` is also the legitimate
+      // value for a doctor document that does not exist.
+      await for (final snap
+          in FirebaseFirestore.instance
+              .collection(FirestoreCollections.doctors)
+              .doc(doctorId)
+              .snapshots()) {
+        yield snap.exists ? snap.data() : null;
+      }
+    });
 
 /// Every appointment in the system, for the admin monitoring screen.
 ///
@@ -3071,27 +3090,30 @@ final doctorBookingProvider = StreamProvider.autoDispose
 /// status, date and name anyway.
 final allAppointmentsProvider =
     StreamProvider.autoDispose<List<AppointmentModel>>((ref) {
-  return ref.read(appointmentControllerProvider).watchAllAppointments();
-});
+      return ref.read(appointmentControllerProvider).watchAllAppointments();
+    });
 
 /// The lifecycle settings document, live. Screens fall back to
 /// `AppointmentConfig.defaults()` while it loads, so a first run never blocks
 /// on an admin having created the document.
-final appointmentConfigProvider =
-    StreamProvider.autoDispose<AppointmentConfig>((ref) {
-  return ref.read(appointmentControllerProvider).watchConfig();
-});
+final appointmentConfigProvider = StreamProvider.autoDispose<AppointmentConfig>(
+  (ref) {
+    return ref.read(appointmentControllerProvider).watchConfig();
+  },
+);
 
 /// One appointment, kept live — the chat's pinned banner and the detail
 /// screens watch this so a phase change written by the other side (or by the
 /// Cloud Function) appears without a refresh.
 final appointmentProvider = StreamProvider.autoDispose
     .family<AppointmentModel?, String>((ref, appointmentId) {
-  return ref.read(appointmentControllerProvider).watchAppointment(appointmentId);
-});
+      return ref
+          .read(appointmentControllerProvider)
+          .watchAppointment(appointmentId);
+    });
 
 /// The append-only audit timeline of one appointment, newest first.
 final appointmentEventsProvider = StreamProvider.autoDispose
     .family<List<AppointmentEvent>, String>((ref, appointmentId) {
-  return ref.read(appointmentControllerProvider).watchEvents(appointmentId);
-});
+      return ref.read(appointmentControllerProvider).watchEvents(appointmentId);
+    });

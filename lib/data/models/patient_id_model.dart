@@ -37,17 +37,22 @@ class PatientIdModel {
     final rawDuration = map['durationMonths'];
     final int? parsedDuration = rawDuration is int
         ? rawDuration
-        : (rawDuration is num ? rawDuration.toInt() : int.tryParse(rawDuration?.toString() ?? ''));
+        : (rawDuration is num
+              ? rawDuration.toInt()
+              : int.tryParse(rawDuration?.toString() ?? ''));
 
     final rawPlan = map['subscriptionPlan']?.toString();
     final String resolvedPlan = rawPlan != null && rawPlan.isNotEmpty
         ? rawPlan
         : (parsedDuration == 1
-            ? 'one_month'
-            : (parsedDuration == 12 ? 'one_year' : 'six_months'));
+              ? 'one_month'
+              : (parsedDuration == 12 ? 'one_year' : 'six_months'));
 
-    final int resolvedDuration = parsedDuration ??
-        (resolvedPlan == 'one_month' ? 1 : (resolvedPlan == 'one_year' ? 12 : 6));
+    final int resolvedDuration =
+        parsedDuration ??
+        (resolvedPlan == 'one_month'
+            ? 1
+            : (resolvedPlan == 'one_year' ? 12 : 6));
 
     return PatientIdModel(
       id: map['id'] ?? '',
@@ -56,27 +61,28 @@ class PatientIdModel {
       batchNumber: map['batchNumber'] ?? '',
       generatedAt: map['generatedAt'] != null
           ? (map['generatedAt'] is Timestamp
-              ? (map['generatedAt'] as Timestamp).toDate()
-              : DateTime.tryParse(map['generatedAt'].toString()) ?? DateTime.now())
+                ? (map['generatedAt'] as Timestamp).toDate()
+                : DateTime.tryParse(map['generatedAt'].toString()) ??
+                      DateTime.now())
           : DateTime.now(),
       assignedAt: map['assignedAt'] != null
           ? (map['assignedAt'] is Timestamp
-              ? (map['assignedAt'] as Timestamp).toDate()
-              : DateTime.tryParse(map['assignedAt'].toString()))
+                ? (map['assignedAt'] as Timestamp).toDate()
+                : DateTime.tryParse(map['assignedAt'].toString()))
           : null,
       startDate: map['startDate'] != null
           ? (map['startDate'] is Timestamp
-              ? (map['startDate'] as Timestamp).toDate()
-              : DateTime.tryParse(map['startDate'].toString()))
+                ? (map['startDate'] as Timestamp).toDate()
+                : DateTime.tryParse(map['startDate'].toString()))
           : (map['assignedAt'] != null
-              ? (map['assignedAt'] is Timestamp
-                  ? (map['assignedAt'] as Timestamp).toDate()
-                  : DateTime.tryParse(map['assignedAt'].toString()))
-              : null),
+                ? (map['assignedAt'] is Timestamp
+                      ? (map['assignedAt'] as Timestamp).toDate()
+                      : DateTime.tryParse(map['assignedAt'].toString()))
+                : null),
       expiryDate: map['expiryDate'] != null
           ? (map['expiryDate'] is Timestamp
-              ? (map['expiryDate'] as Timestamp).toDate()
-              : DateTime.tryParse(map['expiryDate'].toString()))
+                ? (map['expiryDate'] as Timestamp).toDate()
+                : DateTime.tryParse(map['expiryDate'].toString()))
           : null,
       patientUserId: map['patientUserId'],
       isActive: map['isActive'] ?? true,

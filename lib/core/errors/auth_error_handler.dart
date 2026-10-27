@@ -89,7 +89,8 @@ class AuthErrorHandler {
 
     if (error is SocketException || error is TimeoutException) {
       return const AuthError(
-        message: 'Unable to reach the server. Please check your internet connection and try again.',
+        message:
+            'Unable to reach the server. Please check your internet connection and try again.',
         code: 'network-unavailable',
         category: AuthErrorCategory.networkFailure,
         recoverySuggestion: 'Verify Wi-Fi or mobile data connectivity.',
@@ -98,7 +99,8 @@ class AuthErrorHandler {
 
     if (error is FormatException) {
       return const AuthError(
-        message: 'The submitted format is invalid. Please check the entered information.',
+        message:
+            'The submitted format is invalid. Please check the entered information.',
         code: 'invalid-format',
         category: AuthErrorCategory.general,
       );
@@ -108,7 +110,8 @@ class AuthErrorHandler {
     final errorStr = error.toString().toLowerCase();
     if (errorStr.contains('no active patient session')) {
       return const AuthError(
-        message: 'Your active session could not be found. Please log in again to continue.',
+        message:
+            'Your active session could not be found. Please log in again to continue.',
         code: 'session-not-found',
         category: AuthErrorCategory.noActiveSession,
         recoverySuggestion: 'Return to login screen.',
@@ -117,7 +120,8 @@ class AuthErrorHandler {
 
     if (errorStr.contains('network') || errorStr.contains('connection')) {
       return const AuthError(
-        message: 'A network error occurred. Please check your internet connection.',
+        message:
+            'A network error occurred. Please check your internet connection.',
         code: 'network-error',
         category: AuthErrorCategory.networkFailure,
       );
@@ -138,7 +142,8 @@ class AuthErrorHandler {
     switch (code) {
       case 'user-not-found':
         return const AuthError(
-          message: 'No account found with these credentials. Please check and try again.',
+          message:
+              'No account found with these credentials. Please check and try again.',
           code: 'user-not-found',
           category: AuthErrorCategory.userNotFound,
         );
@@ -146,7 +151,8 @@ class AuthErrorHandler {
       case 'wrong-password':
       case 'invalid-credential':
         return const AuthError(
-          message: 'The credentials provided are incorrect. Please verify and try again.',
+          message:
+              'The credentials provided are incorrect. Please verify and try again.',
           code: 'invalid-credential',
           category: AuthErrorCategory.invalidCredentials,
         );
@@ -154,7 +160,8 @@ class AuthErrorHandler {
       case 'invalid-verification-code':
       case 'invalid-otp':
         return const AuthError(
-          message: 'The verification code you entered is invalid. Please check your SMS code.',
+          message:
+              'The verification code you entered is invalid. Please check your SMS code.',
           code: 'invalid-verification-code',
           category: AuthErrorCategory.invalidCredentials,
         );
@@ -162,7 +169,8 @@ class AuthErrorHandler {
       case 'session-expired':
       case 'code-expired':
         return const AuthError(
-          message: 'The verification session has expired. Please request a new code.',
+          message:
+              'The verification session has expired. Please request a new code.',
           code: 'session-expired',
           category: AuthErrorCategory.sessionExpired,
         );
@@ -177,49 +185,56 @@ class AuthErrorHandler {
 
       case 'too-many-requests':
         return const AuthError(
-          message: 'Too many attempts. For your security, this request has been temporarily blocked. Please wait a few minutes.',
+          message:
+              'Too many attempts. For your security, this request has been temporarily blocked. Please wait a few minutes.',
           code: 'too-many-requests',
           category: AuthErrorCategory.rateLimited,
         );
 
       case 'network-request-failed':
         return const AuthError(
-          message: 'Network connection failed. Please check your internet connection and try again.',
+          message:
+              'Network connection failed. Please check your internet connection and try again.',
           code: 'network-request-failed',
           category: AuthErrorCategory.networkFailure,
         );
 
       case 'invalid-phone-number':
         return const AuthError(
-          message: 'The phone number format is invalid. Please enter a valid number with country code.',
+          message:
+              'The phone number format is invalid. Please enter a valid number with country code.',
           code: 'invalid-phone-number',
           category: AuthErrorCategory.invalidCredentials,
         );
 
       case 'user-disabled':
         return const AuthError(
-          message: 'This account has been disabled. Please contact support for assistance.',
+          message:
+              'This account has been disabled. Please contact support for assistance.',
           code: 'user-disabled',
           category: AuthErrorCategory.general,
         );
 
       case 'quota-exceeded':
         return const AuthError(
-          message: 'SMS verification limit reached for today. Please try again later.',
+          message:
+              'SMS verification limit reached for today. Please try again later.',
           code: 'quota-exceeded',
           category: AuthErrorCategory.rateLimited,
         );
 
       case 'operation-not-allowed':
         return const AuthError(
-          message: 'This login method is currently not enabled. Please contact support.',
+          message:
+              'This login method is currently not enabled. Please contact support.',
           code: 'operation-not-allowed',
           category: AuthErrorCategory.general,
         );
 
       default:
         return AuthError(
-          message: 'Authentication failed. Please check your information and try again.',
+          message:
+              'Authentication failed. Please check your information and try again.',
           code: exception.code,
           category: AuthErrorCategory.general,
         );

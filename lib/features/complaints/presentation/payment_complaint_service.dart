@@ -5,12 +5,16 @@ import 'package:telemedicine/data/models/admin_notification_model.dart';
 import 'package:telemedicine/data/models/patient_notification_model.dart';
 import 'package:telemedicine/data/models/payment_complaint_model.dart';
 
-final paymentComplaintServiceProvider = Provider<PaymentComplaintService>((ref) {
+final paymentComplaintServiceProvider = Provider<PaymentComplaintService>((
+  ref,
+) {
   return PaymentComplaintService();
 });
 
 /// Reactive stream of unread admin notifications count for top bar badge
-final adminUnreadNotificationsCountProvider = StreamProvider.autoDispose<int>((ref) {
+final adminUnreadNotificationsCountProvider = StreamProvider.autoDispose<int>((
+  ref,
+) {
   final service = ref.watch(paymentComplaintServiceProvider);
   return service.streamUnreadNotificationsCount();
 });
@@ -18,9 +22,9 @@ final adminUnreadNotificationsCountProvider = StreamProvider.autoDispose<int>((r
 /// Reactive stream of admin notifications
 final adminNotificationsStreamProvider =
     StreamProvider.autoDispose<List<AdminNotificationModel>>((ref) {
-  final service = ref.watch(paymentComplaintServiceProvider);
-  return service.streamAdminNotifications();
-});
+      final service = ref.watch(paymentComplaintServiceProvider);
+      return service.streamAdminNotifications();
+    });
 
 class PaymentComplaintService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -80,8 +84,9 @@ class PaymentComplaintService {
       // Create persistent admin notification record immediately in Firestore
       // (defense in depth alongside Cloud Function trigger)
       final notificationId = 'notif_$complaintId';
-      final notificationRef =
-          _firestore.collection(notificationsCollection).doc(notificationId);
+      final notificationRef = _firestore
+          .collection(notificationsCollection)
+          .doc(notificationId);
 
       final truncatedMessage = cleanMessage.length > 80
           ? '${cleanMessage.substring(0, 77)}...'
@@ -125,7 +130,9 @@ class PaymentComplaintService {
   }
 
   /// Streams complaints filed by a specific patient.
-  Stream<List<PaymentComplaintModel>> streamPatientComplaints(String patientUid) {
+  Stream<List<PaymentComplaintModel>> streamPatientComplaints(
+    String patientUid,
+  ) {
     if (patientUid.isEmpty) return Stream.value(const []);
 
     return _firestore
@@ -133,21 +140,20 @@ class PaymentComplaintService {
         .where('patientUid', isEqualTo: patientUid)
         .snapshots()
         .map((snapshot) {
-      final list = snapshot.docs
-          .map((doc) => PaymentComplaintModel.fromMap(doc.data(), doc.id))
-          .toList();
-      // Sort client-side by createdAt descending to avoid composite index requirement
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return list;
-    });
+          final list = snapshot.docs
+              .map((doc) => PaymentComplaintModel.fromMap(doc.data(), doc.id))
+              .toList();
+          // Sort client-side by createdAt descending to avoid composite index requirement
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 
   /// Streams all complaints for admin portal.
   Stream<List<PaymentComplaintModel>> streamAllComplaints() {
-    return _firestore
-        .collection(complaintsCollection)
-        .snapshots()
-        .map((snapshot) {
+    return _firestore.collection(complaintsCollection).snapshots().map((
+      snapshot,
+    ) {
       final list = snapshot.docs
           .map((doc) => PaymentComplaintModel.fromMap(doc.data(), doc.id))
           .toList();
@@ -158,10 +164,9 @@ class PaymentComplaintService {
 
   /// Streams persistent admin notifications.
   Stream<List<AdminNotificationModel>> streamAdminNotifications() {
-    return _firestore
-        .collection(notificationsCollection)
-        .snapshots()
-        .map((snapshot) {
+    return _firestore.collection(notificationsCollection).snapshots().map((
+      snapshot,
+    ) {
       final list = snapshot.docs
           .map((doc) => AdminNotificationModel.fromMap(doc.data(), doc.id))
           .toList();
@@ -196,8 +201,10 @@ class PaymentComplaintService {
   Future<PaymentComplaintModel?> getComplaintById(String complaintId) async {
     if (complaintId.isEmpty) return null;
     try {
-      final doc =
-          await _firestore.collection(complaintsCollection).doc(complaintId).get();
+      final doc = await _firestore
+          .collection(complaintsCollection)
+          .doc(complaintId)
+          .get();
       if (!doc.exists || doc.data() == null) return null;
       return PaymentComplaintModel.fromMap(doc.data()!, doc.id);
     } catch (e) {
@@ -216,7 +223,8 @@ class PaymentComplaintService {
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
-    final hasResponse = adminResponse != null && adminResponse.trim().isNotEmpty;
+    final hasResponse =
+        adminResponse != null && adminResponse.trim().isNotEmpty;
     if (hasResponse) {
       updates['adminResponse'] = adminResponse.trim();
       updates['adminRespondedAt'] = FieldValue.serverTimestamp();
@@ -236,19 +244,23 @@ class PaymentComplaintService {
               : adminResponse.trim();
 
           final notifId = 'notif_reply_$complaintId';
-          await _firestore.collection('patient_notifications').doc(notifId).set({
-            'notificationId': notifId,
-            'recipientUid': complaint.patientUid,
-            'type': 'complaint_reply',
-            'title': 'Admin Replied to Your Complaint',
-            'body': replyPreview,
-            'senderName': 'OPD Telemedicine Admin',
-            'complaintId': complaintId,
-            if (complaint.paymentId != null) 'paymentId': complaint.paymentId,
-            if (complaint.appointmentId != null) 'appointmentId': complaint.appointmentId,
-            'isRead': false,
-            'createdAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+          await _firestore.collection('patient_notifications').doc(notifId).set(
+            {
+              'notificationId': notifId,
+              'recipientUid': complaint.patientUid,
+              'type': 'complaint_reply',
+              'title': 'Admin Replied to Your Complaint',
+              'body': replyPreview,
+              'senderName': 'OPD Telemedicine Admin',
+              'complaintId': complaintId,
+              if (complaint.paymentId != null) 'paymentId': complaint.paymentId,
+              if (complaint.appointmentId != null)
+                'appointmentId': complaint.appointmentId,
+              'isRead': false,
+              'createdAt': FieldValue.serverTimestamp(),
+            },
+            SetOptions(merge: true),
+          );
         }
       } catch (e) {
         // Notification write failure must not revert complaint status update
@@ -257,7 +269,9 @@ class PaymentComplaintService {
   }
 
   /// Streams persistent notifications for a specific patient.
-  Stream<List<PatientNotificationModel>> streamPatientNotifications(String recipientUid) {
+  Stream<List<PatientNotificationModel>> streamPatientNotifications(
+    String recipientUid,
+  ) {
     if (recipientUid.isEmpty) return Stream.value(const []);
 
     return _firestore
@@ -265,12 +279,14 @@ class PaymentComplaintService {
         .where('recipientUid', isEqualTo: recipientUid)
         .snapshots()
         .map((snapshot) {
-      final list = snapshot.docs
-          .map((doc) => PatientNotificationModel.fromMap(doc.data(), doc.id))
-          .toList();
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return list;
-    });
+          final list = snapshot.docs
+              .map(
+                (doc) => PatientNotificationModel.fromMap(doc.data(), doc.id),
+              )
+              .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 
   /// Marks a specific patient notification as read.
@@ -284,4 +300,3 @@ class PaymentComplaintService {
     } catch (_) {}
   }
 }
-

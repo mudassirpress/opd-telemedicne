@@ -7,19 +7,12 @@ class AppError {
   final String? code;
   final dynamic originalError;
 
-  const AppError({
-    required this.message,
-    this.code,
-    this.originalError,
-  });
+  const AppError({required this.message, this.code, this.originalError});
 
   /// Create an AppError from a caught exception.
   factory AppError.fromException(dynamic e) {
     if (e is AppError) return e;
-    return AppError(
-      message: _userFriendlyMessage(e),
-      originalError: e,
-    );
+    return AppError(message: _userFriendlyMessage(e), originalError: e);
   }
 
   /// Convert technical errors to user-friendly messages.

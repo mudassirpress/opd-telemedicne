@@ -163,7 +163,9 @@ class _FirstSplashScreenState extends ConsumerState<FirstSplashScreen>
       print('Doctor profile incomplete - redirecting to Complete Profile');
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const UpdateDoctorProfileScreen()),
+        MaterialPageRoute(
+          builder: (context) => const UpdateDoctorProfileScreen(),
+        ),
       );
     } else {
       print('Navigating to Doctor Portal (Doctor logged in)');
@@ -249,9 +251,7 @@ class _FirstSplashScreenState extends ConsumerState<FirstSplashScreen>
         print('Navigating to Admin Portal (Admin logged in)');
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => const AdminPortalWrapper(),
-          ),
+          MaterialPageRoute(builder: (context) => const AdminPortalWrapper()),
         );
       }
       // Priority 2: Check if doctor is logged in (has doctorId)
@@ -264,8 +264,9 @@ class _FirstSplashScreenState extends ConsumerState<FirstSplashScreen>
       // Priority 3: Check if patient or guest is logged in
       else if (patientUser != null &&
           (patientUser.role == 'patient' || patientUser.isGuest)) {
-        final destination =
-            AuthRoutingService.evaluatePatientDestination(patientUser);
+        final destination = AuthRoutingService.evaluatePatientDestination(
+          patientUser,
+        );
         switch (destination) {
           case PatientAuthDestination.chatRoom:
             print('Navigating to Chat Room (Patient logged in)');
@@ -318,7 +319,9 @@ class _FirstSplashScreenState extends ConsumerState<FirstSplashScreen>
           print('Navigating to Doctor Portal (Regular doctor)');
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const DoctorPortalWrapper()),
+            MaterialPageRoute(
+              builder: (context) => const DoctorPortalWrapper(),
+            ),
           );
         }
       }
@@ -340,8 +343,14 @@ class _FirstSplashScreenState extends ConsumerState<FirstSplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final logoWidth = math.min(context.sw * 0.75, context.contentMaxWidth * 0.9);
-    final logoHeight = math.min(context.sh * 0.30, math.max(logoWidth * 0.7, 120.0));
+    final logoWidth = math.min(
+      context.sw * 0.75,
+      context.contentMaxWidth * 0.9,
+    );
+    final logoHeight = math.min(
+      context.sh * 0.30,
+      math.max(logoWidth * 0.7, 120.0),
+    );
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -353,10 +362,7 @@ class _FirstSplashScreenState extends ConsumerState<FirstSplashScreen>
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: context.fs(12),
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: context.fs(12), color: Colors.grey[600]),
           ),
         ),
       ),

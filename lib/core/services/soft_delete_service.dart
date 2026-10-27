@@ -439,11 +439,13 @@ class SoftDeleteService {
     SoftDeleteEntity entity,
     String id,
   ) {
-    return _firestore.collection(
-      entity == SoftDeleteEntity.doctor
-          ? FirestoreCollections.doctors
-          : FirestoreCollections.patients,
-    ).doc(id);
+    return _firestore
+        .collection(
+          entity == SoftDeleteEntity.doctor
+              ? FirestoreCollections.doctors
+              : FirestoreCollections.patients,
+        )
+        .doc(id);
   }
 
   static String _label(SoftDeleteEntity entity) =>

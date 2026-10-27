@@ -30,8 +30,9 @@ void main() {
   });
 
   group('MetallicInput Error Text Placement tests', () {
-    testWidgets('renders error text outside and below the rounded container',
-        (tester) async {
+    testWidgets('renders error text outside and below the rounded container', (
+      tester,
+    ) async {
       final formKey = GlobalKey<FormState>();
       final controller = TextEditingController();
 
@@ -44,8 +45,9 @@ void main() {
                 hintText: 'Full Name',
                 icon: Icons.person_rounded,
                 controller: controller,
-                validator: (val) =>
-                    (val == null || val.trim().isEmpty) ? 'Name is required' : null,
+                validator: (val) => (val == null || val.trim().isEmpty)
+                    ? 'Name is required'
+                    : null,
               ),
             ),
           ),
@@ -79,8 +81,9 @@ void main() {
   });
 
   group('GenderDropdownField tests', () {
-    testWidgets('renders Gender dropdown with options and outside error',
-        (tester) async {
+    testWidgets('renders Gender dropdown with options and outside error', (
+      tester,
+    ) async {
       final formKey = GlobalKey<FormState>();
       String? selectedGender;
 
@@ -100,8 +103,9 @@ void main() {
                         selectedGender = val;
                       });
                     },
-                    validator: (val) =>
-                        (val == null || val.isEmpty) ? 'Please select your gender' : null,
+                    validator: (val) => (val == null || val.isEmpty)
+                        ? 'Please select your gender'
+                        : null,
                   ),
                 );
               },
@@ -149,8 +153,9 @@ void main() {
   });
 
   group('CustomTextField Error Text Placement tests', () {
-    testWidgets('renders error text outside and below the rounded container',
-        (tester) async {
+    testWidgets('renders error text outside and below the rounded container', (
+      tester,
+    ) async {
       final formKey = GlobalKey<FormState>();
       final controller = TextEditingController();
 
@@ -163,8 +168,9 @@ void main() {
                 hintText: 'Enter value',
                 prefixIcon: Icons.edit,
                 controller: controller,
-                validator: (val) =>
-                    (val == null || val.isEmpty) ? 'Field cannot be empty' : null,
+                validator: (val) => (val == null || val.isEmpty)
+                    ? 'Field cannot be empty'
+                    : null,
               ),
             ),
           ),

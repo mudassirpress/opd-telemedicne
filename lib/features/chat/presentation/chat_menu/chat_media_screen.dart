@@ -43,22 +43,32 @@ class _ChatMediaScreenState extends State<ChatMediaScreen> {
     _MediaTab.docs: (label: 'Docs', icon: Icons.insert_drive_file_rounded),
   };
 
-  List<ChatMessageModel> get _media => widget.messages
-      .where((m) =>
-          !m.isDeleted &&
-          (m.mediaUrl ?? '').isNotEmpty &&
-          const {'image', 'video', 'audio', 'call_recording'}
-              .contains(m.messageType))
-      .toList()
-    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  List<ChatMessageModel> get _media =>
+      widget.messages
+          .where(
+            (m) =>
+                !m.isDeleted &&
+                (m.mediaUrl ?? '').isNotEmpty &&
+                const {
+                  'image',
+                  'video',
+                  'audio',
+                  'call_recording',
+                }.contains(m.messageType),
+          )
+          .toList()
+        ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
-  List<ChatMessageModel> get _docs => widget.messages
-      .where((m) =>
-          !m.isDeleted &&
-          (m.mediaUrl ?? '').isNotEmpty &&
-          const {'document', 'forwarded_report'}.contains(m.messageType))
-      .toList()
-    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  List<ChatMessageModel> get _docs =>
+      widget.messages
+          .where(
+            (m) =>
+                !m.isDeleted &&
+                (m.mediaUrl ?? '').isNotEmpty &&
+                const {'document', 'forwarded_report'}.contains(m.messageType),
+          )
+          .toList()
+        ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
   List<({String url, ChatMessageModel message})> get _links {
     final results = <({String url, ChatMessageModel message})>[];
@@ -133,10 +143,7 @@ class _ChatMediaScreenState extends State<ChatMediaScreen> {
       itemCount: media.length,
       itemBuilder: (context, index) {
         final message = media[index];
-        return _MediaTile(
-          message: message,
-          onTap: () => _openMedia(message),
-        );
+        return _MediaTile(message: message, onTap: () => _openMedia(message));
       },
     );
   }

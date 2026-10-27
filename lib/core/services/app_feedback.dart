@@ -5,12 +5,7 @@ import 'package:telemedicine/app/theme/app_theme.dart';
 import 'package:telemedicine/core/utils/toast_utils.dart';
 
 /// Feedback types for standard styling.
-enum FeedbackType {
-  success,
-  error,
-  warning,
-  info,
-}
+enum FeedbackType { success, error, warning, info }
 
 /// Standardized, production-grade UI notification and feedback service.
 ///
@@ -119,7 +114,8 @@ class AppFeedback {
     VoidCallback? onAction,
     required Duration duration,
   }) {
-    final effectiveContext = context ?? NotificationService.navigatorKey.currentContext;
+    final effectiveContext =
+        context ?? NotificationService.navigatorKey.currentContext;
 
     if (effectiveContext == null) {
       // Fallback to ToastService if no BuildContext is mounted yet

@@ -25,8 +25,9 @@ class _AdminOnlineHistoryTabState extends ConsumerState<AdminOnlineHistoryTab> {
   @override
   void initState() {
     super.initState();
-    _activityStream =
-        ref.read(doctorControllerProvider).getAllDoctorActivityLogs();
+    _activityStream = ref
+        .read(doctorControllerProvider)
+        .getAllDoctorActivityLogs();
   }
 
   @override
@@ -129,7 +130,10 @@ class _AdminOnlineHistoryTabState extends ConsumerState<AdminOnlineHistoryTab> {
               children: [
                 // Date header
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 4,
+                  ),
                   child: Text(
                     dateKey,
                     style: AdminTextStyles.label(
@@ -216,8 +220,10 @@ class _AdminOnlineHistoryTabState extends ConsumerState<AdminOnlineHistoryTab> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(14),
@@ -246,7 +252,9 @@ class _AdminOnlineHistoryTabState extends ConsumerState<AdminOnlineHistoryTab> {
     );
   }
 
-  Map<String, List<Map<String, dynamic>>> _groupByDate(List<Map<String, dynamic>> logs) {
+  Map<String, List<Map<String, dynamic>>> _groupByDate(
+    List<Map<String, dynamic>> logs,
+  ) {
     final Map<String, List<Map<String, dynamic>>> grouped = {};
     for (final log in logs) {
       final timestamp = log['timestamp'] as Timestamp?;
@@ -259,11 +267,15 @@ class _AdminOnlineHistoryTabState extends ConsumerState<AdminOnlineHistoryTab> {
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
-    if (date.year == now.year && date.month == now.month && date.day == now.day) {
+    if (date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day) {
       return 'Today';
     }
     final yesterday = now.subtract(const Duration(days: 1));
-    if (date.year == yesterday.year && date.month == yesterday.month && date.day == yesterday.day) {
+    if (date.year == yesterday.year &&
+        date.month == yesterday.month &&
+        date.day == yesterday.day) {
       return 'Yesterday';
     }
     return '${date.day}/${date.month}/${date.year}';

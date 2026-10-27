@@ -98,7 +98,9 @@ class FirebaseStorageService {
     final snapshot = await uploadTask;
     final downloadUrl = await snapshot.ref.getDownloadURL();
 
-    debugPrint('✅ [FirebaseStorage] Uploaded: $storagePath (${snapshot.totalBytes} bytes)');
+    debugPrint(
+      '✅ [FirebaseStorage] Uploaded: $storagePath (${snapshot.totalBytes} bytes)',
+    );
 
     return StorageUploadResult(
       downloadUrl: downloadUrl,
@@ -125,7 +127,9 @@ class FirebaseStorageService {
     final snapshot = await uploadTask;
     final downloadUrl = await snapshot.ref.getDownloadURL();
 
-    debugPrint('✅ [FirebaseStorage] Uploaded bytes: $storagePath (${data.length} bytes)');
+    debugPrint(
+      '✅ [FirebaseStorage] Uploaded bytes: $storagePath (${data.length} bytes)',
+    );
 
     return StorageUploadResult(
       downloadUrl: downloadUrl,
@@ -139,7 +143,9 @@ class FirebaseStorageService {
     required String patientUid,
     required File file,
   }) async {
-    final ext = p.extension(file.path).isEmpty ? '.jpg' : p.extension(file.path);
+    final ext = p.extension(file.path).isEmpty
+        ? '.jpg'
+        : p.extension(file.path);
     final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}$ext';
     final path = 'patients/$patientUid/profile/$fileName';
     return uploadFile(storagePath: path, file: file);
@@ -150,7 +156,9 @@ class FirebaseStorageService {
     required String doctorUid,
     required File file,
   }) async {
-    final ext = p.extension(file.path).isEmpty ? '.jpg' : p.extension(file.path);
+    final ext = p.extension(file.path).isEmpty
+        ? '.jpg'
+        : p.extension(file.path);
     final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}$ext';
     final path = 'doctors/$doctorUid/profile/$fileName';
     return uploadFile(storagePath: path, file: file);
@@ -162,7 +170,9 @@ class FirebaseStorageService {
     required String paymentId,
     required File file,
   }) async {
-    final ext = p.extension(file.path).isEmpty ? '.jpg' : p.extension(file.path);
+    final ext = p.extension(file.path).isEmpty
+        ? '.jpg'
+        : p.extension(file.path);
     final fileName = 'proof_${DateTime.now().millisecondsSinceEpoch}$ext';
     final path = 'payment_proofs/$patientUid/$paymentId/$fileName';
     return uploadFile(storagePath: path, file: file);
@@ -173,7 +183,9 @@ class FirebaseStorageService {
     required String appointmentId,
     required File file,
   }) async {
-    final ext = p.extension(file.path).isEmpty ? '.jpg' : p.extension(file.path);
+    final ext = p.extension(file.path).isEmpty
+        ? '.jpg'
+        : p.extension(file.path);
     final fileName = 'proof_${DateTime.now().millisecondsSinceEpoch}$ext';
     final path = 'appointments/$appointmentId/payment_proofs/$fileName';
     return uploadFile(storagePath: path, file: file);
@@ -186,7 +198,8 @@ class FirebaseStorageService {
     required File file,
     String? originalFileName,
   }) async {
-    final cleanName = originalFileName != null && originalFileName.trim().isNotEmpty
+    final cleanName =
+        originalFileName != null && originalFileName.trim().isNotEmpty
         ? p.basename(originalFileName)
         : p.basename(file.path);
     final path = 'chat_attachments/$conversationId/${messageId}_$cleanName';
@@ -200,11 +213,7 @@ class FirebaseStorageService {
     required File file,
   }) async {
     final path = 'chat_voice/$conversationId/$messageId.m4a';
-    return uploadFile(
-      storagePath: path,
-      file: file,
-      contentType: 'audio/mp4',
-    );
+    return uploadFile(storagePath: path, file: file, contentType: 'audio/mp4');
   }
 
   // ── Medical / Lab Reports ──────────────────────────────────────────────────
@@ -213,10 +222,12 @@ class FirebaseStorageService {
     required File file,
     String? originalFileName,
   }) async {
-    final cleanName = originalFileName != null && originalFileName.trim().isNotEmpty
+    final cleanName =
+        originalFileName != null && originalFileName.trim().isNotEmpty
         ? p.basename(originalFileName)
         : p.basename(file.path);
-    final path = 'reports/$userId/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
+    final path =
+        'reports/$userId/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
     return uploadFile(storagePath: path, file: file);
   }
 
@@ -226,10 +237,12 @@ class FirebaseStorageService {
     required File file,
     String? originalFileName,
   }) async {
-    final cleanName = originalFileName != null && originalFileName.trim().isNotEmpty
+    final cleanName =
+        originalFileName != null && originalFileName.trim().isNotEmpty
         ? p.basename(originalFileName)
         : p.basename(file.path);
-    final path = 'admin_uploads/$adminUid/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
+    final path =
+        'admin_uploads/$adminUid/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
     return uploadFile(storagePath: path, file: file);
   }
 

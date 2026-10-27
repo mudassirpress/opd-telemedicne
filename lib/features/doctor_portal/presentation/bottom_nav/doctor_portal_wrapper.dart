@@ -70,7 +70,9 @@ class _DoctorPortalWrapperState extends ConsumerState<DoctorPortalWrapper> {
     if (needsCompletion) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const UpdateDoctorProfileScreen()),
+        MaterialPageRoute(
+          builder: (context) => const UpdateDoctorProfileScreen(),
+        ),
       );
       return;
     }
@@ -126,10 +128,7 @@ class _DoctorPortalWrapperState extends ConsumerState<DoctorPortalWrapper> {
       },
       child: Scaffold(
         backgroundColor: AdminPalette.background,
-        body: IndexedStack(
-          index: currentIndex,
-          children: _screens,
-        ),
+        body: IndexedStack(index: currentIndex, children: _screens),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -218,7 +217,8 @@ class _DoctorPortalWrapperState extends ConsumerState<DoctorPortalWrapper> {
     final isSelected = ref.watch(doctorPortalTabProvider) == tab.index;
 
     return GestureDetector(
-      onTap: onTap ??
+      onTap:
+          onTap ??
           () => ref.read(doctorPortalTabProvider.notifier).state = tab.index,
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
@@ -259,8 +259,7 @@ class _DoctorPortalWrapperState extends ConsumerState<DoctorPortalWrapper> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: context.fs(11),
-                  fontWeight:
-                      isSelected ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   color: isSelected ? Colors.white : AdminPalette.textMuted,
                 ),
               ),

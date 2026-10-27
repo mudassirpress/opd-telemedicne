@@ -72,7 +72,10 @@ class _AdminComplaintDetailScreenState
       );
 
       if (!mounted) return;
-      AppFeedback.showSuccess(context, 'Status updated to ${newStatus.toUpperCase()}');
+      AppFeedback.showSuccess(
+        context,
+        'Status updated to ${newStatus.toUpperCase()}',
+      );
       await _loadComplaint();
     } catch (e) {
       if (!mounted) return;
@@ -135,8 +138,11 @@ class _AdminComplaintDetailScreenState
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline_rounded,
-                  size: 48, color: AdminPalette.error),
+              const Icon(
+                Icons.error_outline_rounded,
+                size: 48,
+                color: AdminPalette.error,
+              ),
               const SizedBox(height: 12),
               const Text('Complaint record could not be loaded.'),
               const SizedBox(height: 16),
@@ -152,8 +158,9 @@ class _AdminComplaintDetailScreenState
       );
     }
 
-    final dateFormatted =
-        DateFormat('MMM d, yyyy  •  h:mm a').format(complaint.createdAt);
+    final dateFormatted = DateFormat(
+      'MMM d, yyyy  •  h:mm a',
+    ).format(complaint.createdAt);
 
     Color statusColor;
     String statusLabel;
@@ -189,12 +196,15 @@ class _AdminComplaintDetailScreenState
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color: statusColor.withValues(alpha: 0.3)),
+                            color: statusColor.withValues(alpha: 0.3),
+                          ),
                         ),
                         child: Text(
                           statusLabel,
@@ -256,8 +266,11 @@ class _AdminComplaintDetailScreenState
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.person_rounded,
-                          size: 20, color: AdminPalette.brand),
+                      Icon(
+                        Icons.person_rounded,
+                        size: 20,
+                        color: AdminPalette.brand,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'Patient Information',
@@ -281,7 +294,10 @@ class _AdminComplaintDetailScreenState
                   ),
                   if (complaint.appointmentId != null &&
                       complaint.appointmentId!.isNotEmpty)
-                    _buildDetailRow('Appointment Reference', complaint.appointmentId!),
+                    _buildDetailRow(
+                      'Appointment Reference',
+                      complaint.appointmentId!,
+                    ),
                   if (complaint.paymentId != null &&
                       complaint.paymentId!.isNotEmpty) ...[
                     _buildDetailRow('Payment Reference', complaint.paymentId!),
@@ -299,7 +315,9 @@ class _AdminComplaintDetailScreenState
                           ),
                         ),
                         onPressed: () {
-                          final isAppt = complaint.category.toLowerCase().contains('appointment');
+                          final isAppt = complaint.category
+                              .toLowerCase()
+                              .contains('appointment');
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -381,8 +399,11 @@ class _AdminComplaintDetailScreenState
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.reply_rounded,
-                          size: 20, color: AdminPalette.brand),
+                      Icon(
+                        Icons.reply_rounded,
+                        size: 20,
+                        color: AdminPalette.brand,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'Admin Response',
@@ -425,8 +446,10 @@ class _AdminComplaintDetailScreenState
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            BorderSide(color: AdminPalette.brand, width: 1.5),
+                        borderSide: BorderSide(
+                          color: AdminPalette.brand,
+                          width: 1.5,
+                        ),
                       ),
                     ),
                   ),
@@ -445,8 +468,11 @@ class _AdminComplaintDetailScreenState
                                 color: Colors.white,
                               ),
                             )
-                          : const Icon(Icons.send_rounded,
-                              size: 18, color: Colors.white),
+                          : const Icon(
+                              Icons.send_rounded,
+                              size: 18,
+                              color: Colors.white,
+                            ),
                       label: Text(
                         _isSaving ? 'Saving...' : 'Send Response',
                         style: TextStyle(

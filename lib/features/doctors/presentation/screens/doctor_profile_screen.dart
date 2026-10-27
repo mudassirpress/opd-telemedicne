@@ -58,13 +58,10 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   /// doctor loads a genuinely different value from the server.
   bool _languagesDirty = false;
 
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
-      _doctorProfileSub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _doctorProfileSub;
 
   final _formKey = GlobalKey<FormState>();
   final ImagePicker _picker = ImagePicker();
-
-
 
   @override
   void initState() {
@@ -169,11 +166,8 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     try {
       final currentUser = ref.read(userProvider);
       final doctorUid = currentUser?.id ?? 'temp_doctor';
-      final result =
-          await FirebaseStorageService.instance.uploadDoctorProfileImage(
-        doctorUid: doctorUid,
-        file: imageFile,
-      );
+      final result = await FirebaseStorageService.instance
+          .uploadDoctorProfileImage(doctorUid: doctorUid, file: imageFile);
       ToastService.instance.showSuccess('Image uploaded');
       return result.downloadUrl;
     } catch (e) {
@@ -244,10 +238,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: Text(
               'Remove',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.red,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red),
             ),
           ),
         ],
@@ -268,7 +259,8 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   }
 
   void _showImageSourceDialog() {
-    final hasPhoto = selectedImage != null ||
+    final hasPhoto =
+        selectedImage != null ||
         (currentImageUrl != null && currentImageUrl!.isNotEmpty);
 
     showModalBottomSheet(
@@ -406,7 +398,9 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
 
       if (success) {
         if (targetStatus) {
-          ToastService.instance.showSuccess('You are now online and ready for calls');
+          ToastService.instance.showSuccess(
+            'You are now online and ready for calls',
+          );
         } else {
           ToastService.instance.showInfo('You are now offline');
         }
@@ -479,7 +473,8 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
         'highestDegree': highestDegreeController.text.trim(),
         'imageUrl': uploadedImageUrl,
         'image': uploadedImageUrl,
-        'profile_image': uploadedImageUrl, // Explicit null when removed, never string "null"
+        'profile_image':
+            uploadedImageUrl, // Explicit null when removed, never string "null"
         if (isRemovingImage) 'remove_profile_image': true,
         // A plain list: `DoctorLanguages.parse` hands back an unmodifiable
         // view, which is fine for the model but not something to hand to the
@@ -619,9 +614,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text(
               'Cancel',
-              style: TextStyle(
-                color: Color(0xFF6B7B8D),
-              ),
+              style: TextStyle(color: Color(0xFF6B7B8D)),
             ),
           ),
           TextButton(
@@ -723,10 +716,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
               Text(
                 'Please sign in again to manage your profile.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: const Color(0xFF657991),
-                ),
+                style: TextStyle(fontSize: 13, color: const Color(0xFF657991)),
               ),
               const SizedBox(height: 20),
               ElevatedButton(
@@ -817,8 +807,9 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF0B2041)
-                                      .withValues(alpha: 0.32),
+                                  color: const Color(
+                                    0xFF0B2041,
+                                  ).withValues(alpha: 0.32),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 ),
@@ -888,8 +879,8 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                                   labelText: 'Full Name',
                                   validator: (value) =>
                                       value?.trim().isEmpty ?? true
-                                          ? 'Required'
-                                          : null,
+                                      ? 'Required'
+                                      : null,
                                 ),
                                 const SizedBox(height: 16),
                                 MetallicInput(
@@ -906,13 +897,15 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                                   controller: priceController,
                                   showLabel: true,
                                   labelText: 'Price (PKR)',
-                                  keyboardType: const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
                                 ),
                                 const SizedBox(height: 16),
                                 MetallicInput(
-                                  hintText: 'Cardiologist with 12 years of experience',
+                                  hintText:
+                                      'Cardiologist with 12 years of experience',
                                   icon: Icons.notes_outlined,
                                   controller: descriptionController,
                                   showLabel: true,
@@ -937,7 +930,6 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                           const SizedBox(height: 32),
                           _buildActionButtons(),
                           const SizedBox(height: 24),
-                           
                         ],
                       ),
                     ),
@@ -1029,12 +1021,17 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   }
 
   Widget _buildAvatarSection() {
-    final hasPhoto = selectedImage != null ||
+    final hasPhoto =
+        selectedImage != null ||
         (currentImageUrl != null && currentImageUrl!.isNotEmpty);
 
     final name = nameController.text.trim();
-    final cleanName = name.replaceFirst(RegExp(r'^Dr\.?\s*', caseSensitive: false), '').trim();
-    final initial = cleanName.isNotEmpty ? cleanName[0].toUpperCase() : (name.isNotEmpty ? name[0].toUpperCase() : 'D');
+    final cleanName = name
+        .replaceFirst(RegExp(r'^Dr\.?\s*', caseSensitive: false), '')
+        .trim();
+    final initial = cleanName.isNotEmpty
+        ? cleanName[0].toUpperCase()
+        : (name.isNotEmpty ? name[0].toUpperCase() : 'D');
 
     return GestureDetector(
       onTap: _showImageSourceDialog,
@@ -1068,11 +1065,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
             child: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    Color(0xFFF3F7FB),
-                    Colors.white,
-                    Color(0xFFF0F4F9),
-                  ],
+                  colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -1086,33 +1079,32 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                         ),
                       )
                     : selectedImage != null
-                        ? Image.file(selectedImage!, fit: BoxFit.cover)
-                        : currentImageUrl != null &&
-                                currentImageUrl!.isNotEmpty
-                            ? Image.network(
-                                currentImageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Center(
-                                  child: Text(
-                                    initial,
-                                    style: TextStyle(
-                                      fontSize: 44,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF15386A),
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : Center(
-                                child: Text(
-                                  initial,
-                                  style: TextStyle(
-                                    fontSize: 44,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF15386A),
-                                  ),
-                                ),
-                              ),
+                    ? Image.file(selectedImage!, fit: BoxFit.cover)
+                    : currentImageUrl != null && currentImageUrl!.isNotEmpty
+                    ? Image.network(
+                        currentImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Text(
+                            initial,
+                            style: TextStyle(
+                              fontSize: 44,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF15386A),
+                            ),
+                          ),
+                        ),
+                      )
+                    : Center(
+                        child: Text(
+                          initial,
+                          style: TextStyle(
+                            fontSize: 44,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF15386A),
+                          ),
+                        ),
+                      ),
               ),
             ),
           ),
@@ -1133,10 +1125,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                   end: Alignment.bottomCenter,
                 ),
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFF132D56),
-                  width: 1.5,
-                ),
+                border: Border.all(color: const Color(0xFF132D56), width: 1.5),
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFF0B2041).withValues(alpha: 0.32),
@@ -1163,10 +1152,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                   decoration: BoxDecoration(
                     color: Colors.red.shade600,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 2,
-                    ),
+                    border: Border.all(color: Colors.white, width: 2),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.red.withValues(alpha: 0.35),
@@ -1426,11 +1412,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.logout_rounded,
-                    color: Colors.red[700],
-                    size: 18,
-                  ),
+                  Icon(Icons.logout_rounded, color: Colors.red[700], size: 18),
                   const SizedBox(width: 8),
                   Text(
                     'Logout',

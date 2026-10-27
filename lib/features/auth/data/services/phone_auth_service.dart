@@ -22,8 +22,10 @@ class PhoneAuthService {
   Future<void> sendOtp({
     required String phoneNumber,
     required void Function(String verificationId, int? resendToken) onCodeSent,
-    required void Function(FirebaseAuthException exception) onVerificationFailed,
-    required void Function(PhoneAuthCredential credential) onVerificationCompleted,
+    required void Function(FirebaseAuthException exception)
+    onVerificationFailed,
+    required void Function(PhoneAuthCredential credential)
+    onVerificationCompleted,
     required void Function(String verificationId) onCodeAutoRetrievalTimeout,
     int? resendToken,
     Duration timeout = const Duration(seconds: 60),
@@ -35,19 +37,27 @@ class PhoneAuthService {
         timeout: timeout,
         forceResendingToken: resendToken,
         verificationCompleted: (PhoneAuthCredential credential) {
-          debugPrint('✅ [PhoneAuthService] Instant verification / auto-retrieval completed');
+          debugPrint(
+            '✅ [PhoneAuthService] Instant verification / auto-retrieval completed',
+          );
           onVerificationCompleted(credential);
         },
         verificationFailed: (FirebaseAuthException exception) {
-          debugPrint('❌ [PhoneAuthService] Verification failed: ${exception.code} - ${exception.message}');
+          debugPrint(
+            '❌ [PhoneAuthService] Verification failed: ${exception.code} - ${exception.message}',
+          );
           onVerificationFailed(exception);
         },
         codeSent: (String verificationId, int? token) {
-          debugPrint('📨 [PhoneAuthService] Code sent successfully. verificationId: $verificationId');
+          debugPrint(
+            '📨 [PhoneAuthService] Code sent successfully. verificationId: $verificationId',
+          );
           onCodeSent(verificationId, token);
         },
         codeAutoRetrievalTimeout: (String verificationId) {
-          debugPrint('⏱️ [PhoneAuthService] Code auto-retrieval timeout for $verificationId');
+          debugPrint(
+            '⏱️ [PhoneAuthService] Code auto-retrieval timeout for $verificationId',
+          );
           onCodeAutoRetrievalTimeout(verificationId);
         },
       );
@@ -71,13 +81,19 @@ class PhoneAuthService {
   }
 
   /// Signs in using a [PhoneAuthCredential] (e.g. from auto-retrieval or manually entered code).
-  Future<UserCredential> signInWithCredential(PhoneAuthCredential credential) async {
+  Future<UserCredential> signInWithCredential(
+    PhoneAuthCredential credential,
+  ) async {
     try {
       final userCredential = await _auth.signInWithCredential(credential);
-      debugPrint('🎉 [PhoneAuthService] Successfully signed in user: ${userCredential.user?.uid}');
+      debugPrint(
+        '🎉 [PhoneAuthService] Successfully signed in user: ${userCredential.user?.uid}',
+      );
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      debugPrint('❌ [PhoneAuthService] signInWithCredential failed: ${e.code} - ${e.message}');
+      debugPrint(
+        '❌ [PhoneAuthService] signInWithCredential failed: ${e.code} - ${e.message}',
+      );
       rethrow;
     }
   }

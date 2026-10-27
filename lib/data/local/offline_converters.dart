@@ -28,10 +28,7 @@ class OfflineConverters {
     }
   }
 
-  static OfflineChatMessage toOffline(
-    ChatMessageModel message,
-    String chatId,
-  ) {
+  static OfflineChatMessage toOffline(ChatMessageModel message, String chatId) {
     return OfflineChatMessage(
       messageId: message.id,
       senderId: message.senderId,
@@ -55,7 +52,9 @@ class OfflineConverters {
       adminName: message.adminName,
       adminId: message.adminId,
       originalSenderId: message.originalSenderId,
-      replyTo: message.replyTo != null ? _replyDataToJson(message.replyTo!) : null,
+      replyTo: message.replyTo != null
+          ? _replyDataToJson(message.replyTo!)
+          : null,
       chatId: chatId,
       prescriptionId: message.prescriptionId,
       prescriptionNotePreview: message.prescriptionNotePreview,
@@ -116,7 +115,8 @@ class OfflineConverters {
     final Map<String, String> values = {};
     var content = raw.trim();
     if (content.startsWith('{')) content = content.substring(1);
-    if (content.endsWith('}')) content = content.substring(0, content.length - 1);
+    if (content.endsWith('}'))
+      content = content.substring(0, content.length - 1);
     for (final part in content.split(',')) {
       final idx = part.indexOf(':');
       if (idx < 0) continue;

@@ -44,7 +44,9 @@ class ReactivationRequestModel {
     final rawDuration = map['durationMonths'];
     final int? parsedDuration = rawDuration is int
         ? rawDuration
-        : (rawDuration is num ? rawDuration.toInt() : int.tryParse(rawDuration?.toString() ?? ''));
+        : (rawDuration is num
+              ? rawDuration.toInt()
+              : int.tryParse(rawDuration?.toString() ?? ''));
 
     return ReactivationRequestModel(
       id: map['id'] ?? '',
@@ -55,25 +57,26 @@ class ReactivationRequestModel {
       status: map['status'] ?? 'pending',
       submittedAt: map['submittedAt'] != null
           ? (map['submittedAt'] is Timestamp
-              ? (map['submittedAt'] as Timestamp).toDate()
-              : DateTime.tryParse(map['submittedAt'].toString()) ?? DateTime.now())
+                ? (map['submittedAt'] as Timestamp).toDate()
+                : DateTime.tryParse(map['submittedAt'].toString()) ??
+                      DateTime.now())
           : DateTime.now(),
       reviewedAt: map['reviewedAt'] != null
           ? (map['reviewedAt'] is Timestamp
-              ? (map['reviewedAt'] as Timestamp).toDate()
-              : DateTime.tryParse(map['reviewedAt'].toString()))
+                ? (map['reviewedAt'] as Timestamp).toDate()
+                : DateTime.tryParse(map['reviewedAt'].toString()))
           : null,
       reviewedBy: map['reviewedBy'],
       rejectionReason: map['rejectionReason'],
       previousExpiryDate: map['previousExpiryDate'] != null
           ? (map['previousExpiryDate'] is Timestamp
-              ? (map['previousExpiryDate'] as Timestamp).toDate()
-              : DateTime.tryParse(map['previousExpiryDate'].toString()))
+                ? (map['previousExpiryDate'] as Timestamp).toDate()
+                : DateTime.tryParse(map['previousExpiryDate'].toString()))
           : null,
       newExpiryDate: map['newExpiryDate'] != null
           ? (map['newExpiryDate'] is Timestamp
-              ? (map['newExpiryDate'] as Timestamp).toDate()
-              : DateTime.tryParse(map['newExpiryDate'].toString()))
+                ? (map['newExpiryDate'] as Timestamp).toDate()
+                : DateTime.tryParse(map['newExpiryDate'].toString()))
           : null,
       subscriptionPlan: map['subscriptionPlan']?.toString(),
       durationMonths: parsedDuration,

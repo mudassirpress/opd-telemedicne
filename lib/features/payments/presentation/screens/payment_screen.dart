@@ -34,18 +34,44 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final String accountTitle = "M/S OPD ONLINE";
   final String accountNumber = "PK97ALFH5660005002596400";
 
-  int _selectedPlanIndex = 0; // 0 = 1 month (300 PKR), 1 = 6 months (1000 PKR), 2 = 1 year (1500 PKR)
+  int _selectedPlanIndex =
+      0; // 0 = 1 month (300 PKR), 1 = 6 months (1000 PKR), 2 = 1 year (1500 PKR)
 
-  static const List<({String planId, String title, String priceText, double amount, int durationMonths})> _plans = [
-    (planId: 'one_month', title: '1 Month', priceText: '300 PKR', amount: 300, durationMonths: 1),
-    (planId: 'six_months', title: '6 Months', priceText: '1,000 PKR', amount: 1000, durationMonths: 6),
-    (planId: 'one_year', title: '1 Year', priceText: '1,500 PKR', amount: 1500, durationMonths: 12),
+  static const List<
+    ({
+      String planId,
+      String title,
+      String priceText,
+      double amount,
+      int durationMonths,
+    })
+  >
+  _plans = [
+    (
+      planId: 'one_month',
+      title: '1 Month',
+      priceText: '300 PKR',
+      amount: 300,
+      durationMonths: 1,
+    ),
+    (
+      planId: 'six_months',
+      title: '6 Months',
+      priceText: '1,000 PKR',
+      amount: 1000,
+      durationMonths: 6,
+    ),
+    (
+      planId: 'one_year',
+      title: '1 Year',
+      priceText: '1,500 PKR',
+      amount: 1500,
+      durationMonths: 12,
+    ),
   ];
 
   String get paymentAmount => _plans[_selectedPlanIndex].priceText;
   double get amountValue => _plans[_selectedPlanIndex].amount;
-
-
 
   @override
   void initState() {
@@ -116,7 +142,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   void _copyAmount() {
     Clipboard.setData(ClipboardData(text: amountValue.toInt().toString()));
-    ToastService.instance.showSuccess('Amount $paymentAmount copied to clipboard');
+    ToastService.instance.showSuccess(
+      'Amount $paymentAmount copied to clipboard',
+    );
   }
 
   void _copyBankName() {
@@ -212,9 +240,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         // SignInScreen underneath, so Back from the portal returned a
         // signed-in patient to the login screen.
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (context) => const PatientPortalWrapper(),
-          ),
+          MaterialPageRoute(builder: (context) => const PatientPortalWrapper()),
           (Route<dynamic> route) => false,
         );
       } else {
@@ -380,7 +406,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 6,
+                      ),
                       decoration: BoxDecoration(
                         gradient: _selectedPlanIndex == i
                             ? const LinearGradient(
@@ -411,7 +440,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         boxShadow: [
                           BoxShadow(
                             color: _selectedPlanIndex == i
-                                ? const Color(0xFF0F1E32).withValues(alpha: 0.25)
+                                ? const Color(
+                                    0xFF0F1E32,
+                                  ).withValues(alpha: 0.25)
                                 : Colors.black.withValues(alpha: 0.03),
                             blurRadius: 6,
                             offset: const Offset(0, 3),
@@ -460,9 +491,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       Navigator.pop(context);
     } else {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (context) => const PatientPortalWrapper(),
-        ),
+        MaterialPageRoute(builder: (context) => const PatientPortalWrapper()),
         (Route<dynamic> route) => false,
       );
     }
@@ -471,7 +500,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(userProvider);
-    final showComplaintButton = PaymentComplaintVisibility.shouldShow(currentUser);
+    final showComplaintButton = PaymentComplaintVisibility.shouldShow(
+      currentUser,
+    );
 
     return PopScope(
       canPop: false,
@@ -506,13 +537,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     vertical: 16,
                   ),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
+                    constraints: BoxConstraints(
+                      maxWidth: context.contentMaxWidth,
+                    ),
                     child: Column(
                       children: [
                         // Top bar with back button and Help / Complaint
                         Row(
                           children: [
-                            CircularBackButton(onPressed: _handleBackNavigation),
+                            CircularBackButton(
+                              onPressed: _handleBackNavigation,
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
@@ -546,324 +581,330 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => const SubmitComplaintScreen(),
+                                      builder: (_) =>
+                                          const SubmitComplaintScreen(),
                                     ),
                                   );
                                 },
                               ),
                           ],
                         ),
-                      const SizedBox(height: 6),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Send payment and upload proof for verification',
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF657991),
-                              height: 1.4,
+                        const SizedBox(height: 6),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Send payment and upload proof for verification',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF657991),
+                                height: 1.4,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
-                      // ===== Subscription Plan Selection Card =====
-                      _buildPlanSelector(),
+                        // ===== Subscription Plan Selection Card =====
+                        _buildPlanSelector(),
 
-                      const SizedBox(height: 20),
+                        const SizedBox(height: 20),
 
-                      // ===== Bank Details Card =====
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0F4FA),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFFDCE6F2)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF12263F).withValues(alpha: 0.06),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.account_balance_rounded,
-                                  size: 22,
-                                  color: AppColors.primaryRed,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Bank Details',
-                                  style: TextStyle(
-                                    fontSize: context.fs(14.5),
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF1F2F44),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-
-                            // Bank Name
-                            _buildDetailRow(
-                              label: 'Bank Name',
-                              value: bankName,
-                              onCopy: _copyBankName,
-                            ),
-                            _buildDivider(),
-
-                            // Amount
-                            _buildDetailRow(
-                              label: 'Amount',
-                              value: paymentAmount,
-                              isHighlighted: true,
-                              onCopy: _copyAmount,
-                            ),
-                            _buildDivider(),
-
-                            // Account Title
-                            _buildDetailRow(
-                              label: 'Account Title',
-                              value: accountTitle,
-                              onCopy: _copyAccountTitle,
-                            ),
-                            _buildDivider(),
-
-                            // Account Number (IBAN)
-                            _buildDetailRow(
-                              label: 'Account Number',
-                              value: accountNumber,
-                              isIBAN: true,
-                              onCopy: _copyAccountNumber,
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            // Info box
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF0F4FA),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: const Color(0xFFDCE6F2)),
+                        // ===== Bank Details Card =====
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0F4FA),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFFDCE6F2)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF12263F,
+                                ).withValues(alpha: 0.06),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
                               ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.info_outline_rounded,
-                                    size: 20,
-                                    color: AppColors.primaryRed,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'Send exact amount of $paymentAmount and upload transaction screenshot below for verification.',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                        color: const Color(0xFF657991),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // ===== Upload Section Card =====
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0F4FA),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFFDCE6F2)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.upload_file_rounded,
-                                  color: AppColors.primaryRed,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Upload Payment Screenshot',
-                                  style: TextStyle(
-                                    fontSize: context.fs(14),
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF1F2F44),
-                                  ),
-                                ),
-                              
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'After sending $paymentAmount to Bank Alfalah, take a screenshot of the transaction and upload it here for admin verification.',
-                              style: TextStyle(
-                                fontSize: context.fs(13),
-                                color: const Color(0xFF657991),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            if (paymentImage != null) ...[
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(14),
-                                child: Image.file(
-                                  paymentImage!,
-                                  height: 200,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Row(
                                 children: [
-                                  Expanded(
-                                    child: GradientButton(
-                                      text: 'Change',
-                                      onPressed: isUploading
-                                          ? null
-                                          : _showImageSourceDialog,
-                                      icon: Icons.refresh_rounded,
-                                    ),
+                                  Icon(
+                                    Icons.account_balance_rounded,
+                                    size: 22,
+                                    color: AppColors.primaryRed,
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: GradientButton(
-                                      text: 'Remove',
-                                      onPressed: () {
-                                        setState(() {
-                                          paymentImage = null;
-                                        });
-                                        ToastService.instance.showInfo(
-                                          'Image removed',
-                                        );
-                                      },
-                                      icon: Icons.delete_rounded,
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Bank Details',
+                                    style: TextStyle(
+                                      fontSize: context.fs(14.5),
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF1F2F44),
                                     ),
                                   ),
                                 ],
                               ),
-                            ] else ...[
-                              InkWell(
-                                onTap: isUploading
-                                    ? null
-                                    : _showImageSourceDialog,
-                                borderRadius: BorderRadius.circular(14),
-                                child: Container(
-                                  width: double.infinity,
-                                  height: 180,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: const Color(0xFFBAC7D8),
-                                      width: 1.5,
-                                    ),
+                              const SizedBox(height: 20),
+
+                              // Bank Name
+                              _buildDetailRow(
+                                label: 'Bank Name',
+                                value: bankName,
+                                onCopy: _copyBankName,
+                              ),
+                              _buildDivider(),
+
+                              // Amount
+                              _buildDetailRow(
+                                label: 'Amount',
+                                value: paymentAmount,
+                                isHighlighted: true,
+                                onCopy: _copyAmount,
+                              ),
+                              _buildDivider(),
+
+                              // Account Title
+                              _buildDetailRow(
+                                label: 'Account Title',
+                                value: accountTitle,
+                                onCopy: _copyAccountTitle,
+                              ),
+                              _buildDivider(),
+
+                              // Account Number (IBAN)
+                              _buildDetailRow(
+                                label: 'Account Number',
+                                value: accountNumber,
+                                isIBAN: true,
+                                onCopy: _copyAccountNumber,
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // Info box
+                              Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF0F4FA),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: const Color(0xFFDCE6F2),
                                   ),
-                                  child: isUploading
-                                      ? const Center(
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Color(0xFF062B72),
-                                          ),
-                                        )
-                                      : Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.cloud_upload_rounded,
-                                              size: 50,
-                                              color: AppColors.primaryRed
-                                                  .withValues(alpha: 0.6),
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Text(
-                                              'Tap to upload screenshot',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500,
-                                                color: const Color(0xFF657991),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              'JPG, PNG up to 5MB',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: const Color(0xFF7E90A6),
-                                              ),
-                                            ),
-                                          ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline_rounded,
+                                      size: 20,
+                                      color: AppColors.primaryRed,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Send exact amount of $paymentAmount and upload transaction screenshot below for verification.',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: const Color(0xFF657991),
                                         ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Error Message
-                      if (errorText.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Text(
-                            errorText,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
                           ),
                         ),
 
-                      // Submit Button
-                      GradientButton(
-                        text: 'Submit Payment Proof',
-                        isLoading: isSubmitting,
-                        onPressed: isSubmitting ? null : _submitImage,
-                        icon: Icons.send_rounded,
-                      ),
+                        const SizedBox(height: 20),
 
-                      const SizedBox(height: 24),
+                        // ===== Upload Section Card =====
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0F4FA),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFFDCE6F2)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.upload_file_rounded,
+                                    color: AppColors.primaryRed,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Upload Payment Screenshot',
+                                    style: TextStyle(
+                                      fontSize: context.fs(14),
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF1F2F44),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'After sending $paymentAmount to Bank Alfalah, take a screenshot of the transaction and upload it here for admin verification.',
+                                style: TextStyle(
+                                  fontSize: context.fs(13),
+                                  color: const Color(0xFF657991),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
 
-            
-                    ],
+                              if (paymentImage != null) ...[
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Image.file(
+                                    paymentImage!,
+                                    height: 200,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: GradientButton(
+                                        text: 'Change',
+                                        onPressed: isUploading
+                                            ? null
+                                            : _showImageSourceDialog,
+                                        icon: Icons.refresh_rounded,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: GradientButton(
+                                        text: 'Remove',
+                                        onPressed: () {
+                                          setState(() {
+                                            paymentImage = null;
+                                          });
+                                          ToastService.instance.showInfo(
+                                            'Image removed',
+                                          );
+                                        },
+                                        icon: Icons.delete_rounded,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ] else ...[
+                                InkWell(
+                                  onTap: isUploading
+                                      ? null
+                                      : _showImageSourceDialog,
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Container(
+                                    width: double.infinity,
+                                    height: 180,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: const Color(0xFFBAC7D8),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: isUploading
+                                        ? const Center(
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Color(0xFF062B72),
+                                            ),
+                                          )
+                                        : Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.cloud_upload_rounded,
+                                                size: 50,
+                                                color: AppColors.primaryRed
+                                                    .withValues(alpha: 0.6),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                'Tap to upload screenshot',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: const Color(
+                                                    0xFF657991,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'JPG, PNG up to 5MB',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: const Color(
+                                                    0xFF7E90A6,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Error Message
+                        if (errorText.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Text(
+                              errorText,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+
+                        // Submit Button
+                        GradientButton(
+                          text: 'Submit Payment Proof',
+                          isLoading: isSubmitting,
+                          onPressed: isSubmitting ? null : _submitImage,
+                          icon: Icons.send_rounded,
+                        ),
+
+                        const SizedBox(height: 24),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildDetailRow({
     required String label,
@@ -986,9 +1027,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   Widget _buildDivider() {
-    return Container(
-      height: 1,
-      color: const Color(0xFFDCE6F2),
-    );
+    return Container(height: 1, color: const Color(0xFFDCE6F2));
   }
 }

@@ -99,10 +99,7 @@ IconData appointmentStatusIcon(String status) {
 /// the scheduled Cloud Function keep it fresh every few seconds. Only a legacy
 /// document that predates the field falls back to deriving it here, with the
 /// business defaults.
-String appointmentDisplayPhase(
-  AppointmentModel appointment, {
-  DateTime? now,
-}) {
+String appointmentDisplayPhase(AppointmentModel appointment, {DateTime? now}) {
   if (!AppointmentStatus.isOpen(appointment.appointmentStatus)) return '';
   if (!appointment.isConfirmed || !appointment.hasSchedule) return '';
 
@@ -484,8 +481,18 @@ String appointmentEventTime(DateTime? at) {
     return time;
   }
   const months = <String>[
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${local.day} ${months[local.month - 1]}, $time';
 }
@@ -512,8 +519,11 @@ class AppointmentTimelineRow extends StatelessWidget {
               color: color.withValues(alpha: 0.10),
               shape: BoxShape.circle,
             ),
-            child:
-                Icon(appointmentEventIcon(event.type), size: 16, color: color),
+            child: Icon(
+              appointmentEventIcon(event.type),
+              size: 16,
+              color: color,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -640,7 +650,8 @@ bool showAppointmentCancelAction(
   required bool asDoctor,
 }) {
   if (!AppointmentStatus.isOpen(appointment.appointmentStatus)) return false;
-  if (asDoctor && appointment.appointmentStatus == AppointmentStatus.requested) {
+  if (asDoctor &&
+      appointment.appointmentStatus == AppointmentStatus.requested) {
     return false;
   }
   return true;
@@ -736,10 +747,7 @@ Future<({bool confirmed, String reason})> showAppointmentCancelDialog(
           ),
           child: Text(
             'Cancel appointment',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
         ),
       ],

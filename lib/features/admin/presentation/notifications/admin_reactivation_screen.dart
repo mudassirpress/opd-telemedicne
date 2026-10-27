@@ -175,7 +175,10 @@ class _AdminReactivationScreenState
                   ),
                 ),
                 Flexible(
-                  child: AdminPill(text: status.toUpperCase(), color: statusColor),
+                  child: AdminPill(
+                    text: status.toUpperCase(),
+                    color: statusColor,
+                  ),
                 ),
               ],
             ),
@@ -195,8 +198,8 @@ class _AdminReactivationScreenState
                   plan == SubscriptionPlan.oneYear
                       ? AdminPalette.success
                       : (plan == SubscriptionPlan.oneMonth
-                          ? AdminPalette.info
-                          : AdminPalette.brand),
+                            ? AdminPalette.info
+                            : AdminPalette.brand),
                 ),
                 if (previousExpiry != null)
                   _buildInfoRow(
@@ -230,9 +233,8 @@ class _AdminReactivationScreenState
                   ),
                   const SizedBox(height: 8),
                   GestureDetector(
-                    onTap: () => _showFullScreenImage(
-                      request['paymentProofUrl'],
-                    ),
+                    onTap: () =>
+                        _showFullScreenImage(request['paymentProofUrl']),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(14),
                       child: CachedNetworkImage(

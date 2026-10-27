@@ -32,13 +32,13 @@ class OfflineChatService {
   /// Exposes the underlying box so listeners can watch for local writes
   /// (e.g. an offline-queued message) and re-emit immediately.
   Box<OfflineChatMessage>? get box => _box;
-  
+
   Box<String>? get _chatListBox => HiveDBService.chatListBox;
 
   bool get _ready => HiveDBService.chatBoxReady;
-  
+
   bool get _listReady => HiveDBService.chatListBoxReady;
-  
+
   static String favouritesKey(String userId) => 'favourite_chats_$userId';
 
   static String syncStateKey(String userId) => 'chat_sync_state_$userId';
@@ -120,8 +120,7 @@ class OfflineChatService {
   static bool needsRecovery({
     required bool hasCachedList,
     required bool syncCompleted,
-  }) =>
-      !hasCachedList || !syncCompleted;
+  }) => !hasCachedList || !syncCompleted;
 
   /// Set of chat ids the user has marked as favourite, persisted locally.
   Set<String> getFavouriteChatIds(String userId) {
@@ -141,10 +140,7 @@ class OfflineChatService {
   Future<void> saveFavouriteChatIds(String userId, Set<String> ids) async {
     if (!_listReady) return;
     try {
-      await _chatListBox!.put(
-        favouritesKey(userId),
-        jsonEncode(ids.toList()),
-      );
+      await _chatListBox!.put(favouritesKey(userId), jsonEncode(ids.toList()));
     } catch (e) {
       print('Error saving favourites: $e');
     }
@@ -221,10 +217,13 @@ class OfflineChatService {
 
   /// Upserts records into the local database without wiping existing cached
   /// entries on transient or unconfirmed remote empty emissions.
-  Future<void> upsertChatList(String userId, List<Map<String, dynamic>> remoteChats) async {
+  Future<void> upsertChatList(
+    String userId,
+    List<Map<String, dynamic>> remoteChats,
+  ) async {
     if (!_listReady) return;
     final existing = getChatList(userId) ?? <Map<String, dynamic>>[];
-    
+
     // Prevent wiping cached data if remote returns empty while sync is in progress
     if (remoteChats.isEmpty && existing.isNotEmpty) {
       final syncState = getSyncState(userId);
@@ -257,7 +256,10 @@ class OfflineChatService {
     return value;
   }
 
-  Future<void> saveChatList(String userId, List<Map<String, dynamic>> chats) async {
+  Future<void> saveChatList(
+    String userId,
+    List<Map<String, dynamic>> chats,
+  ) async {
     if (!_listReady) return;
     try {
       final encodableList = chats.map((chat) {
@@ -295,7 +297,9 @@ class OfflineChatService {
       return decoded.map((item) {
         final map = Map<String, dynamic>.from(item as Map);
         if (map['lastMessageTime'] != null) {
-          map['lastMessageTime'] = DateTime.parse(map['lastMessageTime'].toString());
+          map['lastMessageTime'] = DateTime.parse(
+            map['lastMessageTime'].toString(),
+          );
         }
         return map;
       }).toList();
@@ -349,8 +353,7 @@ class OfflineChatService {
   /// All messages that are queued locally but not yet sent to the server.
   List<OfflineChatMessage> getPendingMessages() {
     if (!_ready) return const [];
-    return _box!
-        .values
+    return _box!.values
         .where((m) => m.deliveryStatus == OfflineDeliveryStatus.pending.name)
         .toList()
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
@@ -366,10 +369,7 @@ class OfflineChatService {
     final key = messageKey(chatId, messageId);
     final current = _box!.get(key);
     if (current == null) return false;
-    await _box!.put(
-      key,
-      current.copyWith(deliveryStatus: status.name),
-    );
+    await _box!.put(key, current.copyWith(deliveryStatus: status.name));
     return true;
   }
 
@@ -395,7 +395,8 @@ class OfflineChatService {
     final box = _box!;
     var updated = 0;
     for (final message in box.values) {
-      final isIncoming = message.receiverId == currentUserId &&
+      final isIncoming =
+          message.receiverId == currentUserId &&
           message.senderId != currentUserId;
       if (message.chatId == chatId &&
           isIncoming &&
@@ -495,8 +496,9 @@ class OfflineChatService {
 
     final rawTs = (data['timestamp'] ?? '').toString();
     final epochMs = int.tryParse(rawTs);
-    final timestamp =
-        epochMs != null ? DateTime.fromMillisecondsSinceEpoch(epochMs) : DateTime.now();
+    final timestamp = epochMs != null
+        ? DateTime.fromMillisecondsSinceEpoch(epochMs)
+        : DateTime.now();
 
     await instance.applyIncomingChatPush(
       receiverId: receiverId,

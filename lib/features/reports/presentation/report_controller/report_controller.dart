@@ -13,7 +13,6 @@ class ReportController {
   final Ref ref;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-
   ReportController({required this.ref});
 
   CollectionReference get _reportsCollection =>

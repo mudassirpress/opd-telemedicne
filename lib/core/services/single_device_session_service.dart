@@ -48,56 +48,59 @@ class SingleDeviceSessionService {
     }
 
     try {
-      final docRef = _firestore.collection(collectionName).doc(documentId.trim());
+      final docRef = _firestore
+          .collection(collectionName)
+          .doc(documentId.trim());
 
-      return await _firestore.runTransaction<({bool allowed, String? errorMessage})>(
-        (transaction) async {
-          final docSnap = await transaction.get(docRef);
+      return await _firestore.runTransaction<
+        ({bool allowed, String? errorMessage})
+      >((transaction) async {
+        final docSnap = await transaction.get(docRef);
 
-          if (!docSnap.exists) {
-            return (allowed: false, errorMessage: 'Account record not found.');
-          }
+        if (!docSnap.exists) {
+          return (allowed: false, errorMessage: 'Account record not found.');
+        }
 
-          final data = docSnap.data() ?? {};
-          final bool isLoggedIn = data['isLoggedIn'] == true;
-          final String? activeDeviceId = data['activeDeviceId'] as String?;
+        final data = docSnap.data() ?? {};
+        final bool isLoggedIn = data['isLoggedIn'] == true;
+        final String? activeDeviceId = data['activeDeviceId'] as String?;
 
-          // Check if another DIFFERENT device is currently active
-          if (blockSecondLogin &&
-              isLoggedIn &&
-              activeDeviceId != null &&
-              activeDeviceId.isNotEmpty &&
-              activeDeviceId != currentDeviceId &&
-              DeviceService.isValidInstallationId(activeDeviceId)) {
-            debugPrint(
-              '🔒 [SingleDeviceSession] Second login rejected: active on $activeDeviceId (current: $currentDeviceId)',
-            );
-            return (
-              allowed: false,
-              errorMessage:
-                  'This account is already active on another device. Please logout first.',
-            );
-          }
-
-          // Atomically claim session on this device
-          transaction.update(docRef, {
-            'activeDeviceId': currentDeviceId,
-            'deviceId': currentDeviceId,
-            'isLoggedIn': true,
-            'lastLoginAt': FieldValue.serverTimestamp(),
-          });
-
+        // Check if another DIFFERENT device is currently active
+        if (blockSecondLogin &&
+            isLoggedIn &&
+            activeDeviceId != null &&
+            activeDeviceId.isNotEmpty &&
+            activeDeviceId != currentDeviceId &&
+            DeviceService.isValidInstallationId(activeDeviceId)) {
           debugPrint(
-            '✅ [SingleDeviceSession] Session claimed successfully for $documentId on $currentDeviceId',
+            '🔒 [SingleDeviceSession] Second login rejected: active on $activeDeviceId (current: $currentDeviceId)',
           );
-          return (allowed: true, errorMessage: null);
-        },
-      );
+          return (
+            allowed: false,
+            errorMessage:
+                'This account is already active on another device. Please logout first.',
+          );
+        }
+
+        // Atomically claim session on this device
+        transaction.update(docRef, {
+          'activeDeviceId': currentDeviceId,
+          'deviceId': currentDeviceId,
+          'isLoggedIn': true,
+          'lastLoginAt': FieldValue.serverTimestamp(),
+        });
+
+        debugPrint(
+          '✅ [SingleDeviceSession] Session claimed successfully for $documentId on $currentDeviceId',
+        );
+        return (allowed: true, errorMessage: null);
+      });
     } catch (e) {
       debugPrint('❌ [SingleDeviceSession] Error claiming session: $e');
       return (
         allowed: false,
-        errorMessage: 'Unable to verify device session. Please check your connection and try again.',
+        errorMessage:
+            'Unable to verify device session. Please check your connection and try again.',
       );
     }
   }
@@ -121,7 +124,8 @@ class SingleDeviceSessionService {
       final data = docSnap.data() ?? {};
       final String? activeDeviceId = data['activeDeviceId'] as String?;
 
-      final bool isCurrentDeviceActive = activeDeviceId == null ||
+      final bool isCurrentDeviceActive =
+          activeDeviceId == null ||
           activeDeviceId.isEmpty ||
           activeDeviceId == currentDeviceId;
 
@@ -144,7 +148,9 @@ class SingleDeviceSessionService {
       }
 
       await docRef.update(updateData);
-      debugPrint('🔓 [SingleDeviceSession] Session released for $documentId (isCurrentDeviceActive=$isCurrentDeviceActive)');
+      debugPrint(
+        '🔓 [SingleDeviceSession] Session released for $documentId (isCurrentDeviceActive=$isCurrentDeviceActive)',
+      );
     } catch (e) {
       debugPrint('⚠️ [SingleDeviceSession] Error releasing session: $e');
     }
@@ -223,14 +229,18 @@ class SingleDeviceSessionService {
               'ℹ️ [SingleDeviceSession] Uninitialized session field on $documentId. Initializing for current device ($currentDeviceId)...',
             );
             hasEstablishedSession = true;
-            docRef.update({
-              'activeDeviceId': currentDeviceId,
-              'deviceId': currentDeviceId,
-              'isLoggedIn': true,
-              'lastLoginAt': FieldValue.serverTimestamp(),
-            }).catchError((e) {
-              debugPrint('⚠️ [SingleDeviceSession] Error initializing session: $e');
-            });
+            docRef
+                .update({
+                  'activeDeviceId': currentDeviceId,
+                  'deviceId': currentDeviceId,
+                  'isLoggedIn': true,
+                  'lastLoginAt': FieldValue.serverTimestamp(),
+                })
+                .catchError((e) {
+                  debugPrint(
+                    '⚠️ [SingleDeviceSession] Error initializing session: $e',
+                  );
+                });
           } else if (isLoggedInRaw == false) {
             // Previously established on this device, but now explicitly revoked/cleared
             debugPrint(

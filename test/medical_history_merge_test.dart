@@ -68,39 +68,38 @@ void main() {
       expect(item.report, isNotNull);
     });
 
-    test('a prescription carries the doctor, note and issue date, but no file', () {
-      final item = MedicalHistoryItem.fromPrescription(
-        prescription(
-          id: 'p1',
-          doctor: 'Dr. Ahmed',
-          createdAt: DateTime(2026, 4, 2),
-          note: 'Paracetamol 500mg twice daily',
-        ),
-      );
+    test(
+      'a prescription carries the doctor, note and issue date, but no file',
+      () {
+        final item = MedicalHistoryItem.fromPrescription(
+          prescription(
+            id: 'p1',
+            doctor: 'Dr. Ahmed',
+            createdAt: DateTime(2026, 4, 2),
+            note: 'Paracetamol 500mg twice daily',
+          ),
+        );
 
-      expect(item.kind, MedicalHistoryKind.prescription);
-      expect(item.isPrescription, isTrue);
-      expect(item.title, 'Prescription');
-      expect(item.issuerName, 'Dr. Ahmed');
-      expect(item.description, 'Paracetamol 500mg twice daily');
-      expect(item.date, DateTime(2026, 4, 2));
-      // Critical: an empty fileUrl keeps the row out of the downloader, which
-      // would otherwise Uri.parse('') and fail.
-      expect(item.fileUrl, isEmpty);
-      expect(item.report, isNull);
-      expect(item.prescription, isNotNull);
-    });
+        expect(item.kind, MedicalHistoryKind.prescription);
+        expect(item.isPrescription, isTrue);
+        expect(item.title, 'Prescription');
+        expect(item.issuerName, 'Dr. Ahmed');
+        expect(item.description, 'Paracetamol 500mg twice daily');
+        expect(item.date, DateTime(2026, 4, 2));
+        // Critical: an empty fileUrl keeps the row out of the downloader, which
+        // would otherwise Uri.parse('') and fail.
+        expect(item.fileUrl, isEmpty);
+        expect(item.report, isNull);
+        expect(item.prescription, isNotNull);
+      },
+    );
 
     test('the two kinds project to distinct icons', () {
       final reportItem = MedicalHistoryItem.fromReport(
         report(id: 'r1', type: 'Laboratory Test', uploaded: DateTime(2026)),
       );
       final prescriptionItem = MedicalHistoryItem.fromPrescription(
-        prescription(
-          id: 'p1',
-          doctor: 'Dr. Ahmed',
-          createdAt: DateTime(2026),
-        ),
+        prescription(id: 'p1', doctor: 'Dr. Ahmed', createdAt: DateTime(2026)),
       );
       expect(reportItem.icon, isNot(prescriptionItem.icon));
     });
@@ -120,14 +119,15 @@ void main() {
           ),
         ),
         MedicalHistoryItem.fromReport(
-          report(id: 'r2', type: 'Medical Record', uploaded: DateTime(2026, 2, 2)),
+          report(
+            id: 'r2',
+            type: 'Medical Record',
+            uploaded: DateTime(2026, 2, 2),
+          ),
         ),
       ]..sort((a, b) => b.date.compareTo(a.date));
 
-      expect(
-        items.map((i) => i.id).toList(),
-        ['p1', 'r2', 'r1'],
-      );
+      expect(items.map((i) => i.id).toList(), ['p1', 'r2', 'r1']);
     });
 
     test('a prescription is not collapsed into a report — no duplication', () {

@@ -32,15 +32,50 @@ class AdminMoreScreen extends ConsumerWidget {
         ref.watch(adminUnreadNotificationsCountProvider).valueOrNull ?? 0;
 
     final items = <(String, IconData, Widget, int)>[
-      ('Notifications', Icons.notifications_rounded, const AdminNotificationsScreen(), unreadNotifications),
-      ('Doctors', Icons.medical_services_outlined, const AdminChatManagementScreen(), 0),
-      ('Payments', Icons.payment_rounded, const AdminPaymentScreen(), pendingPayments),
-      ('Patient IDs', Icons.badge_rounded, const PatientIdManagementScreen(), 0),
-      ('Doctor Videos', Icons.video_library_rounded, const AdminDoctorVideosScreen(), 0),
-      ('Reactivation', Icons.replay_circle_filled_rounded, const AdminReactivationScreen(), pendingReactivations),
+      (
+        'Notifications',
+        Icons.notifications_rounded,
+        const AdminNotificationsScreen(),
+        unreadNotifications,
+      ),
+      (
+        'Doctors',
+        Icons.medical_services_outlined,
+        const AdminChatManagementScreen(),
+        0,
+      ),
+      (
+        'Payments',
+        Icons.payment_rounded,
+        const AdminPaymentScreen(),
+        pendingPayments,
+      ),
+      (
+        'Patient IDs',
+        Icons.badge_rounded,
+        const PatientIdManagementScreen(),
+        0,
+      ),
+      (
+        'Doctor Videos',
+        Icons.video_library_rounded,
+        const AdminDoctorVideosScreen(),
+        0,
+      ),
+      (
+        'Reactivation',
+        Icons.replay_circle_filled_rounded,
+        const AdminReactivationScreen(),
+        pendingReactivations,
+      ),
       ('Online History', Icons.history_rounded, DoctorOnlineHistoryScreen(), 0),
       ('Reports', Icons.assessment_rounded, const AdminReportsScreen(), 0),
-      ('Create Doctor ID', Icons.person_add_alt_1_rounded, CreateDoctorIdScreen(), 0),
+      (
+        'Create Doctor ID',
+        Icons.person_add_alt_1_rounded,
+        CreateDoctorIdScreen(),
+        0,
+      ),
       ('Settings', Icons.settings_rounded, const AdminSettingsScreen(), 0),
     ];
 
@@ -95,8 +130,10 @@ class AdminMoreScreen extends ConsumerWidget {
                     BadgeIndicator(count: badgeCount),
                     const SizedBox(width: 8),
                   ],
-                  const Icon(Icons.chevron_right_rounded,
-                      color: AdminPalette.textMuted),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AdminPalette.textMuted,
+                  ),
                 ],
               ),
             ),

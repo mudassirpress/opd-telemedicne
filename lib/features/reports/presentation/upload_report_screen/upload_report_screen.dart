@@ -13,8 +13,7 @@ class UploadReportScreen extends ConsumerStatefulWidget {
   const UploadReportScreen({super.key});
 
   @override
-  ConsumerState<UploadReportScreen> createState() =>
-      _UploadReportScreenState();
+  ConsumerState<UploadReportScreen> createState() => _UploadReportScreenState();
 }
 
 class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
@@ -401,7 +400,6 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
                               onPressed: _uploadReport,
                             ),
                             SizedBox(height: context.rsp(16)),
-
                           ],
                         ),
                       ),
@@ -432,11 +430,7 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
           padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [
-                Color(0xFFE3EAF2),
-                Color(0xFFF5F8FC),
-                Color(0xFFE2E9F2),
-              ],
+              colors: [Color(0xFFE3EAF2), Color(0xFFF5F8FC), Color(0xFFE2E9F2)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -455,11 +449,7 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [
-                  Color(0xFFF3F7FB),
-                  Colors.white,
-                  Color(0xFFF0F4F9),
-                ],
+                colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -522,10 +512,7 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
             padding: const EdgeInsets.only(left: 24, top: 6),
             child: Text(
               validator(value) ?? '',
-              style: TextStyle(
-                color: Colors.red,
-                fontSize: context.fs(12),
-              ),
+              style: TextStyle(color: Colors.red, fontSize: context.fs(12)),
             ),
           ),
       ],
@@ -544,11 +531,7 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFFE3EAF2),
-              Color(0xFFF5F8FC),
-              Color(0xFFE2E9F2),
-            ],
+            colors: [Color(0xFFE3EAF2), Color(0xFFF5F8FC), Color(0xFFE2E9F2)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -567,11 +550,7 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [
-                Color(0xFFF3F7FB),
-                Colors.white,
-                Color(0xFFF0F4F9),
-              ],
+              colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -599,10 +578,7 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
                   ),
                 ),
               ),
-              const Icon(
-                Icons.arrow_drop_down,
-                color: Color(0xFF7E90A6),
-              ),
+              const Icon(Icons.arrow_drop_down, color: Color(0xFF7E90A6)),
             ],
           ),
         ),
@@ -656,11 +632,7 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
               padding: EdgeInsets.all(context.rsp(16)),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFFF3F7FB),
-                    Colors.white,
-                    Color(0xFFF0F4F9),
-                  ],
+                  colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -715,8 +687,9 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF0F233C)
-                                      .withValues(alpha: 0.1),
+                                  color: const Color(
+                                    0xFF0F233C,
+                                  ).withValues(alpha: 0.1),
                                   blurRadius: 6,
                                 ),
                               ],

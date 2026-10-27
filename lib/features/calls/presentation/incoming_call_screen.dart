@@ -290,7 +290,9 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen>
   // ── Reject ────────────────────────────────────────────────────
   Future<void> _rejectCall() async {
     if (_isProcessing || _isConnecting) return;
-    debugPrint('📞 Decline pressed on IncomingCallScreen callId=${widget.callId}');
+    debugPrint(
+      '📞 Decline pressed on IncomingCallScreen callId=${widget.callId}',
+    );
     setState(() => _isProcessing = true);
     _stopAnimations();
     await _stopRinging();
@@ -395,8 +397,7 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen>
                               maxWidth: context.contentMaxWidth,
                             ),
                             child: Column(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.only(top: 12),

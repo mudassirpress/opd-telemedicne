@@ -36,10 +36,7 @@ class PrescriptionModel {
     this.chatId = '',
   });
 
-  factory PrescriptionModel.fromMap(
-    String id,
-    Map<String, dynamic> map,
-  ) {
+  factory PrescriptionModel.fromMap(String id, Map<String, dynamic> map) {
     return PrescriptionModel(
       prescriptionId: (map['prescriptionId'] ?? id).toString(),
       doctorId: (map['doctorId'] ?? '').toString(),
@@ -54,16 +51,16 @@ class PrescriptionModel {
   }
 
   Map<String, dynamic> toMap() => {
-        'prescriptionId': prescriptionId,
-        'doctorId': doctorId,
-        'doctorName': doctorName,
-        'patientId': patientId,
-        'patientName': patientName,
-        'patientAge': patientAge,
-        'note': note,
-        'createdAt': Timestamp.fromDate(createdAt),
-        'chatId': chatId,
-      };
+    'prescriptionId': prescriptionId,
+    'doctorId': doctorId,
+    'doctorName': doctorName,
+    'patientId': patientId,
+    'patientName': patientName,
+    'patientAge': patientAge,
+    'note': note,
+    'createdAt': Timestamp.fromDate(createdAt),
+    'chatId': chatId,
+  };
 
   /// A short, human-friendly reference printed at the bottom of the
   /// prescription, e.g. `RX-7F3A21C4`.

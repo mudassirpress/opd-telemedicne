@@ -59,7 +59,9 @@ class _ForwardRecipientScreenState
       _loadFailed = false;
     });
     try {
-      final recipients = _isDoctor ? await _loadPatients() : await _loadDoctors();
+      final recipients = _isDoctor
+          ? await _loadPatients()
+          : await _loadDoctors();
       if (!mounted) return;
       setState(() {
         _recipients = recipients;
@@ -89,7 +91,9 @@ class _ForwardRecipientScreenState
         'role': UserRoles.patient,
       });
     }
-    recipients.sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
+    recipients.sort(
+      (a, b) => (a['name'] as String).compareTo(b['name'] as String),
+    );
     return recipients;
   }
 
@@ -112,7 +116,9 @@ class _ForwardRecipientScreenState
         'role': UserRoles.doctor,
       });
     }
-    recipients.sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
+    recipients.sort(
+      (a, b) => (a['name'] as String).compareTo(b['name'] as String),
+    );
     return recipients;
   }
 
@@ -132,8 +138,9 @@ class _ForwardRecipientScreenState
     setState(() => _isSending = true);
 
     // Re-check the live state: the list was built when this screen opened.
-    final blocked =
-        await SoftDeleteService.newBusinessBlockedReason(recipientId);
+    final blocked = await SoftDeleteService.newBusinessBlockedReason(
+      recipientId,
+    );
     if (blocked != null) {
       if (!mounted) return;
       ToastService.instance.showError(blocked);
@@ -293,12 +300,18 @@ class _RecipientTile extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: isSelected ? const Color(0xFF062B72) : Colors.white,
                 border: Border.all(
-                  color: isSelected ? const Color(0xFF062B72) : const Color(0xFFBAC7D8),
+                  color: isSelected
+                      ? const Color(0xFF062B72)
+                      : const Color(0xFFBAC7D8),
                   width: 1.5,
                 ),
               ),
               child: isSelected
-                  ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+                  ? const Icon(
+                      Icons.check_rounded,
+                      size: 16,
+                      color: Colors.white,
+                    )
                   : null,
             ),
           ],

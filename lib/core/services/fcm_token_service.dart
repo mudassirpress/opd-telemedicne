@@ -55,7 +55,9 @@ class FcmTokenService {
     try {
       final token = await getToken();
       if (token == null || token.trim().isEmpty) {
-        debugPrint('⚠️ [FCM] No valid registration token available to update for $cleanId');
+        debugPrint(
+          '⚠️ [FCM] No valid registration token available to update for $cleanId',
+        );
         return;
       }
 
@@ -71,7 +73,9 @@ class FcmTokenService {
 
       debugPrint('✅ [FCM] Token updated for $userType ($cleanId)');
     } catch (e, s) {
-      debugPrint('❌ [FCM] Error updating token for $userType ($cleanId): $e\n$s');
+      debugPrint(
+        '❌ [FCM] Error updating token for $userType ($cleanId): $e\n$s',
+      );
     }
   }
 
@@ -98,7 +102,9 @@ class FcmTokenService {
         final storedToken = data['fcmToken'] as String?;
 
         // Only clear if the stored token matches this device's token, or if there is no token
-        if (storedToken == null || storedToken.isEmpty || storedToken == currentToken) {
+        if (storedToken == null ||
+            storedToken.isEmpty ||
+            storedToken == currentToken) {
           await docRef.update({
             'fcmToken': FieldValue.delete(),
             'lastTokenClearedAt': FieldValue.serverTimestamp(),

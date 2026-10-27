@@ -34,9 +34,9 @@ class DoctorRepository {
         .collection(FirestoreCollections.doctors)
         .doc(doctorId)
         .update({
-      'lastSeen': FieldValue.serverTimestamp(),
-      'lastHeartbeat': FieldValue.serverTimestamp(),
-    });
+          'lastSeen': FieldValue.serverTimestamp(),
+          'lastHeartbeat': FieldValue.serverTimestamp(),
+        });
   }
 
   Future<DocumentSnapshot?> getDoctorDocByDoctorId(String doctorId) async {
@@ -50,19 +50,28 @@ class DoctorRepository {
   }
 
   Future<DocumentSnapshot?> getDoctorDocById(String id) async {
-    final doc = await _firestore.collection(FirestoreCollections.doctors).doc(id).get();
+    final doc = await _firestore
+        .collection(FirestoreCollections.doctors)
+        .doc(id)
+        .get();
     return doc.exists ? doc : null;
   }
 
   Future<void> saveFcmToken(String doctorId, String fcmToken) async {
-    await _firestore.collection(FirestoreCollections.doctors).doc(doctorId).update({
-      'fcmToken': fcmToken,
-      'tokenUpdatedAt': FieldValue.serverTimestamp(),
-    });
+    await _firestore
+        .collection(FirestoreCollections.doctors)
+        .doc(doctorId)
+        .update({
+          'fcmToken': fcmToken,
+          'tokenUpdatedAt': FieldValue.serverTimestamp(),
+        });
   }
 
   Future<String?> getFcmToken(String doctorId) async {
-    final doc = await _firestore.collection(FirestoreCollections.doctors).doc(doctorId).get();
+    final doc = await _firestore
+        .collection(FirestoreCollections.doctors)
+        .doc(doctorId)
+        .get();
     if (doc.exists) {
       return doc.data()?['fcmToken'] as String?;
     }
@@ -70,7 +79,10 @@ class DoctorRepository {
   }
 
   Future<String> getAccountStatus(String doctorId) async {
-    final doc = await _firestore.collection(FirestoreCollections.doctors).doc(doctorId).get();
+    final doc = await _firestore
+        .collection(FirestoreCollections.doctors)
+        .doc(doctorId)
+        .get();
     if (doc.exists) {
       return doc.data()?['accountStatus'] ?? 'Active';
     }
@@ -78,10 +90,13 @@ class DoctorRepository {
   }
 
   Future<void> updateAccountStatus(String doctorId, String status) async {
-    await _firestore.collection(FirestoreCollections.doctors).doc(doctorId).update({
-      'accountStatus': status,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    await _firestore
+        .collection(FirestoreCollections.doctors)
+        .doc(doctorId)
+        .update({
+          'accountStatus': status,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
   }
 
   Future<void> recordLogin(String doctorId, String doctorName) async {
@@ -91,11 +106,14 @@ class DoctorRepository {
       'event': 'login',
       'timestamp': FieldValue.serverTimestamp(),
     });
-    await _firestore.collection(FirestoreCollections.doctors).doc(doctorId).update({
-      'loginStatus': 'Online',
-      'lastLogin': FieldValue.serverTimestamp(),
-      'lastSeen': FieldValue.serverTimestamp(),
-    });
+    await _firestore
+        .collection(FirestoreCollections.doctors)
+        .doc(doctorId)
+        .update({
+          'loginStatus': 'Online',
+          'lastLogin': FieldValue.serverTimestamp(),
+          'lastSeen': FieldValue.serverTimestamp(),
+        });
   }
 
   Future<void> recordLogout(String doctorId, String doctorName) async {
@@ -105,12 +123,15 @@ class DoctorRepository {
       'event': 'logout',
       'timestamp': FieldValue.serverTimestamp(),
     });
-    await _firestore.collection(FirestoreCollections.doctors).doc(doctorId).update({
-      'loginStatus': 'Offline',
-      'lastLogout': FieldValue.serverTimestamp(),
-      'lastSeen': FieldValue.serverTimestamp(),
-      'isOnline': false,
-    });
+    await _firestore
+        .collection(FirestoreCollections.doctors)
+        .doc(doctorId)
+        .update({
+          'loginStatus': 'Offline',
+          'lastLogout': FieldValue.serverTimestamp(),
+          'lastSeen': FieldValue.serverTimestamp(),
+          'isOnline': false,
+        });
   }
 
   Stream<List<Map<String, dynamic>>> getAllDoctorActivityLogs() {
@@ -119,18 +140,20 @@ class DoctorRepository {
         .orderBy('timestamp', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return data;
-      }).toList();
-    });
+          return snapshot.docs.map((doc) {
+            final data = doc.data();
+            data['id'] = doc.id;
+            return data;
+          }).toList();
+        });
   }
 
   /// ADMIN VIEW — unfiltered, so the admin can open a deleted doctor's full
   /// preserved record. The Active/Deleted toggle is applied in the UI.
   Future<List<Map<String, dynamic>>> getAllDoctorsWithStatus() async {
-    final querySnapshot = await _firestore.collection(FirestoreCollections.doctors).get();
+    final querySnapshot = await _firestore
+        .collection(FirestoreCollections.doctors)
+        .get();
     return querySnapshot.docs.map((doc) {
       final data = doc.data();
       data['id'] = doc.id;
@@ -141,10 +164,9 @@ class DoctorRepository {
   /// ADMIN VIEW — unfiltered, same reasoning as
   /// [getAllDoctorsWithStatus].
   Stream<List<Map<String, dynamic>>> streamAllDoctorsWithStatus() {
-    return _firestore
-        .collection(FirestoreCollections.doctors)
-        .snapshots()
-        .map((snapshot) {
+    return _firestore.collection(FirestoreCollections.doctors).snapshots().map((
+      snapshot,
+    ) {
       return snapshot.docs.map((doc) {
         final data = doc.data();
         data['id'] = doc.id;
@@ -152,30 +174,34 @@ class DoctorRepository {
       }).toList();
     });
   }
-  
+
   Future<bool> doesDoctorNameExist(String fullname) async {
     final existingDoctor = await _firestore
-          .collection(FirestoreCollections.doctors)
-          .where('fullname', isEqualTo: fullname)
-          .where('isActive', isEqualTo: true)
-          .get();
+        .collection(FirestoreCollections.doctors)
+        .where('fullname', isEqualTo: fullname)
+        .where('isActive', isEqualTo: true)
+        .get();
     return existingDoctor.docs.isNotEmpty;
   }
-  
-  Future<String> createDoctorProfile(Map<String, dynamic> doctorProfile, String? sharedAccountId) async {
-     final doctorRef = _firestore.collection(FirestoreCollections.doctors).doc();
-     doctorProfile['id'] = doctorRef.id;
-     // Price + description are part of the doctor document from creation. A
-     // caller that does not pass them still gets the keys, so readers never
-     // have to distinguish "field missing" from "field empty" for new records.
-     final price = (doctorProfile['price'] ?? doctorProfile['consultationFee']) ?? 0.0;
-     doctorProfile['price'] = price;
-     doctorProfile['consultationFee'] = price;
-     doctorProfile['description'] = doctorProfile['description'] ?? '';
-     await doctorRef.set(doctorProfile);
-     
-     if(sharedAccountId != null) {
-       await _firestore
+
+  Future<String> createDoctorProfile(
+    Map<String, dynamic> doctorProfile,
+    String? sharedAccountId,
+  ) async {
+    final doctorRef = _firestore.collection(FirestoreCollections.doctors).doc();
+    doctorProfile['id'] = doctorRef.id;
+    // Price + description are part of the doctor document from creation. A
+    // caller that does not pass them still gets the keys, so readers never
+    // have to distinguish "field missing" from "field empty" for new records.
+    final price =
+        (doctorProfile['price'] ?? doctorProfile['consultationFee']) ?? 0.0;
+    doctorProfile['price'] = price;
+    doctorProfile['consultationFee'] = price;
+    doctorProfile['description'] = doctorProfile['description'] ?? '';
+    await doctorRef.set(doctorProfile);
+
+    if (sharedAccountId != null) {
+      await _firestore
           .collection(FirestoreCollections.patients)
           .doc(sharedAccountId)
           .collection('doctor_profiles')
@@ -188,11 +214,11 @@ class DoctorRepository {
             'imageUrl': doctorProfile['imageUrl'] ?? '',
             'isActive': true,
           });
-     }
-     
-     return doctorRef.id;
+    }
+
+    return doctorRef.id;
   }
-  
+
   /// Active doctor profiles for patient-facing listings.
   ///
   /// The `isActive` clause plus the Dart-side `activeOnly` pass together: the
@@ -201,9 +227,9 @@ class DoctorRepository {
   /// server-side `isDeleted == false` would wrongly exclude them).
   Future<List<Map<String, dynamic>>> getAllDoctorProfiles() async {
     final querySnapshot = await _firestore
-          .collection(FirestoreCollections.doctors)
-          .where('isActive', isEqualTo: true)
-          .get();
+        .collection(FirestoreCollections.doctors)
+        .where('isActive', isEqualTo: true)
+        .get();
     return SoftDeleteService.activeOnly(
       querySnapshot.docs.map((doc) {
         final data = doc.data();
@@ -213,7 +239,7 @@ class DoctorRepository {
       (doctor) => doctor,
     );
   }
-  
+
   /// REMOVED — hard delete of a doctor and its related collections.
   ///
   /// This method destroyed the doctor document and then cascaded through
@@ -268,7 +294,7 @@ class DoctorRepository {
       throw StateError('Failed to restore doctor $doctorId');
     }
   }
-  
+
   /// Active doctors only. Feeds booking / consultation pickers, so a
   /// soft-deleted doctor must never appear here.
   Stream<QuerySnapshot> streamActiveDoctors() {
@@ -277,7 +303,7 @@ class DoctorRepository {
         .where('isActive', isEqualTo: true)
         .snapshots();
   }
-  
+
   Stream<DocumentSnapshot> streamDoctor(String doctorId) {
     return _firestore
         .collection(FirestoreCollections.doctors)

@@ -18,7 +18,6 @@ class ToastService {
   void showSuccess(
     String message, {
     ToastGravity gravity = ToastGravity.BOTTOM,
-    
   }) {
     Fluttertoast.showToast(
       msg: message,
@@ -28,7 +27,6 @@ class ToastService {
       backgroundColor: AppColors.primaryRed.withOpacity(0.1),
       textColor: AppColors.primaryRed,
       fontSize: 14.0,
-
     );
   }
 

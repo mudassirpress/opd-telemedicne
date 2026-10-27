@@ -5,12 +5,12 @@ import 'package:telemedicine/data/models/user_model.dart';
 /// A doctor document in whatever shape the given keys produce — everything
 /// else falls back to the fields every record has carried forever.
 UserModel doctorFrom(Map<String, dynamic> fields) => UserModel.fromMap({
-      'id': 'doctor-doc-1',
-      'fullname': 'Dr. Amina Khan',
-      'role': 'doctor',
-      'doctorId': '4711',
-      ...fields,
-    });
+  'id': 'doctor-doc-1',
+  'fullname': 'Dr. Amina Khan',
+  'role': 'doctor',
+  'doctorId': '4711',
+  ...fields,
+});
 
 void main() {
   group('existing doctor profile completion gate', () {

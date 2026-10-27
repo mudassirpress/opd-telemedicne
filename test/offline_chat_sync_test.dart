@@ -92,41 +92,43 @@ void main() {
   group('patchChatListForPush (FCM → cached list, §4)', () {
     final when = DateTime(2026, 1, 2, 15);
 
-    test('updates preview, receipts, unread badge and moves the chat to top',
-        () {
-      final chats = [
-        _entry(chatId: 'c1', lastMessageTime: DateTime(2026, 1, 2, 14)),
-        _entry(
+    test(
+      'updates preview, receipts, unread badge and moves the chat to top',
+      () {
+        final chats = [
+          _entry(chatId: 'c1', lastMessageTime: DateTime(2026, 1, 2, 14)),
+          _entry(
+            chatId: 'c2',
+            unreadCount: 2,
+            lastMessageTime: DateTime(2026, 1, 2, 12),
+          ),
+        ];
+
+        final patched = OfflineChatService.patchChatListForPush(
+          chats,
           chatId: 'c2',
-          unreadCount: 2,
-          lastMessageTime: DateTime(2026, 1, 2, 12),
-        ),
-      ];
+          messageId: 'm9',
+          senderId: 'u2',
+          messageText: 'Hello',
+          timestamp: when,
+        );
 
-      final patched = OfflineChatService.patchChatListForPush(
-        chats,
-        chatId: 'c2',
-        messageId: 'm9',
-        senderId: 'u2',
-        messageText: 'Hello',
-        timestamp: when,
-      );
-
-      expect(patched, isNotNull);
-      // Sorted newest-first: the pushed chat now leads.
-      expect(patched!.first['chatId'], 'c2');
-      expect(patched.first['lastMessage'], 'Hello');
-      expect(patched.first['lastMessageId'], 'm9');
-      expect(patched.first['lastMessageSenderId'], 'u2');
-      expect(patched.first['lastMessageTime'], when);
-      // Unread incremented from 2 → 3; delivered-to-us, not yet read.
-      expect(patched.first['unreadCount'], 3);
-      expect(patched.first['lastMessageDelivered'], isTrue);
-      expect(patched.first['lastMessageRead'], isFalse);
-      // The untouched chat survives.
-      expect(patched.last['chatId'], 'c1');
-      expect(patched.last['unreadCount'], 0);
-    });
+        expect(patched, isNotNull);
+        // Sorted newest-first: the pushed chat now leads.
+        expect(patched!.first['chatId'], 'c2');
+        expect(patched.first['lastMessage'], 'Hello');
+        expect(patched.first['lastMessageId'], 'm9');
+        expect(patched.first['lastMessageSenderId'], 'u2');
+        expect(patched.first['lastMessageTime'], when);
+        // Unread incremented from 2 → 3; delivered-to-us, not yet read.
+        expect(patched.first['unreadCount'], 3);
+        expect(patched.first['lastMessageDelivered'], isTrue);
+        expect(patched.first['lastMessageRead'], isFalse);
+        // The untouched chat survives.
+        expect(patched.last['chatId'], 'c1');
+        expect(patched.last['unreadCount'], 0);
+      },
+    );
 
     test('a redelivered push (same messageId) does not double-count', () {
       final chats = [
@@ -218,10 +220,7 @@ void main() {
     });
 
     test('unknown account → other accounts\' queued messages stay queued', () {
-      expect(
-        ChatController.pendingOutboxForUser(pending, 'user-z'),
-        isEmpty,
-      );
+      expect(ChatController.pendingOutboxForUser(pending, 'user-z'), isEmpty);
     });
   });
 }

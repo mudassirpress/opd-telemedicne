@@ -117,7 +117,8 @@ class _ChatContactScreenState extends State<ChatContactScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Column(
                 children: [
-                  for (final row in (_isDoctor ? _doctorRows() : _patientRows()))
+                  for (final row
+                      in (_isDoctor ? _doctorRows() : _patientRows()))
                     row,
                 ],
               ),
@@ -221,7 +222,7 @@ class _ChatContactScreenState extends State<ChatContactScreen> {
         fallback: _text(_profile?['highestDegree'], fallback: 'Doctor'),
       );
     }
-    final gender = ( _profile?['gender'] ?? '').toString().trim();
+    final gender = (_profile?['gender'] ?? '').toString().trim();
     return gender.isEmpty ? 'Patient' : 'Patient • $gender';
   }
 
@@ -297,8 +298,12 @@ class _DoctorRatingSummary extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final doctorId = profile?['id']?.toString() ?? '';
     final ratingAsync = ref.watch(doctorRatingSummaryProvider(doctorId));
-    final total = ratingAsync.valueOrNull?.total ?? (profile?['totalRatings'] ?? 0).toInt();
-    final average = ratingAsync.valueOrNull?.average ?? (profile?['averageRating'] ?? 0.0).toDouble();
+    final total =
+        ratingAsync.valueOrNull?.total ??
+        (profile?['totalRatings'] ?? 0).toInt();
+    final average =
+        ratingAsync.valueOrNull?.average ??
+        (profile?['averageRating'] ?? 0.0).toDouble();
     final hasRatings = total > 0;
 
     return OpdCard(
@@ -308,7 +313,9 @@ class _DoctorRatingSummary extends ConsumerWidget {
           Icon(
             hasRatings ? Icons.star_rounded : Icons.star_border_rounded,
             size: hasRatings ? 24 : 20,
-            color: hasRatings ? const Color(0xFFE9A400) : const Color(0xFFBAC6D5),
+            color: hasRatings
+                ? const Color(0xFFE9A400)
+                : const Color(0xFFBAC6D5),
           ),
           const SizedBox(width: 10),
           if (hasRatings) ...[

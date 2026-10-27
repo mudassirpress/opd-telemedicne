@@ -94,10 +94,7 @@ Future<void> showChatMenu({
         ),
       // Search never leaves this screen — it turns the chat header into the
       // WhatsApp-style search header instead of pushing a new route.
-      AnchoredMenuItem(
-        label: 'Search',
-        onTap: onSearch,
-      ),
+      AnchoredMenuItem(label: 'Search', onTap: onSearch),
       AnchoredMenuItem(
         label: 'Media, Links & Docs',
         onTap: () => navigator.push(
@@ -111,9 +108,7 @@ Future<void> showChatMenu({
       ),
       if (!isDoctor)
         AnchoredMenuItem(
-          label: isFavourite
-              ? 'Remove from Favorites'
-              : 'Add to Favorites',
+          label: isFavourite ? 'Remove from Favorites' : 'Add to Favorites',
           onTap: () => _toggleFavourite(
             notifier,
             chatId: chatId,

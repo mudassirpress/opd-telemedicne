@@ -66,7 +66,8 @@ class SharedReportModel {
       reportName: data['reportName'] ?? '',
       description: data['description'] ?? '',
       reportUrl: data['reportUrl'] ?? '',
-      reportDate: (data['reportDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      reportDate:
+          (data['reportDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       reportUploadDate:
           (data['reportUploadDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       sharedAt: (data['sharedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),

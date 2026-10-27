@@ -40,7 +40,10 @@ class PhoneUtils {
   ///   - International with plus: `+12025550123`, `+447911123456`
   ///   - International with 00: `0012025550123` -> `+12025550123`
   ///   - National + dialCode: e.g. dialCode: `+1`, input: `2025550123` -> `+12025550123`
-  static String? normalizePhone(String? raw, {String? defaultDialCode = '+92'}) {
+  static String? normalizePhone(
+    String? raw, {
+    String? defaultDialCode = '+92',
+  }) {
     if (raw == null) return null;
     final trimmed = raw.trim();
     if (trimmed.isEmpty || trimmed.length > 40) return null;
@@ -76,7 +79,8 @@ class PhoneUtils {
         if (nationalDigits.startsWith(dialDigits) &&
             nationalDigits.length > dialDigits.length + 5) {
           final candidate = '+$nationalDigits';
-          if (RegExp(r'^\+[1-9]\d{6,14}$').hasMatch(candidate)) return candidate;
+          if (RegExp(r'^\+[1-9]\d{6,14}$').hasMatch(candidate))
+            return candidate;
         }
         final candidate = '+$dialDigits$nationalDigits';
         if (RegExp(r'^\+[1-9]\d{6,14}$').hasMatch(candidate)) {
@@ -99,23 +103,20 @@ class PhoneUtils {
   }
 
   /// Returns historical string variants used in database documents.
-  static List<String> phoneLookupVariants(String raw, {String? defaultDialCode = '+92'}) {
-    final normalized = normalizePhone(raw, defaultDialCode: defaultDialCode) ?? raw.trim();
+  static List<String> phoneLookupVariants(
+    String raw, {
+    String? defaultDialCode = '+92',
+  }) {
+    final normalized =
+        normalizePhone(raw, defaultDialCode: defaultDialCode) ?? raw.trim();
     if (normalized.startsWith('+92')) {
       final national = normalized.replaceFirst('+92', '');
-      return [
-        '0$national',
-        normalized,
-        '92$national',
-        national,
-      ];
+      return ['0$national', normalized, '92$national', national];
     }
-    final digits = normalized.replaceFirst('+', '').replaceAll(RegExp(r'\D'), '');
-    final variants = <String>[
-      normalized,
-      digits,
-      '00$digits',
-    ];
+    final digits = normalized
+        .replaceFirst('+', '')
+        .replaceAll(RegExp(r'\D'), '');
+    final variants = <String>[normalized, digits, '00$digits'];
     if (normalized.startsWith('+44') && digits.length >= 11) {
       variants.add('0${digits.substring(2)}');
     } else if (normalized.startsWith('+971') && digits.length >= 11) {

@@ -137,13 +137,15 @@ class _AnchoredMenuState extends State<_AnchoredMenu>
 
     final screenSize = MediaQuery.sizeOf(context);
     final anchorTopLeft = anchorBox.localToGlobal(Offset.zero);
-    final availableBelow = screenSize.height -
+    final availableBelow =
+        screenSize.height -
         (anchorTopLeft.dy + anchorBox.size.height) -
         widget.gap;
     final availableAbove = anchorTopLeft.dy - widget.gap;
     final needed = menuBox.size.height;
 
-    final shouldFlip = needed > availableBelow && availableAbove > availableBelow;
+    final shouldFlip =
+        needed > availableBelow && availableAbove > availableBelow;
     final available = shouldFlip ? availableAbove : availableBelow;
 
     setState(() {
@@ -186,11 +188,10 @@ class _AnchoredMenuState extends State<_AnchoredMenu>
         ),
         CompositedTransformFollower(
           link: widget.link,
-          targetAnchor: _flipAbove
-              ? Alignment.topRight
-              : Alignment.bottomRight,
-          followerAnchor:
-              _flipAbove ? Alignment.bottomRight : Alignment.topRight,
+          targetAnchor: _flipAbove ? Alignment.topRight : Alignment.bottomRight,
+          followerAnchor: _flipAbove
+              ? Alignment.bottomRight
+              : Alignment.topRight,
           offset: Offset(
             -widget.horizontalInset,
             _flipAbove ? -widget.gap : widget.gap,
@@ -223,9 +224,7 @@ class _AnchoredMenuState extends State<_AnchoredMenu>
     final rows = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final item in widget.items) _buildRow(item),
-      ],
+      children: [for (final item in widget.items) _buildRow(item)],
     );
 
     // A plain `Column` is greedy under a `SingleChildScrollView`, so the
@@ -239,10 +238,7 @@ class _AnchoredMenuState extends State<_AnchoredMenu>
 
     return Container(
       key: _menuKey,
-      constraints: BoxConstraints(
-        maxWidth: maxWidth,
-        maxHeight: _maxHeight,
-      ),
+      constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: _maxHeight),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),

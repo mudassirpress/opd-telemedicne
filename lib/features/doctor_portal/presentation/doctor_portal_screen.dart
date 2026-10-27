@@ -13,8 +13,7 @@ class DoctorPortalScreen extends ConsumerStatefulWidget {
   const DoctorPortalScreen({super.key});
 
   @override
-  ConsumerState<DoctorPortalScreen> createState() =>
-      _DoctorPortalScreenState();
+  ConsumerState<DoctorPortalScreen> createState() => _DoctorPortalScreenState();
 }
 
 class _DoctorPortalScreenState extends ConsumerState<DoctorPortalScreen> {
@@ -104,12 +103,16 @@ class _DoctorPortalScreenState extends ConsumerState<DoctorPortalScreen> {
 
       if (success) {
         if (targetStatus) {
-          ToastService.instance.showSuccess('You are now online and ready for calls');
+          ToastService.instance.showSuccess(
+            'You are now online and ready for calls',
+          );
         } else {
           ToastService.instance.showInfo('You are now offline');
         }
       } else {
-        ToastService.instance.showWarning('Failed to update online status. Please check your connection.');
+        ToastService.instance.showWarning(
+          'Failed to update online status. Please check your connection.',
+        );
       }
     }
   }
@@ -208,8 +211,9 @@ class _DoctorPortalScreenState extends ConsumerState<DoctorPortalScreen> {
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF0F233C)
-                                    .withValues(alpha: 0.08),
+                                color: const Color(
+                                  0xFF0F233C,
+                                ).withValues(alpha: 0.08),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -256,7 +260,9 @@ class _DoctorPortalScreenState extends ConsumerState<DoctorPortalScreen> {
                           ),
                         ),
                         onPressed: () {
-                          ToastService.instance.showInfo('Opening call history');
+                          ToastService.instance.showInfo(
+                            'Opening call history',
+                          );
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -265,19 +271,21 @@ class _DoctorPortalScreenState extends ConsumerState<DoctorPortalScreen> {
                           );
                         },
                       ),
-                       
                     ],
                   ),
                   const SizedBox(height: 8),
                   Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
-                  child: MetallicInput(
-                    hintText: 'Search doctors by name...',
-                    icon: Icons.search_rounded,
-                    controller: _searchController,
-                    validator: null,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 0,
+                      vertical: 8,
+                    ),
+                    child: MetallicInput(
+                      hintText: 'Search doctors by name...',
+                      icon: Icons.search_rounded,
+                      controller: _searchController,
+                      validator: null,
+                    ),
                   ),
-                ),
                 ],
               ),
             ),
@@ -310,25 +318,21 @@ class _DoctorPortalScreenState extends ConsumerState<DoctorPortalScreen> {
           radius: 20,
           backgroundColor: const Color(0xFFF0F4FA),
           backgroundImage:
-              (currentDoctor?.image != null &&
-                      currentDoctor!.image!.isNotEmpty)
-                  ? NetworkImage(currentDoctor!.image!)
-                  : null,
-          child:
-              (currentDoctor?.image == null || currentDoctor!.image!.isEmpty)
-                  ? Text(
-                      (currentDoctor?.fullname ?? 'D')
-                              .isNotEmpty
-                          ? (currentDoctor!.fullname ?? 'D')[0]
-                              .toUpperCase()
-                          : 'D',
-                      style: TextStyle(
-                        color: AppColors.primaryRed,
-                        fontSize: context.fs(15),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    )
-                  : null,
+              (currentDoctor?.image != null && currentDoctor!.image!.isNotEmpty)
+              ? NetworkImage(currentDoctor!.image!)
+              : null,
+          child: (currentDoctor?.image == null || currentDoctor!.image!.isEmpty)
+              ? Text(
+                  (currentDoctor?.fullname ?? 'D').isNotEmpty
+                      ? (currentDoctor!.fullname ?? 'D')[0].toUpperCase()
+                      : 'D',
+                  style: TextStyle(
+                    color: AppColors.primaryRed,
+                    fontSize: context.fs(15),
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              : null,
         ),
       ),
     );

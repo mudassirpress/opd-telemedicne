@@ -101,8 +101,8 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
 
       if (response.statusCode == 200) {
         final Directory tempDir = await getTemporaryDirectory();
-        final String timestamp =
-            DateTime.now().millisecondsSinceEpoch.toString();
+        final String timestamp = DateTime.now().millisecondsSinceEpoch
+            .toString();
 
         String fileExtension = 'pdf';
         if (fileUrl.contains('.jpg') || fileUrl.contains('.jpeg')) {
@@ -142,10 +142,7 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
     }
   }
 
-  Future<void> _deleteReport(
-    String reportId,
-    ReportController controller,
-  ) {
+  Future<void> _deleteReport(String reportId, ReportController controller) {
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
@@ -173,9 +170,7 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
               onPressed: () => Navigator.pop(context),
               child: Text(
                 'Cancel',
-                style: TextStyle(
-                  color: const Color(0xFF6B7B8D),
-                ),
+                style: TextStyle(color: const Color(0xFF6B7B8D)),
               ),
             ),
             TextButton(
@@ -267,8 +262,7 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
                         onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) =>
-                                const PatientSharedReportsScreen(),
+                            builder: (_) => const PatientSharedReportsScreen(),
                           ),
                         ),
                       ),
@@ -292,11 +286,7 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
                 const SizedBox(height: 8),
 
                 // Content
-                Expanded(
-                  child: _buildContent(reportController),
-                ),
-
-                
+                Expanded(child: _buildContent(reportController)),
               ],
             ),
           ),
@@ -323,6 +313,7 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
       ),
     );
   }
+
   Widget _buildContent(ReportController reportController) {
     // `medicalHistoryProvider` is a StreamProvider, so watching it already
     // yields the current value plus its loading/error state — no StreamBuilder
@@ -583,11 +574,7 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFFE3EAF2),
-            Color(0xFFF5F8FC),
-            Color(0xFFE2E9F2),
-          ],
+          colors: [Color(0xFFE3EAF2), Color(0xFFF5F8FC), Color(0xFFE2E9F2)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -605,11 +592,7 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
         margin: const EdgeInsets.all(2),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFFF3F7FB),
-              Colors.white,
-              Color(0xFFF0F4F9),
-            ],
+            colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -633,7 +616,11 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
                           color: const Color(0xFFD6E4F0).withValues(alpha: 0.4),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(icon, color: const Color(0xFF062B72), size: 24),
+                        child: Icon(
+                          icon,
+                          color: const Color(0xFF062B72),
+                          size: 24,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -709,10 +696,7 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
                           ],
                         ),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: trailing,
-                      ),
+                      Row(mainAxisSize: MainAxisSize.min, children: trailing),
                     ],
                   ),
                 ],
@@ -758,7 +742,9 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
           constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
           onPressed: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => ShareReportScreen(report: report)),
+            MaterialPageRoute(
+              builder: (_) => ShareReportScreen(report: report),
+            ),
           ),
           tooltip: 'Forward Report',
         ),

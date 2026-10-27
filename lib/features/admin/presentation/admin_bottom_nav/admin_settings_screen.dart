@@ -10,7 +10,8 @@ class AdminSettingsScreen extends ConsumerStatefulWidget {
   const AdminSettingsScreen({super.key});
 
   @override
-  ConsumerState<AdminSettingsScreen> createState() => _AdminSettingsScreenState();
+  ConsumerState<AdminSettingsScreen> createState() =>
+      _AdminSettingsScreenState();
 }
 
 class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
@@ -82,7 +83,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                       border: Border.all(color: AdminPalette.brandBorder),
                       boxShadow: [
                         BoxShadow(
-                          color: AdminPalette.brandShadow.withValues(alpha: 0.2),
+                          color: AdminPalette.brandShadow.withValues(
+                            alpha: 0.2,
+                          ),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
                         ),
@@ -103,7 +106,10 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
 
             const SizedBox(height: 20),
 
-            AdminSectionLabel('Account', padding: const EdgeInsets.only(bottom: 8, left: 4)),
+            AdminSectionLabel(
+              'Account',
+              padding: const EdgeInsets.only(bottom: 8, left: 4),
+            ),
             _buildSettingsItem(
               icon: Icons.person_outline,
               title: 'Profile',
@@ -122,7 +128,10 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
             ),
 
             const SizedBox(height: 16),
-            AdminSectionLabel('Application', padding: const EdgeInsets.only(bottom: 8, left: 4)),
+            AdminSectionLabel(
+              'Application',
+              padding: const EdgeInsets.only(bottom: 8, left: 4),
+            ),
             _buildSettingsItem(
               icon: Icons.info_outline,
               title: 'About',
@@ -141,7 +150,10 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
             ),
 
             const SizedBox(height: 16),
-            AdminSectionLabel('Admin Actions', padding: const EdgeInsets.only(bottom: 8, left: 4)),
+            AdminSectionLabel(
+              'Admin Actions',
+              padding: const EdgeInsets.only(bottom: 8, left: 4),
+            ),
             _buildSettingsItem(
               icon: Icons.admin_panel_settings_outlined,
               title: 'Manage Admin Access',

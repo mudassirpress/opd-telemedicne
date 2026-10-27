@@ -110,8 +110,9 @@ class _AppointmentRequestScreenState
 
   @override
   Widget build(BuildContext context) {
-    final doctorName =
-        widget.payment.doctorName.isEmpty ? 'your doctor' : widget.payment.doctorName;
+    final doctorName = widget.payment.doctorName.isEmpty
+        ? 'your doctor'
+        : widget.payment.doctorName;
 
     return OpdScreenShell(
       title: 'Appointment Request',

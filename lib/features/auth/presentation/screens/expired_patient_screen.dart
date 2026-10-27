@@ -42,7 +42,6 @@ class _ExpiredPatientScreenState extends ConsumerState<ExpiredPatientScreen> {
 
   final ImagePicker _picker = ImagePicker();
 
-
   @override
   void initState() {
     super.initState();
@@ -90,7 +89,9 @@ class _ExpiredPatientScreenState extends ConsumerState<ExpiredPatientScreen> {
       return result.downloadUrl;
     } catch (e) {
       debugPrint('Failed to upload image: $e');
-      ToastService.instance.showError('Something went wrong. Please try again.');
+      ToastService.instance.showError(
+        'Something went wrong. Please try again.',
+      );
       return null;
     }
   }
@@ -151,7 +152,9 @@ class _ExpiredPatientScreenState extends ConsumerState<ExpiredPatientScreen> {
     } catch (e) {
       debugPrint('Error submitting payment proof: $e');
       if (!mounted) return;
-      ToastService.instance.showError('Something went wrong. Please try again.');
+      ToastService.instance.showError(
+        'Something went wrong. Please try again.',
+      );
       setState(() => _isSubmitting = false);
     }
   }
@@ -259,7 +262,9 @@ class _ExpiredPatientScreenState extends ConsumerState<ExpiredPatientScreen> {
   Widget build(BuildContext context) {
     final currentUser = ref.watch(userProvider);
     final patientId = currentUser?.patientId ?? 'N/A';
-    final showComplaintButton = PaymentComplaintVisibility.shouldShow(currentUser);
+    final showComplaintButton = PaymentComplaintVisibility.shouldShow(
+      currentUser,
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFEDF2F8),
@@ -313,7 +318,8 @@ class _ExpiredPatientScreenState extends ConsumerState<ExpiredPatientScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => const SubmitComplaintScreen(),
+                                    builder: (_) =>
+                                        const SubmitComplaintScreen(),
                                   ),
                                 );
                               },
@@ -388,8 +394,8 @@ class _ExpiredPatientScreenState extends ConsumerState<ExpiredPatientScreen> {
                           widget.isExpiringSoon
                               ? AccountExpiry.warningMessage
                               : 'Your Patient ID validity period has ended. '
-                                  'Please submit a new payment proof to '
-                                  'reactivate your account.',
+                                    'Please submit a new payment proof to '
+                                    'reactivate your account.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: context.fs(13),
@@ -535,8 +541,9 @@ class _ExpiredPatientScreenState extends ConsumerState<ExpiredPatientScreen> {
                                     Expanded(
                                       child: GradientButton(
                                         text: 'Remove',
-                                        onPressed: () =>
-                                            setState(() => _paymentImage = null),
+                                        onPressed: () => setState(
+                                          () => _paymentImage = null,
+                                        ),
                                         icon: Icons.delete_rounded,
                                       ),
                                     ),
@@ -558,12 +565,14 @@ class _ExpiredPatientScreenState extends ConsumerState<ExpiredPatientScreen> {
                                       ),
                                     ),
                                     child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Icon(
                                           Icons.cloud_upload_rounded,
                                           size: 48,
-                                          color: AppColors.primaryRed.withValues(alpha: 0.6),
+                                          color: AppColors.primaryRed
+                                              .withValues(alpha: 0.6),
                                         ),
                                         const SizedBox(height: 8),
                                         Text(
@@ -589,10 +598,9 @@ class _ExpiredPatientScreenState extends ConsumerState<ExpiredPatientScreen> {
                         GradientButton(
                           text: 'Submit Payment Proof',
                           isLoading: _isSubmitting,
-                          onPressed:
-                              (_isSubmitting || _paymentImage == null)
-                                  ? null
-                                  : _submitPaymentProof,
+                          onPressed: (_isSubmitting || _paymentImage == null)
+                              ? null
+                              : _submitPaymentProof,
                           icon: Icons.send_rounded,
                         ),
                       ],
@@ -620,7 +628,6 @@ class _ExpiredPatientScreenState extends ConsumerState<ExpiredPatientScreen> {
                       ),
 
                       SizedBox(height: context.rsp(16)),
- 
                     ],
                   ),
                 ),

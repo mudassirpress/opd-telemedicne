@@ -35,8 +35,7 @@ class _ConfirmAppointmentScreenState
 
   AppointmentModel get appointment => widget.appointment;
 
-  bool get _readOnly =>
-      !appointment.isRequested || appointment.hasSchedule;
+  bool get _readOnly => !appointment.isRequested || appointment.hasSchedule;
 
   @override
   void initState() {
@@ -56,8 +55,9 @@ class _ConfirmAppointmentScreenState
   }
 
   TimeOfDay? _parseLabel(String label) {
-    final match =
-        RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)?$').firstMatch(label.trim().toUpperCase());
+    final match = RegExp(
+      r'^(\d{1,2}):(\d{2})\s*(AM|PM)?$',
+    ).firstMatch(label.trim().toUpperCase());
     if (match == null) return null;
     var hour = int.tryParse(match.group(1) ?? '');
     final minute = int.tryParse(match.group(2) ?? '');
@@ -106,10 +106,7 @@ class _ConfirmAppointmentScreenState
         _start = picked;
         // Keep the pair sensible on first pick.
         if (_end == null) {
-          _end = TimeOfDay(
-            hour: (picked.hour + 1) % 24,
-            minute: picked.minute,
-          );
+          _end = TimeOfDay(hour: (picked.hour + 1) % 24, minute: picked.minute);
         }
       }
     });
@@ -137,7 +134,9 @@ class _ConfirmAppointmentScreenState
       _error = '';
     });
 
-    final error = await ref.read(appointmentControllerProvider).confirmAppointment(
+    final error = await ref
+        .read(appointmentControllerProvider)
+        .confirmAppointment(
           appointment: appointment,
           actingDoctorId: user.id,
           scheduledDate: _iso(_date!),
@@ -272,8 +271,9 @@ class _ConfirmAppointmentScreenState
 
   Widget _identityCard() {
     final image = appointment.patientImage;
-    final name =
-        appointment.patientName.isEmpty ? 'Patient' : appointment.patientName;
+    final name = appointment.patientName.isEmpty
+        ? 'Patient'
+        : appointment.patientName;
 
     return OpdCard(
       padding: const EdgeInsets.all(16),
@@ -282,8 +282,9 @@ class _ConfirmAppointmentScreenState
           CircleAvatar(
             radius: 26,
             backgroundColor: const Color(0xFFF0F4FA),
-            backgroundImage:
-                image.isNotEmpty ? CachedNetworkImageProvider(image) : null,
+            backgroundImage: image.isNotEmpty
+                ? CachedNetworkImageProvider(image)
+                : null,
             child: image.isEmpty
                 ? Text(
                     name[0].toUpperCase(),
@@ -484,6 +485,5 @@ class _ConfirmAppointmentScreenState
     );
   }
 
-  String _formatDate(DateTime date) =>
-      '${date.day}/${date.month}/${date.year}';
+  String _formatDate(DateTime date) => '${date.day}/${date.month}/${date.year}';
 }

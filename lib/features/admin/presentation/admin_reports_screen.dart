@@ -19,8 +19,7 @@ class AdminReportsScreen extends ConsumerStatefulWidget {
   const AdminReportsScreen({super.key});
 
   @override
-  ConsumerState<AdminReportsScreen> createState() =>
-      _AdminReportsScreenState();
+  ConsumerState<AdminReportsScreen> createState() => _AdminReportsScreenState();
 }
 
 class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {

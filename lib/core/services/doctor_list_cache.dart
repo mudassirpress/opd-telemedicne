@@ -95,7 +95,8 @@ class DoctorListCache extends ChangeNotifier {
         // A first emission with the same doctors (the 15s refresh re-emits) must
         // still refresh in memory so the online dots stay live, but must not
         // rewrite the box.
-        final changed = _doctors.isEmpty ||
+        final changed =
+            _doctors.isEmpty ||
             !OfflineDoctorService.isEquivalent(_doctors, doctors);
 
         _doctors = doctors;
@@ -131,9 +132,7 @@ class DoctorListCache extends ChangeNotifier {
 /// Deliberately **not** `autoDispose`: the provider is read once at app start
 /// and must outlive every screen, otherwise closing `ShareReportScreen` would
 /// drop the single background subscription and the next open would re-fetch.
-final doctorListCacheProvider = ChangeNotifierProvider<DoctorListCache>((
-  ref,
-) {
+final doctorListCacheProvider = ChangeNotifierProvider<DoctorListCache>((ref) {
   final cache = DoctorListCache();
   // `streamAllDoctors()` returns the shared broadcast singleton, so this
   // reuses the existing Firestore listener instead of opening a second one.

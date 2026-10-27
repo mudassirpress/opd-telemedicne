@@ -514,10 +514,7 @@ class OpdEmptyState extends StatelessWidget {
                 height: 1.4,
               ),
             ),
-            if (action != null) ...[
-              const SizedBox(height: 10),
-              action!,
-            ],
+            if (action != null) ...[const SizedBox(height: 10), action!],
           ],
         ),
       ),
@@ -547,11 +544,7 @@ class OpdSegmentedSelector<T> extends StatelessWidget {
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFFD4DCE6),
-            Color(0xFFE8EEF5),
-            Color(0xFFC2CDDC),
-          ],
+          colors: [Color(0xFFD4DCE6), Color(0xFFE8EEF5), Color(0xFFC2CDDC)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -568,8 +561,7 @@ class OpdSegmentedSelector<T> extends StatelessWidget {
       child: Row(
         children: [
           for (int i = 0; i < options.length; i++) ...[
-            if (i > 0)
-              Container(width: 1, height: 24, color: Colors.black12),
+            if (i > 0) Container(width: 1, height: 24, color: Colors.black12),
             Expanded(
               child: _SegmentButton(
                 label: options[i].label,

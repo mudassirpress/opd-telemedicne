@@ -48,9 +48,11 @@ class _CallScreenState extends State<CallScreen>
   bool _isCallActive = true;
   bool _isConnected = false;
   String? _connectionStatus;
+
   /// True while [_connectionStatus] shows the transient "Call reconnected."
   /// success message — rendered with the green pill instead of the red one.
   bool _isStatusSuccess = false;
+
   /// Weak-network warning from Zego's quality callback. Shown only while the
   /// call is otherwise healthy ([_connectionStatus] == null), so a reconnect
   /// message always takes precedence.
@@ -62,12 +64,15 @@ class _CallScreenState extends State<CallScreen>
   StreamSubscription? _connectivitySub;
   Timer? _reconnectWatchdog;
   Timer? _transientStatusTimer;
+
   /// Manual re-join attempts made since the connection first dropped. Zego
   /// retries internally first; the watchdog only intervenes when the SDK has
   /// given up (room state parked in Disconnected) for a long time.
   int _reconnectAttempts = 0;
+
   /// When the call first lost its connection, used by the watchdog.
   DateTime? _disconnectedSince;
+
   /// Last known connectivity interface — used to tell a real disconnect
   /// (wifi → none) apart from a Wi-Fi ⇄ mobile-data handover (wifi → mobile).
   ConnectivityResult? _lastConnectivity;
@@ -143,18 +148,18 @@ class _CallScreenState extends State<CallScreen>
           _startRingingSimulation();
         }
         setState(() {
-          _connectionStatus = widget.isCaller
-              ? 'Ringing...'
-              : 'Connecting...';
+          _connectionStatus = widget.isCaller ? 'Ringing...' : 'Connecting...';
         });
         // Safety net: ends the call only when it is genuinely unanswered /
         // unable to connect. It is cancelled as soon as 'accepted' arrives or
         // media starts flowing.
         _connectionTimer = Timer(const Duration(seconds: 45), () {
           if (mounted && !_isConnected && _isCallActive) {
-            _showErrorAndExit(widget.isCaller
-                ? 'No answer from ${widget.otherUserName}'
-                : 'Failed to connect to call');
+            _showErrorAndExit(
+              widget.isCaller
+                  ? 'No answer from ${widget.otherUserName}'
+                  : 'Failed to connect to call',
+            );
           }
         });
       }
@@ -293,54 +298,55 @@ class _CallScreenState extends State<CallScreen>
   ///    nothing — Zego survives this on its own and flashing a warning would
   ///    be noise.
   void _listenForConnectivity() {
-    _connectivitySub = _connectivity.onConnectivityChanged.listen((
-      result,
-    ) {
-      if (!mounted || !_isCallActive) return;
+    _connectivitySub = _connectivity.onConnectivityChanged.listen(
+      (result) {
+        if (!mounted || !_isCallActive) return;
 
-      final previous = _lastConnectivity;
-      _lastConnectivity = result;
+        final previous = _lastConnectivity;
+        _lastConnectivity = result;
 
-      if (result == ConnectivityResult.none) {
-        if (previous == ConnectivityResult.none) return;
-        _disconnectedSince ??= DateTime.now();
-        if (_isConnected || _connectionStatus != null) {
-          _transientStatusTimer?.cancel();
-          setState(() {
-            _connectionStatus = 'Network disconnected. Trying to reconnect…';
-            _isStatusSuccess = false;
-          });
-          _startReconnectWatchdog();
-        }
-        return;
-      }
-
-      // Back online after a real disconnect.
-      if (previous == ConnectivityResult.none && _disconnectedSince != null) {
-        setState(() {
-          if (_connectionStatus != null) {
-            _connectionStatus = 'Reconnecting to call…';
-            _isStatusSuccess = false;
+        if (result == ConnectivityResult.none) {
+          if (previous == ConnectivityResult.none) return;
+          _disconnectedSince ??= DateTime.now();
+          if (_isConnected || _connectionStatus != null) {
+            _transientStatusTimer?.cancel();
+            setState(() {
+              _connectionStatus = 'Network disconnected. Trying to reconnect…';
+              _isStatusSuccess = false;
+            });
+            _startReconnectWatchdog();
           }
-        });
-        // The room-state listener completes the recovery ("Call
-        // reconnected."). Give Zego's own internal rejoin a few seconds to
-        // act on the restored network first; only force a manual re-join if
-        // the SDK is still not back in the room.
-        if (!_callController.isJoined) {
-          unawaited(
-            Future.delayed(const Duration(seconds: 3), () {
-              if (mounted && _isCallActive && !_callController.isJoined) {
-                unawaited(_attemptCallRejoin());
-              }
-            }),
-          );
+          return;
         }
-      }
-      // wifi ⇄ mobile handover: no message, no action.
-    }, onError: (Object e) {
-      debugPrint('Connectivity listener error during call: $e');
-    });
+
+        // Back online after a real disconnect.
+        if (previous == ConnectivityResult.none && _disconnectedSince != null) {
+          setState(() {
+            if (_connectionStatus != null) {
+              _connectionStatus = 'Reconnecting to call…';
+              _isStatusSuccess = false;
+            }
+          });
+          // The room-state listener completes the recovery ("Call
+          // reconnected."). Give Zego's own internal rejoin a few seconds to
+          // act on the restored network first; only force a manual re-join if
+          // the SDK is still not back in the room.
+          if (!_callController.isJoined) {
+            unawaited(
+              Future.delayed(const Duration(seconds: 3), () {
+                if (mounted && _isCallActive && !_callController.isJoined) {
+                  unawaited(_attemptCallRejoin());
+                }
+              }),
+            );
+          }
+        }
+        // wifi ⇄ mobile handover: no message, no action.
+      },
+      onError: (Object e) {
+        debugPrint('Connectivity listener error during call: $e');
+      },
+    );
   }
 
   /// Safety net for a connection that stays dead.
@@ -368,7 +374,9 @@ class _CallScreenState extends State<CallScreen>
     if (!mounted || !_isCallActive) return;
 
     if (_reconnectAttempts >= 2) {
-      debugPrint('⚠️ Call reconnection failed after $_reconnectAttempts attempts');
+      debugPrint(
+        '⚠️ Call reconnection failed after $_reconnectAttempts attempts',
+      );
       if (mounted) {
         ToastService.instance.showError(
           'Unable to reconnect. Please check your internet.',
@@ -777,8 +785,8 @@ class _CallScreenState extends State<CallScreen>
   Widget _buildRingingStatusLine() {
     final status = widget.isCaller
         ? (_ringingStatus.isNotEmpty
-            ? _ringingStatus
-            : _connectionStatus ?? 'Calling...')
+              ? _ringingStatus
+              : _connectionStatus ?? 'Calling...')
         : (_connectionStatus ?? 'Incoming call...');
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -903,14 +911,14 @@ class _CallScreenState extends State<CallScreen>
                           ],
                         ),
                         const SizedBox(height: 8),
-                        if (_recordingStarted && !isVideo) _buildRecordingPill(),
+                        if (_recordingStarted && !isVideo)
+                          _buildRecordingPill(),
                         const SizedBox(height: 6),
                         if (_connectionStatus != null) _buildReconnectStatus(),
                         // Weak-network warning only while the call is
                         // otherwise healthy — a reconnecting status always
                         // takes precedence so the pills never stack.
-                        if (_connectionStatus == null &&
-                            _qualityStatus != null)
+                        if (_connectionStatus == null && _qualityStatus != null)
                           _buildWeakNetworkPill(),
                         const SizedBox(height: 24),
                       ],
@@ -1166,7 +1174,9 @@ class _CallScreenState extends State<CallScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     _ControlButton(
-                      icon: _cameraEnabled ? Icons.videocam : Icons.videocam_off,
+                      icon: _cameraEnabled
+                          ? Icons.videocam
+                          : Icons.videocam_off,
                       label: _cameraEnabled ? 'Camera' : 'Camera off',
                       isActive: !_cameraEnabled,
                       activeColor: const Color(0xFFE53935),
@@ -1248,7 +1258,9 @@ class _CallScreenState extends State<CallScreen>
           Flexible(
             child: Text(
               widget.isCaller
-                  ? (_ringingStatus.isNotEmpty ? _ringingStatus : _connectionStatus ?? 'Calling...')
+                  ? (_ringingStatus.isNotEmpty
+                        ? _ringingStatus
+                        : _connectionStatus ?? 'Calling...')
                   : (_connectionStatus ?? 'Incoming call...'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1339,9 +1351,7 @@ class _CallScreenState extends State<CallScreen>
     final initial = widget.otherUserName.isNotEmpty
         ? widget.otherUserName[0].toUpperCase()
         : '?';
-    final ringColor = connected
-        ? const Color(0xFF4CAF50)
-        : Colors.white;
+    final ringColor = connected ? const Color(0xFF4CAF50) : Colors.white;
     final avatarSize = (132 * (context.sw / 360)).clamp(104.0, 132.0);
     return AnimatedBuilder(
       animation: _pulseAnimation,
@@ -1391,10 +1401,7 @@ class _CallScreenState extends State<CallScreen>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
-                border: Border.all(
-                  color: const Color(0xFF132D56),
-                  width: 2,
-                ),
+                border: Border.all(color: const Color(0xFF132D56), width: 2),
               ),
               child: ClipOval(
                 child: hasImage
@@ -1496,9 +1503,7 @@ class _ControlButton extends StatelessWidget {
             ),
             child: Icon(
               icon,
-              color: disabled
-                  ? Colors.white38
-                  : inactiveColor,
+              color: disabled ? Colors.white38 : inactiveColor,
               size: 24,
             ),
           ),
@@ -1511,8 +1516,8 @@ class _ControlButton extends StatelessWidget {
               color: disabled
                   ? Colors.white38
                   : isActive
-                      ? activeColor
-                      : Colors.white70,
+                  ? activeColor
+                  : Colors.white70,
               fontSize: context.fs(11),
               fontWeight: FontWeight.w500,
             ),
@@ -1544,10 +1549,7 @@ class _EndButton extends StatelessWidget {
                 end: Alignment.bottomRight,
               ),
               shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFB71C1C),
-                width: 1.5,
-              ),
+              border: Border.all(color: const Color(0xFFB71C1C), width: 1.5),
               boxShadow: [
                 BoxShadow(
                   color: const Color(0xFFD32F2F).withValues(alpha: 0.45),

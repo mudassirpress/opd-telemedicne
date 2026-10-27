@@ -2032,7 +2032,9 @@ class NotificationService {
     if (navigator == null) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ToastService.instance.showSuccess('Password reset confirmed successfully.');
+      ToastService.instance.showSuccess(
+        'Password reset confirmed successfully.',
+      );
     });
   }
 
@@ -2162,7 +2164,9 @@ class NotificationService {
 
     if (type == FcmMessageType.paymentComplaint) {
       final complaintId = (data['complaintId'] ?? '').toString();
-      debugPrint('💳 Admin payment complaint notification tapped complaintId=$complaintId');
+      debugPrint(
+        '💳 Admin payment complaint notification tapped complaintId=$complaintId',
+      );
       await _navigateToAdminComplaint(complaintId: complaintId);
       return;
     }
@@ -2170,8 +2174,11 @@ class NotificationService {
     if (type == FcmMessageType.paymentSubmitted ||
         type == FcmMessageType.paymentProof ||
         type == FcmMessageType.paymentProofSubmitted) {
-      final isAppt = (data['paymentType'] ?? '').toString() == 'appointment_booking';
-      debugPrint('💳 Admin payment notification tapped patientId=$patientId isAppt=$isAppt');
+      final isAppt =
+          (data['paymentType'] ?? '').toString() == 'appointment_booking';
+      debugPrint(
+        '💳 Admin payment notification tapped patientId=$patientId isAppt=$isAppt',
+      );
       await _navigateToAdminPayment(
         patientId: patientId,
         paymentId: paymentId,
@@ -2345,7 +2352,9 @@ class NotificationService {
   Future<void> _navigateToAdminComplaint({required String complaintId}) async {
     final role = await _currentSessionRole();
     if (role != UserRoles.admin) {
-      debugPrint('🚫 Suppressing admin complaint push for non-admin user (role=$role)');
+      debugPrint(
+        '🚫 Suppressing admin complaint push for non-admin user (role=$role)',
+      );
       return;
     }
 

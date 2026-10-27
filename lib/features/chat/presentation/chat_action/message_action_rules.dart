@@ -24,7 +24,8 @@ class ChatToolbarActions {
 
   static const ChatToolbarActions none = ChatToolbarActions();
 
-  bool get isEmpty => !canReply &&
+  bool get isEmpty =>
+      !canReply &&
       !canEdit &&
       !canDownload &&
       !canForward &&
@@ -100,8 +101,7 @@ class MessageActionRules {
   static bool canDeleteForEveryone(
     ChatMessageModel message,
     String currentUserId,
-  ) =>
-      !message.isDeleted && isOwnMessage(message, currentUserId);
+  ) => !message.isDeleted && isOwnMessage(message, currentUserId);
 
   /// Forwarding works for every selectable message.
   static bool canForward(ChatMessageModel message) => isSelectable(message, '');
@@ -128,7 +128,8 @@ class MessageActionRules {
 
     final allForwardable = selected.every(canForward);
     final anyDeletableForMe = selected.any(canDeleteForMe);
-    final allYours = selected.isNotEmpty &&
+    final allYours =
+        selected.isNotEmpty &&
         selected.every((m) => canDeleteForEveryone(m, currentUserId));
 
     return ChatToolbarActions(

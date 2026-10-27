@@ -323,18 +323,21 @@ class PatientController extends ChangeNotifier {
               !DeviceService.isValidInstallationId(storedActiveId) ||
               firestoreData['isLoggedIn'] != true) {
             unawaited(
-              userDoc.reference.update({
-                'activeDeviceId': currentDevId,
-                'deviceId': storedDeviceId != null &&
-                        storedDeviceId.isNotEmpty &&
-                        DeviceService.isValidInstallationId(storedDeviceId)
-                    ? storedDeviceId
-                    : currentDevId,
-                'isLoggedIn': true,
-                'lastLoginAt': FieldValue.serverTimestamp(),
-              }).catchError((e) {
-                print('⚠️ Error updating session record on load: $e');
-              }),
+              userDoc.reference
+                  .update({
+                    'activeDeviceId': currentDevId,
+                    'deviceId':
+                        storedDeviceId != null &&
+                            storedDeviceId.isNotEmpty &&
+                            DeviceService.isValidInstallationId(storedDeviceId)
+                        ? storedDeviceId
+                        : currentDevId,
+                    'isLoggedIn': true,
+                    'lastLoginAt': FieldValue.serverTimestamp(),
+                  })
+                  .catchError((e) {
+                    print('⚠️ Error updating session record on load: $e');
+                  }),
             );
           }
         }
@@ -1446,7 +1449,8 @@ class PatientController extends ChangeNotifier {
           .doc(userId)
           .get();
       final data = doc.data() ?? {};
-      final paymentTypeStr = (data['paymentType'] as String?) ?? 'account_activation';
+      final paymentTypeStr =
+          (data['paymentType'] as String?) ?? 'account_activation';
       final isReactivation = paymentTypeStr == 'account_reactivation';
       final paymentId = (data['paymentId'] as String?) ?? '';
       final durationMonths = data['durationMonths'] is int
@@ -1534,7 +1538,8 @@ class PatientController extends ChangeNotifier {
           .doc(userId)
           .get();
       final data = doc.data() ?? {};
-      final paymentTypeStr = (data['paymentType'] as String?) ?? 'account_activation';
+      final paymentTypeStr =
+          (data['paymentType'] as String?) ?? 'account_activation';
       final paymentId = (data['paymentId'] as String?) ?? '';
 
       await _firestore.collection('telemedicine_patient').doc(userId).update({
@@ -2105,7 +2110,11 @@ class PatientController extends ChangeNotifier {
 
       final plan = _currentUser!.plan;
       final durationMonths = _currentUser!.effectiveDurationMonths;
-      final amount = plan.amount > 0 ? plan.amount : (_currentUser!.totalPayment > 0 ? _currentUser!.totalPayment : 300.0);
+      final amount = plan.amount > 0
+          ? plan.amount
+          : (_currentUser!.totalPayment > 0
+                ? _currentUser!.totalPayment
+                : 300.0);
 
       final requestRef = _firestore
           .collection('patient_reactivation_requests')
@@ -2151,14 +2160,17 @@ class PatientController extends ChangeNotifier {
       // Update patient profile so Cloud Function and Admin screen pick up pending reactivation
       try {
         final notifId = const Uuid().v4();
-        await _firestore.collection('telemedicine_patient').doc(_currentUser!.id).update({
-          'paymentStatus': 'pending',
-          'paymentType': 'account_reactivation',
-          'paymentImage': paymentProofUrl,
-          'paymentId': requestRef.id,
-          'lastPaymentNotificationId': notifId,
-          'paymentSubmittedAt': DateTime.now().toIso8601String(),
-        });
+        await _firestore
+            .collection('telemedicine_patient')
+            .doc(_currentUser!.id)
+            .update({
+              'paymentStatus': 'pending',
+              'paymentType': 'account_reactivation',
+              'paymentImage': paymentProofUrl,
+              'paymentId': requestRef.id,
+              'lastPaymentNotificationId': notifId,
+              'paymentSubmittedAt': DateTime.now().toIso8601String(),
+            });
         _currentUser = _currentUser?.copyWith(
           paymentStatus: 'pending',
           paymentImage: paymentProofUrl,
@@ -2442,22 +2454,30 @@ class PatientController extends ChangeNotifier {
 
       // Find patientUserId to notify
       try {
-        final reqDoc = await _firestore.collection('patient_reactivation_requests').doc(requestId).get();
+        final reqDoc = await _firestore
+            .collection('patient_reactivation_requests')
+            .doc(requestId)
+            .get();
         final pUid = (reqDoc.data()?['patientUserId'] ?? '').toString();
         if (pUid.isNotEmpty) {
           final notifId = const Uuid().v4();
-          await _firestore.collection('patient_notifications').doc(notifId).set({
-            'notificationId': notifId,
-            'recipientUid': pUid,
-            'type': FcmMessageType.paymentRejected,
-            'title': 'Payment Proof Rejected',
-            'body': reason.isNotEmpty ? reason : 'Your reactivation payment proof has been rejected.',
-            'senderName': 'OPD Telemedicine Admin',
-            'paymentId': requestId,
-            'paymentType': 'account_reactivation',
-            'isRead': false,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
+          await _firestore
+              .collection('patient_notifications')
+              .doc(notifId)
+              .set({
+                'notificationId': notifId,
+                'recipientUid': pUid,
+                'type': FcmMessageType.paymentRejected,
+                'title': 'Payment Proof Rejected',
+                'body': reason.isNotEmpty
+                    ? reason
+                    : 'Your reactivation payment proof has been rejected.',
+                'senderName': 'OPD Telemedicine Admin',
+                'paymentId': requestId,
+                'paymentType': 'account_reactivation',
+                'isRead': false,
+                'createdAt': FieldValue.serverTimestamp(),
+              });
           await NotificationDispatcher().sendPaymentRejectedNotification(
             toUserId: pUid,
             patientId: pUid,
@@ -3443,18 +3463,27 @@ class PatientController extends ChangeNotifier {
       }
     }
 
-    debugPrint('📝 [PatientController.completePatientProfile] Resolving session:');
+    debugPrint(
+      '📝 [PatientController.completePatientProfile] Resolving session:',
+    );
     debugPrint('   - explicitUid: $explicitUid');
     debugPrint('   - _currentUser?.id: ${_currentUser?.id}');
-    debugPrint('   - FirebaseAuth.currentUser?.uid: ${FirebaseAuth.instance.currentUser?.uid}');
-    debugPrint('   - patientIdModel?.patientUserId: ${patientIdModel?.patientUserId}');
+    debugPrint(
+      '   - FirebaseAuth.currentUser?.uid: ${FirebaseAuth.instance.currentUser?.uid}',
+    );
+    debugPrint(
+      '   - patientIdModel?.patientUserId: ${patientIdModel?.patientUserId}',
+    );
     debugPrint('   - resolvedUid: $resolvedUid');
 
     // If still null and it is a phone/existing user flow, fail with clear exception
-    if ((resolvedUid == null || resolvedUid.isEmpty) && patientIdModel == null) {
+    if ((resolvedUid == null || resolvedUid.isEmpty) &&
+        patientIdModel == null) {
       _errorMessage = 'No active patient session found.';
       _setLoading(false);
-      debugPrint('❌ [PatientController.completePatientProfile] Failed: No active patient session found.');
+      debugPrint(
+        '❌ [PatientController.completePatientProfile] Failed: No active patient session found.',
+      );
       throw Exception('No active patient session found.');
     }
 
@@ -3521,15 +3550,18 @@ class PatientController extends ChangeNotifier {
         _startSingleDeviceSessionWatcher(userId);
 
         // Mark patient card assigned
-        await _firestore.collection('patient_ids').doc(patientIdModel.id).update({
-          'status': 'Assigned',
-          'assignedAt': FieldValue.serverTimestamp(),
-          'startDate': FieldValue.serverTimestamp(),
-          'expiryDate': Timestamp.fromDate(expiryDate),
-          'patientUserId': userId,
-          'subscriptionPlan': plan.planId,
-          'durationMonths': durationMonths,
-        });
+        await _firestore
+            .collection('patient_ids')
+            .doc(patientIdModel.id)
+            .update({
+              'status': 'Assigned',
+              'assignedAt': FieldValue.serverTimestamp(),
+              'startDate': FieldValue.serverTimestamp(),
+              'expiryDate': Timestamp.fromDate(expiryDate),
+              'patientUserId': userId,
+              'subscriptionPlan': plan.planId,
+              'durationMonths': durationMonths,
+            });
 
         // Claim phone uniqueness
         try {
@@ -3554,8 +3586,9 @@ class PatientController extends ChangeNotifier {
 
       // ── Handle Phone / Normal Auth Profile Completion ──────────────────
       final targetUserId = resolvedUid!;
-      final userDocRef =
-          _firestore.collection('telemedicine_patient').doc(targetUserId);
+      final userDocRef = _firestore
+          .collection('telemedicine_patient')
+          .doc(targetUserId);
 
       final userDocSnap = await userDocRef.get();
 

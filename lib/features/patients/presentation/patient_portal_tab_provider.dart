@@ -13,5 +13,6 @@ enum PatientPortalTab {
   int get navIndex => index;
 }
 
-final patientPortalTabProvider =
-    StateProvider<PatientPortalTab>((ref) => PatientPortalTab.chat);
+final patientPortalTabProvider = StateProvider<PatientPortalTab>(
+  (ref) => PatientPortalTab.chat,
+);

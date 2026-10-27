@@ -54,11 +54,17 @@ void main() {
 
     test('rejects rich cards and deleted messages', () {
       expect(
-        MessageActionRules.isSelectable(message(messageType: 'prescription'), 'me'),
+        MessageActionRules.isSelectable(
+          message(messageType: 'prescription'),
+          'me',
+        ),
         isFalse,
       );
       expect(
-        MessageActionRules.isSelectable(message(messageType: 'appointment'), 'me'),
+        MessageActionRules.isSelectable(
+          message(messageType: 'appointment'),
+          'me',
+        ),
         isFalse,
       );
       expect(
@@ -76,7 +82,10 @@ void main() {
         MessageActionRules.canEdit(message(messageType: 'image'), 'me'),
         isFalse,
       );
-      expect(MessageActionRules.canEdit(message(isDeleted: true), 'me'), isFalse);
+      expect(
+        MessageActionRules.canEdit(message(isDeleted: true), 'me'),
+        isFalse,
+      );
     });
 
     test('delete for me: any non-deleted message', () {
@@ -85,7 +94,10 @@ void main() {
         MessageActionRules.canDeleteForMe(message(senderId: 'you')),
         isTrue,
       );
-      expect(MessageActionRules.canDeleteForMe(message(isDeleted: true)), isFalse);
+      expect(
+        MessageActionRules.canDeleteForMe(message(isDeleted: true)),
+        isFalse,
+      );
     });
 
     test('delete for everyone: own non-deleted message only', () {
@@ -134,8 +146,7 @@ void main() {
     });
 
     test('your own single text message: reply, edit, forward, delete', () {
-      final actions =
-          MessageActionRules.resolveForSelection([message()], 'me');
+      final actions = MessageActionRules.resolveForSelection([message()], 'me');
       expect(actions.canReply, isTrue);
       expect(actions.canEdit, isTrue);
       expect(actions.canDownload, isFalse);
@@ -144,64 +155,62 @@ void main() {
       expect(actions.canDeleteForEveryone, isTrue);
     });
 
-    test("someone else's single text message: reply, forward, delete for me",
-        () {
-      final actions =
-          MessageActionRules.resolveForSelection([message(senderId: 'you')], 'me');
-      expect(actions.canReply, isTrue);
-      expect(actions.canEdit, isFalse);
-      expect(actions.canDeleteForMe, isTrue);
-      expect(actions.canDeleteForEveryone, isFalse);
-      expect(actions.canForward, isTrue);
-    });
+    test(
+      "someone else's single text message: reply, forward, delete for me",
+      () {
+        final actions = MessageActionRules.resolveForSelection([
+          message(senderId: 'you'),
+        ], 'me');
+        expect(actions.canReply, isTrue);
+        expect(actions.canEdit, isFalse);
+        expect(actions.canDeleteForMe, isTrue);
+        expect(actions.canDeleteForEveryone, isFalse);
+        expect(actions.canForward, isTrue);
+      },
+    );
 
     test('a single image offers download and hides edit', () {
-      final actions = MessageActionRules.resolveForSelection(
-        [message(messageType: 'image', mediaUrl: 'https://x/y.jpg')],
-        'me',
-      );
+      final actions = MessageActionRules.resolveForSelection([
+        message(messageType: 'image', mediaUrl: 'https://x/y.jpg'),
+      ], 'me');
       expect(actions.canDownload, isTrue);
       expect(actions.canEdit, isFalse);
       expect(actions.canReply, isTrue);
       expect(actions.canForward, isTrue);
     });
 
-    test('multi-select drops reply/edit/download, keeps forward and delete',
-        () {
-      final actions = MessageActionRules.resolveForSelection(
-        [
+    test(
+      'multi-select drops reply/edit/download, keeps forward and delete',
+      () {
+        final actions = MessageActionRules.resolveForSelection([
           message(),
           message(id: 'm2', messageType: 'image', mediaUrl: 'https://x/y.jpg'),
           message(id: 'm3', messageType: 'call_recording'),
-        ],
-        'me',
-      );
-      expect(actions.canReply, isFalse);
-      expect(actions.canEdit, isFalse);
-      expect(actions.canDownload, isFalse);
-      expect(actions.canForward, isTrue);
-      expect(actions.canDeleteForMe, isTrue);
-      expect(actions.canDeleteForEveryone, isTrue);
-    });
+        ], 'me');
+        expect(actions.canReply, isFalse);
+        expect(actions.canEdit, isFalse);
+        expect(actions.canDownload, isFalse);
+        expect(actions.canForward, isTrue);
+        expect(actions.canDeleteForMe, isTrue);
+        expect(actions.canDeleteForEveryone, isTrue);
+      },
+    );
 
     test('mixed ownership hides "delete for everyone" but keeps "for me"', () {
-      final actions = MessageActionRules.resolveForSelection(
-        [message(), message(id: 'm2', senderId: 'you')],
-        'me',
-      );
+      final actions = MessageActionRules.resolveForSelection([
+        message(),
+        message(id: 'm2', senderId: 'you'),
+      ], 'me');
       expect(actions.canDeleteForMe, isTrue);
       expect(actions.canDeleteForEveryone, isFalse);
       expect(actions.canForward, isTrue);
     });
 
     test('a selection containing a rich card cannot be forwarded', () {
-      final actions = MessageActionRules.resolveForSelection(
-        [
-          message(),
-          message(id: 'm2', messageType: 'prescription'),
-        ],
-        'me',
-      );
+      final actions = MessageActionRules.resolveForSelection([
+        message(),
+        message(id: 'm2', messageType: 'prescription'),
+      ], 'me');
       expect(actions.canForward, isFalse);
       expect(actions.canDeleteForMe, isTrue);
     });
@@ -224,17 +233,11 @@ void main() {
         isFalse,
       );
       expect(
-        MessageActionRules.isValidForwardTarget(
-          senderId: '',
-          recipientId: 'b',
-        ),
+        MessageActionRules.isValidForwardTarget(senderId: '', recipientId: 'b'),
         isFalse,
       );
       expect(
-        MessageActionRules.isValidForwardTarget(
-          senderId: 'a',
-          recipientId: '',
-        ),
+        MessageActionRules.isValidForwardTarget(senderId: 'a', recipientId: ''),
         isFalse,
       );
     });
@@ -315,13 +318,9 @@ void main() {
   });
 
   group('ChatController.preferLocalMutation', () {
-    test('a local deletion outranks a server copy that still has the text',
-        () {
+    test('a local deletion outranks a server copy that still has the text', () {
       expect(
-        ChatController.preferLocalMutation(
-          message(isDeleted: true),
-          message(),
-        ),
+        ChatController.preferLocalMutation(message(isDeleted: true), message()),
         isTrue,
       );
       expect(
@@ -335,26 +334,17 @@ void main() {
 
     test('a local edit outranks a server copy that has not caught up', () {
       expect(
-        ChatController.preferLocalMutation(
-          message(isEdited: true),
-          message(),
-        ),
+        ChatController.preferLocalMutation(message(isEdited: true), message()),
         isTrue,
       );
       expect(
-        ChatController.preferLocalMutation(
-          message(),
-          message(isEdited: true),
-        ),
+        ChatController.preferLocalMutation(message(), message(isEdited: true)),
         isFalse,
       );
     });
 
     test('untouched messages never prefer the local copy', () {
-      expect(
-        ChatController.preferLocalMutation(message(), message()),
-        isFalse,
-      );
+      expect(ChatController.preferLocalMutation(message(), message()), isFalse);
     });
   });
 
@@ -400,20 +390,13 @@ void main() {
   });
 
   group('SwipeToReplyWrapper', () {
-    Widget wrap({
-      required VoidCallback onReply,
-      bool enabled = true,
-    }) {
+    Widget wrap({required VoidCallback onReply, bool enabled = true}) {
       return MaterialApp(
         home: Scaffold(
           body: SwipeToReplyWrapper(
             enabled: enabled,
             onReply: onReply,
-            child: Container(
-              width: 240,
-              height: 120,
-              color: Colors.black,
-            ),
+            child: Container(width: 240, height: 120, color: Colors.black),
           ),
         ),
       );
@@ -433,8 +416,9 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('fires onReply once the drag passes the threshold',
-        (tester) async {
+    testWidgets('fires onReply once the drag passes the threshold', (
+      tester,
+    ) async {
       var calls = 0;
       await tester.pumpWidget(wrap(onReply: () => calls++));
 
@@ -504,9 +488,18 @@ void main() {
         MessageActionRules.isOwnMessage(message(senderId: ' u1 '), 'u1'),
         isTrue,
       );
-      expect(MessageActionRules.isOwnMessage(message(senderId: ''), 'u1'), isFalse);
-      expect(MessageActionRules.isOwnMessage(message(senderId: 'u1'), ''), isFalse);
-      expect(MessageActionRules.isOwnMessage(message(senderId: '  '), 'u1'), isFalse);
+      expect(
+        MessageActionRules.isOwnMessage(message(senderId: ''), 'u1'),
+        isFalse,
+      );
+      expect(
+        MessageActionRules.isOwnMessage(message(senderId: 'u1'), ''),
+        isFalse,
+      );
+      expect(
+        MessageActionRules.isOwnMessage(message(senderId: '  '), 'u1'),
+        isFalse,
+      );
     });
 
     test('Firestore documents and offline rows answer identically', () {
@@ -556,8 +549,9 @@ void main() {
         margin: const EdgeInsets.only(bottom: 8),
         constraints: const BoxConstraints(maxWidth: 460),
         child: Column(
-          crossAxisAlignment:
-              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: isMe
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
           children: [
             Container(
               padding: const EdgeInsets.all(8),
@@ -576,8 +570,7 @@ void main() {
       );
     }
 
-    testWidgets(
-        'own messages stay on the right even behind the swipe wrapper, '
+    testWidgets('own messages stay on the right even behind the swipe wrapper, '
         'received stay on the left', (tester) async {
       await tester.pumpWidget(
         MaterialApp(

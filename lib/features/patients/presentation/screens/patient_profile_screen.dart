@@ -33,8 +33,6 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
   final _formKey = GlobalKey<FormState>();
   final ImagePicker _picker = ImagePicker();
 
-
-
   @override
   bool get wantKeepAlive => true;
 
@@ -67,11 +65,8 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
     try {
       final currentUser = ref.read(userProvider);
       final uid = currentUser?.id ?? 'temp_patient';
-      final result =
-          await FirebaseStorageService.instance.uploadPatientProfileImage(
-        patientUid: uid,
-        file: imageFile,
-      );
+      final result = await FirebaseStorageService.instance
+          .uploadPatientProfileImage(patientUid: uid, file: imageFile);
       ToastService.instance.showSuccess('Image uploaded');
       return result.downloadUrl;
     } catch (e) {
@@ -278,9 +273,7 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
             onPressed: () => Navigator.pop(context, false),
             child: Text(
               'Cancel',
-              style: TextStyle(
-                color: const Color(0xFF6B7B8D),
-              ),
+              style: TextStyle(color: const Color(0xFF6B7B8D)),
             ),
           ),
           TextButton(
@@ -378,9 +371,7 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
             onPressed: () => Navigator.pop(context, false),
             child: Text(
               'Cancel',
-              style: TextStyle(
-                color: const Color(0xFF6B7B8D),
-              ),
+              style: TextStyle(color: const Color(0xFF6B7B8D)),
             ),
           ),
           TextButton(
@@ -508,8 +499,9 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF0B2041)
-                                      .withValues(alpha: 0.32),
+                                  color: const Color(
+                                    0xFF0B2041,
+                                  ).withValues(alpha: 0.32),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 ),
@@ -583,8 +575,8 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                                   labelText: 'Full Name',
                                   validator: (value) =>
                                       value?.trim().isEmpty ?? true
-                                          ? 'Required'
-                                          : null,
+                                      ? 'Required'
+                                      : null,
                                 ),
                                 const SizedBox(height: 16),
                                 MetallicInput(
@@ -597,8 +589,8 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                                   enabled: false,
                                   validator: (value) =>
                                       value?.trim().isEmpty ?? true
-                                          ? 'Required'
-                                          : null,
+                                      ? 'Required'
+                                      : null,
                                 ),
                                 const SizedBox(height: 16),
                                 GenderDropdownField(
@@ -612,8 +604,8 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                                   },
                                   validator: (val) =>
                                       (val == null || val.isEmpty)
-                                          ? 'Please select your gender'
-                                          : null,
+                                      ? 'Please select your gender'
+                                      : null,
                                 ),
                                 if (currentUser.role == 'doctor') ...[
                                   const SizedBox(height: 16),
@@ -646,8 +638,6 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                           // Action Buttons
                           _buildActionButtons(),
                           const SizedBox(height: 24),
-
-        
                         ],
                       ),
                     ),
@@ -693,11 +683,7 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
             child: Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFFF3F7FB),
-                    Colors.white,
-                    Color(0xFFF0F4F9),
-                  ],
+                  colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -711,23 +697,22 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                         ),
                       )
                     : selectedImage != null
-                        ? Image.file(selectedImage!, fit: BoxFit.cover)
-                        : currentImageUrl != null &&
-                                currentImageUrl!.isNotEmpty
-                            ? Image.network(
-                                currentImageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.person_rounded,
-                                  size: 50,
-                                  color: Color(0xFF8FA4BD),
-                                ),
-                              )
-                            : const Icon(
-                                Icons.person_rounded,
-                                size: 50,
-                                color: Color(0xFF8FA4BD),
-                              ),
+                    ? Image.file(selectedImage!, fit: BoxFit.cover)
+                    : currentImageUrl != null && currentImageUrl!.isNotEmpty
+                    ? Image.network(
+                        currentImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.person_rounded,
+                          size: 50,
+                          color: Color(0xFF8FA4BD),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.person_rounded,
+                        size: 50,
+                        color: Color(0xFF8FA4BD),
+                      ),
               ),
             ),
           ),
@@ -748,10 +733,7 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                   end: Alignment.bottomCenter,
                 ),
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFF132D56),
-                  width: 1.5,
-                ),
+                border: Border.all(color: const Color(0xFF132D56), width: 1.5),
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFF0B2041).withValues(alpha: 0.32),
@@ -813,11 +795,7 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.logout_rounded,
-                    color: Colors.red[700],
-                    size: 18,
-                  ),
+                  Icon(Icons.logout_rounded, color: Colors.red[700], size: 18),
                   const SizedBox(width: 8),
                   Text(
                     'Logout',
@@ -914,7 +892,10 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 32,
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -928,7 +909,10 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        border: Border.all(color: const Color(0xFF94A3B8), width: 2),
+                        border: Border.all(
+                          color: const Color(0xFF94A3B8),
+                          width: 2,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.08),
@@ -954,7 +938,10 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                     ),
                     const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFE2E8F0),
                         borderRadius: BorderRadius.circular(12),
@@ -991,7 +978,9 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF001B48).withValues(alpha: 0.3),
+                            color: const Color(
+                              0xFF001B48,
+                            ).withValues(alpha: 0.3),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -1004,14 +993,20 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                           onTap: () {
                             Navigator.pushAndRemoveUntil(
                               context,
-                              MaterialPageRoute(builder: (_) => const SignInScreen()),
+                              MaterialPageRoute(
+                                builder: (_) => const SignInScreen(),
+                              ),
                               (route) => false,
                             );
                           },
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.login_rounded, color: Colors.white, size: 20),
+                              const Icon(
+                                Icons.login_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                               const SizedBox(width: 10),
                               Text(
                                 'Sign In / Register',

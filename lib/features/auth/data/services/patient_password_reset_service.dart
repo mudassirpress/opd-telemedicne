@@ -80,8 +80,8 @@ class PatientPasswordResetService {
   PatientPasswordResetService({
     FirebaseFunctions? functions,
     FirebaseFirestore? firestore,
-  })  : _customFunctions = functions,
-        _customFirestore = firestore;
+  }) : _customFunctions = functions,
+       _customFirestore = firestore;
 
   /// Primary region of the deployed callables (see functions/patient_password_reset.js).
   static const String region = 'asia-south1';
@@ -201,7 +201,8 @@ class PatientPasswordResetService {
         if (nationalDigits.startsWith(dialDigits) &&
             nationalDigits.length > dialDigits.length + 5) {
           final candidate = '+$nationalDigits';
-          if (RegExp(r'^\+[1-9]\d{6,14}$').hasMatch(candidate)) return candidate;
+          if (RegExp(r'^\+[1-9]\d{6,14}$').hasMatch(candidate))
+            return candidate;
         }
         final candidate = '+$dialDigits$nationalDigits';
         if (RegExp(r'^\+[1-9]\d{6,14}$').hasMatch(candidate)) {
@@ -224,23 +225,20 @@ class PatientPasswordResetService {
   }
 
   /// The lookup variants stored across historical patient documents.
-  static List<String> phoneLookupVariants(String raw, {String? defaultDialCode}) {
-    final normalized = normalizePhone(raw, defaultDialCode: defaultDialCode) ?? raw.trim();
+  static List<String> phoneLookupVariants(
+    String raw, {
+    String? defaultDialCode,
+  }) {
+    final normalized =
+        normalizePhone(raw, defaultDialCode: defaultDialCode) ?? raw.trim();
     if (normalized.startsWith('+92')) {
       final national = normalized.replaceFirst('+92', '');
-      return [
-        '0$national',
-        normalized,
-        '92$national',
-        national,
-      ];
+      return ['0$national', normalized, '92$national', national];
     }
-    final digits = normalized.replaceFirst('+', '').replaceAll(RegExp(r'\D'), '');
-    final variants = <String>[
-      normalized,
-      digits,
-      '00$digits',
-    ];
+    final digits = normalized
+        .replaceFirst('+', '')
+        .replaceAll(RegExp(r'\D'), '');
+    final variants = <String>[normalized, digits, '00$digits'];
     if (normalized.startsWith('+44') && digits.length >= 11) {
       variants.add('0${digits.substring(2)}');
     } else if (normalized.startsWith('+971') && digits.length >= 11) {
@@ -292,7 +290,9 @@ class PatientPasswordResetService {
 
     // If Cloud Functions are known to be undeployed/unavailable, jump directly to fallback
     if (_cloudFunctionsAvailable == false) {
-      debugPrint('$_logPrefix Cloud Functions unavailable. Using secure Firestore fallback.');
+      debugPrint(
+        '$_logPrefix Cloud Functions unavailable. Using secure Firestore fallback.',
+      );
       return _startOtpFirestoreFallback(
         phone,
         countryCode: countryCode,
@@ -316,11 +316,14 @@ class PatientPasswordResetService {
       return StartOtpResult(
         resendInSeconds: _asInt(data['resendInSeconds'], fallback: 60),
         otpExpiresInSeconds: _asInt(data['otpExpiresInSeconds'], fallback: 300),
-        message: (data['message'] as String?) ??
+        message:
+            (data['message'] as String?) ??
             'If this number is registered, a verification code has been sent.',
       );
     } catch (error) {
-      debugPrint('$_logPrefix [startOtp] Request failed for phone=$masked: $error');
+      debugPrint(
+        '$_logPrefix [startOtp] Request failed for phone=$masked: $error',
+      );
       if (_isNotFoundOrUnavailable(error)) {
         _cloudFunctionsAvailable = false;
         debugPrint(
@@ -362,7 +365,9 @@ class PatientPasswordResetService {
     debugPrint('$_logPrefix [verifyOtp] Verifying OTP for phone=$masked');
 
     if (_cloudFunctionsAvailable == false) {
-      debugPrint('$_logPrefix Cloud Functions unavailable. Using secure Firestore fallback.');
+      debugPrint(
+        '$_logPrefix Cloud Functions unavailable. Using secure Firestore fallback.',
+      );
       return _verifyOtpFirestoreFallback(phone, code);
     }
 
@@ -384,13 +389,17 @@ class PatientPasswordResetService {
           'Something went wrong. Try again.',
         );
       }
-      debugPrint('$_logPrefix [verifyOtp] Verification succeeded for phone=$masked');
+      debugPrint(
+        '$_logPrefix [verifyOtp] Verification succeeded for phone=$masked',
+      );
       return VerifyOtpResult(
         resetToken: token,
         expiresIn: _asInt(data['expiresIn'], fallback: 600),
       );
     } catch (error) {
-      debugPrint('$_logPrefix [verifyOtp] Verification failed for phone=$masked: $error');
+      debugPrint(
+        '$_logPrefix [verifyOtp] Verification failed for phone=$masked: $error',
+      );
       if (error is PasswordResetException) rethrow;
       if (_isNotFoundOrUnavailable(error)) {
         _cloudFunctionsAvailable = false;
@@ -425,7 +434,9 @@ class PatientPasswordResetService {
     debugPrint('$_logPrefix [resetPassword] Consuming reset token...');
 
     if (_cloudFunctionsAvailable == false) {
-      debugPrint('$_logPrefix Cloud Functions unavailable. Using secure Firestore fallback.');
+      debugPrint(
+        '$_logPrefix Cloud Functions unavailable. Using secure Firestore fallback.',
+      );
       return _resetPasswordFirestoreFallback(resetToken, newPassword);
     }
 
@@ -458,7 +469,9 @@ class PatientPasswordResetService {
     String? deviceFcmToken,
   }) async {
     final masked = maskPhoneNumber(phone);
-    debugPrint('$_logPrefix [_startOtpFirestoreFallback] Initiating fallback for phone=$masked');
+    debugPrint(
+      '$_logPrefix [_startOtpFirestoreFallback] Initiating fallback for phone=$masked',
+    );
 
     final variants = phoneLookupVariants(phone, defaultDialCode: countryCode);
     QueryDocumentSnapshot<Map<String, dynamic>>? accountDoc;
@@ -494,7 +507,8 @@ class PatientPasswordResetService {
       return const StartOtpResult(
         resendInSeconds: 60,
         otpExpiresInSeconds: 300,
-        message: 'If this number is registered, a verification code has been sent.',
+        message:
+            'If this number is registered, a verification code has been sent.',
       );
     }
 
@@ -509,7 +523,8 @@ class PatientPasswordResetService {
       return const StartOtpResult(
         resendInSeconds: 60,
         otpExpiresInSeconds: 300,
-        message: 'If this number is registered, a verification code has been sent.',
+        message:
+            'If this number is registered, a verification code has been sent.',
       );
     }
 
@@ -525,8 +540,10 @@ class PatientPasswordResetService {
           .get();
       if (existingDoc.exists) {
         final existingData = existingDoc.data();
-        final createdAtMs = (existingData?['createdAtMs'] as num?)?.toInt() ??
-            ((existingData?['createdAt'] as Timestamp?)?.millisecondsSinceEpoch);
+        final createdAtMs =
+            (existingData?['createdAtMs'] as num?)?.toInt() ??
+            ((existingData?['createdAt'] as Timestamp?)
+                ?.millisecondsSinceEpoch);
         if (createdAtMs != null) {
           final elapsedSeconds = (nowMs - createdAtMs) ~/ 1000;
           if (elapsedSeconds < 60) {
@@ -568,24 +585,31 @@ class PatientPasswordResetService {
 
     // Populate password_reset_requests for backwards compatibility
     try {
-      await _firestore.collection('password_reset_requests').doc(accountId).set({
-        'userId': accountId,
-        'phoneNumber': phone,
-        'resetToken': otp,
-        'createdAt': FieldValue.serverTimestamp(),
-        'expiresAt': Timestamp.fromDate(expiresAt),
-        'isUsed': false,
-        'confirmed': false,
-        'declined': false,
-      });
+      await _firestore
+          .collection('password_reset_requests')
+          .doc(accountId)
+          .set({
+            'userId': accountId,
+            'phoneNumber': phone,
+            'resetToken': otp,
+            'createdAt': FieldValue.serverTimestamp(),
+            'expiresAt': Timestamp.fromDate(expiresAt),
+            'isUsed': false,
+            'confirmed': false,
+            'declined': false,
+          });
     } catch (e) {
       debugPrint('$_logPrefix Compatibility write warning: $e');
     }
 
     // Trigger local push notification heads-up banner
     try {
-      await NotificationService().showPasswordResetOtpNotificationDirect(otp: otp);
-      debugPrint('$_logPrefix Heads-up local notification dispatched for OTP delivery');
+      await NotificationService().showPasswordResetOtpNotificationDirect(
+        otp: otp,
+      );
+      debugPrint(
+        '$_logPrefix Heads-up local notification dispatched for OTP delivery',
+      );
     } catch (e) {
       debugPrint('$_logPrefix Notification dispatch warning: $e');
     }
@@ -612,11 +636,14 @@ class PatientPasswordResetService {
       debugPrint('$_logPrefix notification_outbox queue warning: $e');
     }
 
-    debugPrint('$_logPrefix Fallback OTP successfully generated and dispatched');
+    debugPrint(
+      '$_logPrefix Fallback OTP successfully generated and dispatched',
+    );
     return const StartOtpResult(
       resendInSeconds: 60,
       otpExpiresInSeconds: 300,
-      message: 'If this number is registered, a verification code has been sent.',
+      message:
+          'If this number is registered, a verification code has been sent.',
     );
   }
 
@@ -627,11 +654,16 @@ class PatientPasswordResetService {
     final pepper = _kOtpPepper;
     final otpDocKey = _hmacHex(pepper, 'phone:$phone');
     final masked = maskPhoneNumber(phone);
-    debugPrint('$_logPrefix [_verifyOtpFirestoreFallback] Verifying OTP for phone=$masked');
+    debugPrint(
+      '$_logPrefix [_verifyOtpFirestoreFallback] Verifying OTP for phone=$masked',
+    );
 
     DocumentSnapshot<Map<String, dynamic>> snap;
     try {
-      snap = await _firestore.collection('password_reset_otps').doc(otpDocKey).get();
+      snap = await _firestore
+          .collection('password_reset_otps')
+          .doc(otpDocKey)
+          .get();
     } catch (e) {
       debugPrint('$_logPrefix Error fetching OTP record: $e');
       throw const PasswordResetException(
@@ -653,11 +685,16 @@ class PatientPasswordResetService {
     final isInvalidated =
         data['invalidated'] == true || data['consumed'] == true;
     final attempts = (data['attempts'] as num?)?.toInt() ?? 0;
-    final expiresAtMs = (data['expiresAtMs'] as num?)?.toInt() ??
+    final expiresAtMs =
+        (data['expiresAtMs'] as num?)?.toInt() ??
         ((data['expiresAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0);
 
-    if (isInvalidated || attempts >= 5 || (expiresAtMs > 0 && nowMs > expiresAtMs)) {
-      debugPrint('$_logPrefix OTP expired/invalidated/exhausted for phone=$masked');
+    if (isInvalidated ||
+        attempts >= 5 ||
+        (expiresAtMs > 0 && nowMs > expiresAtMs)) {
+      debugPrint(
+        '$_logPrefix OTP expired/invalidated/exhausted for phone=$masked',
+      );
       throw const PasswordResetException(
         PasswordResetException.otpInvalid,
         'Invalid or expired verification code. Please request a new one.',
@@ -670,13 +707,18 @@ class PatientPasswordResetService {
     if (!_timingSafeEqualHex(storedHash, candidate)) {
       final newAttempts = attempts + 1;
       try {
-        await _firestore.collection('password_reset_otps').doc(otpDocKey).update({
-          'attempts': newAttempts,
-          if (newAttempts >= 5) 'invalidated': true,
-          if (newAttempts >= 5) 'invalidatedReason': 'max_attempts',
-        });
+        await _firestore
+            .collection('password_reset_otps')
+            .doc(otpDocKey)
+            .update({
+              'attempts': newAttempts,
+              if (newAttempts >= 5) 'invalidated': true,
+              if (newAttempts >= 5) 'invalidatedReason': 'max_attempts',
+            });
       } catch (_) {}
-      debugPrint('$_logPrefix OTP mismatch: attempt $newAttempts/5 for phone=$masked');
+      debugPrint(
+        '$_logPrefix OTP mismatch: attempt $newAttempts/5 for phone=$masked',
+      );
       throw const PasswordResetException(
         PasswordResetException.otpInvalid,
         'Invalid verification code. Please check and try again.',
@@ -713,10 +755,7 @@ class PatientPasswordResetService {
     });
 
     debugPrint('$_logPrefix OTP verification successful. Reset token issued.');
-    return VerifyOtpResult(
-      resetToken: resetToken,
-      expiresIn: 600,
-    );
+    return VerifyOtpResult(resetToken: resetToken, expiresIn: 600);
   }
 
   Future<void> _resetPasswordFirestoreFallback(
@@ -726,7 +765,9 @@ class PatientPasswordResetService {
     final pepper = _kOtpPepper;
     final tokenDocKey = _hmacHex(pepper, 'reset:$resetToken');
     final nowMs = DateTime.now().millisecondsSinceEpoch;
-    debugPrint('$_logPrefix [_resetPasswordFirestoreFallback] Consuming reset token');
+    debugPrint(
+      '$_logPrefix [_resetPasswordFirestoreFallback] Consuming reset token',
+    );
 
     DocumentSnapshot<Map<String, dynamic>> tokenSnap;
     try {
@@ -753,7 +794,8 @@ class PatientPasswordResetService {
     final tokenData = tokenSnap.data()!;
     final isConsumed =
         tokenData['consumed'] == true || tokenData['usedAtMs'] != null;
-    final expiresAtMs = (tokenData['expiresAtMs'] as num?)?.toInt() ??
+    final expiresAtMs =
+        (tokenData['expiresAtMs'] as num?)?.toInt() ??
         ((tokenData['expiresAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0);
 
     if (isConsumed || (expiresAtMs > 0 && nowMs > expiresAtMs)) {
@@ -773,11 +815,14 @@ class PatientPasswordResetService {
     }
 
     // Invalidate reset token immediately
-    await _firestore.collection('password_reset_tokens').doc(tokenDocKey).update({
-      'consumed': true,
-      'usedAtMs': nowMs,
-      'usedAt': FieldValue.serverTimestamp(),
-    });
+    await _firestore
+        .collection('password_reset_tokens')
+        .doc(tokenDocKey)
+        .update({
+          'consumed': true,
+          'usedAtMs': nowMs,
+          'usedAt': FieldValue.serverTimestamp(),
+        });
 
     // Update patient password in telemedicine_patient
     await _firestore.collection('telemedicine_patient').doc(accountId).update({
@@ -796,13 +841,18 @@ class PatientPasswordResetService {
 
     // Compatibility update
     try {
-      await _firestore.collection('password_reset_requests').doc(accountId).update({
-        'isUsed': true,
-        'completedAt': FieldValue.serverTimestamp(),
-      });
+      await _firestore
+          .collection('password_reset_requests')
+          .doc(accountId)
+          .update({
+            'isUsed': true,
+            'completedAt': FieldValue.serverTimestamp(),
+          });
     } catch (_) {}
 
-    debugPrint('$_logPrefix Password successfully reset for accountId=$accountId');
+    debugPrint(
+      '$_logPrefix Password successfully reset for accountId=$accountId',
+    );
   }
 
   // ── Network callable execution ────────────────────────────────────────────
@@ -823,27 +873,37 @@ class PatientPasswordResetService {
           .call<dynamic>(data)
           .timeout(const Duration(seconds: 10));
     } on FirebaseFunctionsException catch (e) {
-      debugPrint('$_logPrefix Primary $primary ($region) failed: ${e.code} ${e.message}');
+      debugPrint(
+        '$_logPrefix Primary $primary ($region) failed: ${e.code} ${e.message}',
+      );
       if (e.code == 'not-found') {
         // Try primary function name on fallback region
         try {
-          debugPrint('$_logPrefix Retrying $primary on fallback region $fallbackRegion...');
+          debugPrint(
+            '$_logPrefix Retrying $primary on fallback region $fallbackRegion...',
+          );
           return await fallbackFunctions
               .httpsCallable(primary)
               .call<dynamic>(data)
               .timeout(const Duration(seconds: 8));
         } on FirebaseFunctionsException catch (fallbackErr) {
-          debugPrint('$_logPrefix Fallback region $primary failed: ${fallbackErr.code}');
+          debugPrint(
+            '$_logPrefix Fallback region $primary failed: ${fallbackErr.code}',
+          );
           // If legacy alias is supplied, try legacy alias on primary and fallback regions
           if (legacy != null) {
             try {
-              debugPrint('$_logPrefix Trying legacy alias $legacy on $region...');
+              debugPrint(
+                '$_logPrefix Trying legacy alias $legacy on $region...',
+              );
               return await primaryFunctions
                   .httpsCallable(legacy)
                   .call<dynamic>(data)
                   .timeout(const Duration(seconds: 8));
             } on FirebaseFunctionsException {
-              debugPrint('$_logPrefix Trying legacy alias $legacy on $fallbackRegion...');
+              debugPrint(
+                '$_logPrefix Trying legacy alias $legacy on $fallbackRegion...',
+              );
               return await fallbackFunctions
                   .httpsCallable(legacy)
                   .call<dynamic>(data)

@@ -405,10 +405,7 @@ class _ImagePickerWidgetState extends State<ImagePickerWidget> {
           textAlign: TextAlign.center,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: context.fs(12),
-            color: Colors.grey[500],
-          ),
+          style: TextStyle(fontSize: context.fs(12), color: Colors.grey[500]),
         ),
       ],
     );

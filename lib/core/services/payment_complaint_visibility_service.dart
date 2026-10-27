@@ -32,7 +32,9 @@ class PaymentComplaintVisibility {
     if (user.isPatientIdUser) return true;
 
     final status = (user.paymentStatus ?? '').toLowerCase().trim();
-    final isApproved = (status == 'approved' || status == 'completed') || user.ispayment == true;
+    final isApproved =
+        (status == 'approved' || status == 'completed') ||
+        user.ispayment == true;
     return isApproved;
   }
 

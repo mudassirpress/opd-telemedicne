@@ -250,8 +250,10 @@ class _AdminPortalScreenState extends ConsumerState<AdminPortalScreen> {
   void _openPayments() =>
       _push(const AdminPaymentScreen(), 'Opening payment requests');
 
-  void _openNotifications() =>
-      _push(const AdminNotificationsScreen(), 'Opening notifications & complaints');
+  void _openNotifications() => _push(
+    const AdminNotificationsScreen(),
+    'Opening notifications & complaints',
+  );
 
   Future<void> _logout() async {
     final shouldLogout = await showAdminConfirmDialog(
@@ -349,19 +351,17 @@ class _AdminPortalScreenState extends ConsumerState<AdminPortalScreen> {
     final presenceMap = ref.watch(doctorPresenceProvider);
     final totalDoctors = _doctors.length;
     final suspendedDoctors = _doctors.where(_isSuspendedDoctor).length;
-    final onlineDoctors = _doctors
-        .where((d) {
-          final id = (d['id'] ?? '').toString();
-          final isOnline = presenceMap[id]?.isOnline ?? (d['isOnline'] == true);
-          return isOnline && !_isSuspendedDoctor(d);
-        })
-        .length;
+    final onlineDoctors = _doctors.where((d) {
+      final id = (d['id'] ?? '').toString();
+      final isOnline = presenceMap[id]?.isOnline ?? (d['isOnline'] == true);
+      return isOnline && !_isSuspendedDoctor(d);
+    }).length;
     final rawOffline = totalDoctors - onlineDoctors - suspendedDoctors;
     final offlineDoctors = rawOffline < 0 ? 0 : rawOffline;
 
-    final sortedAppointments = [...appointments]..sort(
-        (a, b) => (b.createdAt ?? _epoch).compareTo(a.createdAt ?? _epoch),
-      );
+    final sortedAppointments = [
+      ...appointments,
+    ]..sort((a, b) => (b.createdAt ?? _epoch).compareTo(a.createdAt ?? _epoch));
     final recentAppointments = sortedAppointments.take(4).toList();
     final pendingRows = _buildPendingRows(pendingAppointmentPayments);
     final activity = _buildActivity(
@@ -386,8 +386,10 @@ class _AdminPortalScreenState extends ConsumerState<AdminPortalScreen> {
           AdminCard(
             child: Row(
               children: [
-                const Icon(Icons.warning_amber_rounded,
-                    color: AdminPalette.warning),
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: AdminPalette.warning,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -395,10 +397,7 @@ class _AdminPortalScreenState extends ConsumerState<AdminPortalScreen> {
                     style: AdminTextStyles.body(size: context.fs(12)),
                   ),
                 ),
-                TextButton(
-                  onPressed: _retry,
-                  child: const Text('Retry'),
-                ),
+                TextButton(onPressed: _retry, child: const Text('Retry')),
               ],
             ),
           ),
@@ -516,7 +515,9 @@ class _AdminPortalScreenState extends ConsumerState<AdminPortalScreen> {
           _emptyCard(context, 'No appointments yet.')
         else
           ..._spaced(
-            recentAppointments.map((a) => _appointmentTile(context, a)).toList(),
+            recentAppointments
+                .map((a) => _appointmentTile(context, a))
+                .toList(),
             10,
           ),
 
@@ -537,7 +538,11 @@ class _AdminPortalScreenState extends ConsumerState<AdminPortalScreen> {
           ),
 
         const SizedBox(height: 18),
-        _sectionHeader(context, Icons.medical_services_outlined, 'Doctor Status'),
+        _sectionHeader(
+          context,
+          Icons.medical_services_outlined,
+          'Doctor Status',
+        ),
         const SizedBox(height: 12),
         IntrinsicHeight(
           child: Row(
@@ -590,17 +595,18 @@ class _AdminPortalScreenState extends ConsumerState<AdminPortalScreen> {
         if (activity.isEmpty)
           _emptyCard(context, 'No recent activity yet.')
         else
-          ..._spaced(activity.map((i) => _activityTile(context, i)).toList(), 10),
+          ..._spaced(
+            activity.map((i) => _activityTile(context, i)).toList(),
+            10,
+          ),
 
         const SizedBox(height: 18),
         _sectionHeader(
           context,
           Icons.chat_bubble_outline_rounded,
           'Recent Chats',
-          onAction: () => _push(
-            const AdminChatManagementScreen(),
-            'Opening doctor chats',
-          ),
+          onAction: () =>
+              _push(const AdminChatManagementScreen(), 'Opening doctor chats'),
         ),
         const SizedBox(height: 12),
         if (chatDoctors.isEmpty)
@@ -830,7 +836,10 @@ class _AdminPortalScreenState extends ConsumerState<AdminPortalScreen> {
               caption,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: AdminTextStyles.small(size: context.fs(10.5), color: color),
+              style: AdminTextStyles.small(
+                size: context.fs(10.5),
+                color: color,
+              ),
             ),
           ],
         ],
@@ -875,10 +884,7 @@ class _AdminPortalScreenState extends ConsumerState<AdminPortalScreen> {
       (
         'Doctors',
         Icons.medical_services_outlined,
-        () => _push(
-          const AdminChatManagementScreen(),
-          'Opening doctor chats',
-        ),
+        () => _push(const AdminChatManagementScreen(), 'Opening doctor chats'),
         0,
       ),
       (
@@ -899,10 +905,7 @@ class _AdminPortalScreenState extends ConsumerState<AdminPortalScreen> {
       (
         'Appointments',
         Icons.event_note_rounded,
-        () => _push(
-          const AdminAppointmentsScreen(),
-          'Opening appointments',
-        ),
+        () => _push(const AdminAppointmentsScreen(), 'Opening appointments'),
         pendingAppointments,
       ),
       (
@@ -914,10 +917,7 @@ class _AdminPortalScreenState extends ConsumerState<AdminPortalScreen> {
       (
         'Doctor Videos',
         Icons.video_library_rounded,
-        () => _push(
-          const AdminDoctorVideosScreen(),
-          'Opening doctor videos',
-        ),
+        () => _push(const AdminDoctorVideosScreen(), 'Opening doctor videos'),
         0,
       ),
       (

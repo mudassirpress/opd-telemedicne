@@ -75,7 +75,8 @@ class _PatientIdVerificationScreenState
   Widget build(BuildContext context) {
     return AuthScreenLayout(
       title: 'Enter Patient ID',
-      subtitle: 'Enter your 12-digit Patient ID to verify and complete your profile.',
+      subtitle:
+          'Enter your 12-digit Patient ID to verify and complete your profile.',
       child: Form(
         key: _formKey,
         child: Column(

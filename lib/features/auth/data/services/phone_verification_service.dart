@@ -48,7 +48,9 @@ class PhoneAvailabilityResult {
       role: role,
       userId: userId,
       hasPatientId: hasPatientId,
-      message: customMessage ?? 'This phone number is already registered. Please log in instead.',
+      message:
+          customMessage ??
+          'This phone number is already registered. Please log in instead.',
     );
   }
 
@@ -76,8 +78,8 @@ class PhoneVerificationService {
   PhoneVerificationService({
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _functions = functions ?? FirebaseFunctions.instanceFor(region: region);
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _functions = functions ?? FirebaseFunctions.instanceFor(region: region);
 
   /// Checks if [rawPhone] is available or already registered in the system.
   Future<PhoneAvailabilityResult> checkPhoneAvailability(
@@ -85,7 +87,10 @@ class PhoneVerificationService {
     String role = 'patient',
     String defaultDialCode = '+92',
   }) async {
-    final normalized = PhoneUtils.normalizePhone(rawPhone, defaultDialCode: defaultDialCode);
+    final normalized = PhoneUtils.normalizePhone(
+      rawPhone,
+      defaultDialCode: defaultDialCode,
+    );
     if (normalized == null || !PhoneUtils.isValidE164(normalized)) {
       return PhoneAvailabilityResult.invalid(rawPhone);
     }
@@ -117,11 +122,17 @@ class PhoneVerificationService {
         return PhoneAvailabilityResult.available(normalized);
       }
     } catch (e) {
-      debugPrint('[PhoneVerificationService] Cloud Function failed or unavailable: $e. Falling back to direct Firestore check.');
+      debugPrint(
+        '[PhoneVerificationService] Cloud Function failed or unavailable: $e. Falling back to direct Firestore check.',
+      );
     }
 
     // 2. Direct Firestore fallback (resilient offline/direct mode)
-    return _checkDirectFirestore(normalized, role: role, defaultDialCode: defaultDialCode);
+    return _checkDirectFirestore(
+      normalized,
+      role: role,
+      defaultDialCode: defaultDialCode,
+    );
   }
 
   /// Direct Firestore fallback query.
@@ -130,11 +141,17 @@ class PhoneVerificationService {
     required String role,
     required String defaultDialCode,
   }) async {
-    final variants = PhoneUtils.phoneLookupVariants(normalizedPhone, defaultDialCode: defaultDialCode);
+    final variants = PhoneUtils.phoneLookupVariants(
+      normalizedPhone,
+      defaultDialCode: defaultDialCode,
+    );
 
     try {
       // Check registered_phones index doc
-      final phoneDoc = await _firestore.collection(registeredPhonesCollection).doc(normalizedPhone).get();
+      final phoneDoc = await _firestore
+          .collection(registeredPhonesCollection)
+          .doc(normalizedPhone)
+          .get();
       if (phoneDoc.exists) {
         final data = phoneDoc.data() ?? {};
         final existingRole = data['role']?.toString() ?? 'patient';
@@ -159,7 +176,9 @@ class PhoneVerificationService {
         final data = doc.data();
         if (data['isDeleted'] == true) continue;
 
-        final hasPid = data['patientId'] != null && data['patientId'].toString().trim().isNotEmpty;
+        final hasPid =
+            data['patientId'] != null &&
+            data['patientId'].toString().trim().isNotEmpty;
         return PhoneAvailabilityResult.alreadyRegistered(
           normalizedPhone: normalizedPhone,
           role: 'patient',
@@ -202,7 +221,9 @@ class PhoneVerificationService {
     required String role,
     String? patientId,
   }) async {
-    final docRef = _firestore.collection(registeredPhonesCollection).doc(normalizedPhone);
+    final docRef = _firestore
+        .collection(registeredPhonesCollection)
+        .doc(normalizedPhone);
     await docRef.set({
       'phone': normalizedPhone,
       'userId': userId,

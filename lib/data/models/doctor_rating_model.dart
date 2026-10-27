@@ -38,13 +38,9 @@ class DoctorRatingModel {
     required String doctorId,
     required String patientId,
     required String prescriptionId,
-  }) =>
-      '${doctorId}_${patientId}_$prescriptionId';
+  }) => '${doctorId}_${patientId}_$prescriptionId';
 
-  factory DoctorRatingModel.fromMap(
-    String id,
-    Map<String, dynamic> map,
-  ) {
+  factory DoctorRatingModel.fromMap(String id, Map<String, dynamic> map) {
     return DoctorRatingModel(
       ratingId: (map['ratingId'] ?? id).toString(),
       doctorId: (map['doctorId'] ?? '').toString(),
@@ -58,15 +54,15 @@ class DoctorRatingModel {
   }
 
   Map<String, dynamic> toMap() => {
-        'ratingId': ratingId,
-        'doctorId': doctorId,
-        'doctorName': doctorName,
-        'patientId': patientId,
-        'patientName': patientName,
-        'prescriptionId': prescriptionId,
-        'rating': rating,
-        'createdAt': Timestamp.fromDate(createdAt),
-      };
+    'ratingId': ratingId,
+    'doctorId': doctorId,
+    'doctorName': doctorName,
+    'patientId': patientId,
+    'patientName': patientName,
+    'prescriptionId': prescriptionId,
+    'rating': rating,
+    'createdAt': Timestamp.fromDate(createdAt),
+  };
 }
 
 /// Aggregate rating shown on a doctor's profile.

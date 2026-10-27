@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
 import 'package:telemedicine/data/models/prescription_model.dart';
 
-final prescriptionControllerProvider =
-    Provider<PrescriptionController>((ref) => PrescriptionController());
+final prescriptionControllerProvider = Provider<PrescriptionController>(
+  (ref) => PrescriptionController(),
+);
 
 /// Firestore access for prescriptions issued inside a chat.
 ///
@@ -27,7 +28,7 @@ class PrescriptionController {
   final FirebaseFirestore _firestore;
 
   PrescriptionController({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _collection =>
       _firestore.collection(FirestoreCollections.prescriptions);
@@ -67,10 +68,9 @@ class PrescriptionController {
   /// `createdAt` descending in Dart (see the class docs for why).
   Stream<List<PrescriptionModel>> streamForChat(String chatId) {
     if (chatId.isEmpty) return Stream.value(const []);
-    return _collection
-        .where('chatId', isEqualTo: chatId)
-        .snapshots()
-        .map((snapshot) {
+    return _collection.where('chatId', isEqualTo: chatId).snapshots().map((
+      snapshot,
+    ) {
       final models = _toModels(snapshot.docs);
       models.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return models;
@@ -91,14 +91,13 @@ class PrescriptionController {
   /// needed, sorted in Dart for the same reason as [streamForChat].
   Stream<List<PrescriptionModel>> streamForPatient(String patientId) {
     if (patientId.isEmpty) return Stream.value(const []);
-    return _collection
-        .where('patientId', isEqualTo: patientId)
-        .snapshots()
-        .map((snapshot) {
-      final models = _toModels(snapshot.docs);
-      models.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return models;
-    });
+    return _collection.where('patientId', isEqualTo: patientId).snapshots().map(
+      (snapshot) {
+        final models = _toModels(snapshot.docs);
+        models.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return models;
+      },
+    );
   }
 
   /// Reads specific prescriptions by id. Used by the chat card and the detail
@@ -111,10 +110,12 @@ class PrescriptionController {
     );
     return snapshots
         .where((doc) => doc.exists)
-        .map((doc) => PrescriptionModel.fromMap(
-              doc.id,
-              Map<String, dynamic>.from(doc.data() ?? const {}),
-            ))
+        .map(
+          (doc) => PrescriptionModel.fromMap(
+            doc.id,
+            Map<String, dynamic>.from(doc.data() ?? const {}),
+          ),
+        )
         .toList();
   }
 
@@ -148,10 +149,12 @@ class PrescriptionController {
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
     return docs
-        .map((doc) => PrescriptionModel.fromMap(
-              doc.id,
-              Map<String, dynamic>.from(doc.data()),
-            ))
+        .map(
+          (doc) => PrescriptionModel.fromMap(
+            doc.id,
+            Map<String, dynamic>.from(doc.data()),
+          ),
+        )
         .toList();
   }
 

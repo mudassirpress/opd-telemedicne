@@ -71,7 +71,9 @@ class _DoctorOnlineHistoryScreenState
         _errorMessage = 'Something went wrong. Please try again.';
         _isLoading = false;
       });
-      ToastService.instance.showError('Something went wrong. Please try again.');
+      ToastService.instance.showError(
+        'Something went wrong. Please try again.',
+      );
     }
   }
 
@@ -110,7 +112,9 @@ class _DoctorOnlineHistoryScreenState
         _errorMessage = 'Something went wrong. Please try again.';
         _isLoading = false;
       });
-      ToastService.instance.showError('Something went wrong. Please try again.');
+      ToastService.instance.showError(
+        'Something went wrong. Please try again.',
+      );
     }
   }
 
@@ -189,8 +193,8 @@ class _DoctorOnlineHistoryScreenState
       body: _isLoading
           ? const AdminLoading(label: 'Loading statistics...')
           : _errorMessage != null
-              ? _buildErrorWidget()
-              : _buildContent(),
+          ? _buildErrorWidget()
+          : _buildContent(),
     );
   }
 
@@ -241,12 +245,26 @@ class _DoctorOnlineHistoryScreenState
                       _selectedTimeRange = range;
                       _loadStatsForDoctor();
                     });
-                    ToastService.instance.showInfo('Showing ${_rangeLabel(range)} data');
+                    ToastService.instance.showInfo(
+                      'Showing ${_rangeLabel(range)} data',
+                    );
                   },
                   options: [
-                    AdminSegmentOption(TimeRange.day, 'Today', Icons.today_outlined),
-                    AdminSegmentOption(TimeRange.week, 'Week', Icons.calendar_view_week_outlined),
-                    AdminSegmentOption(TimeRange.month, 'Month', Icons.calendar_month_outlined),
+                    AdminSegmentOption(
+                      TimeRange.day,
+                      'Today',
+                      Icons.today_outlined,
+                    ),
+                    AdminSegmentOption(
+                      TimeRange.week,
+                      'Week',
+                      Icons.calendar_view_week_outlined,
+                    ),
+                    AdminSegmentOption(
+                      TimeRange.month,
+                      'Month',
+                      Icons.calendar_month_outlined,
+                    ),
                   ],
                 ),
               ],
@@ -294,10 +312,7 @@ class _DoctorOnlineHistoryScreenState
                 ),
                 SizedBox(height: context.rsp(16)),
                 SizedBox(
-                  height: math.min(
-                    300.0,
-                    math.max(220.0, context.sh * 0.38),
-                  ),
+                  height: math.min(300.0, math.max(220.0, context.sh * 0.38)),
                   child: _buildChart(),
                 ),
               ],
@@ -421,52 +436,52 @@ class _DoctorOnlineHistoryScreenState
                         value: doctor['id'].toString(),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 30,
-                                    height: 30,
-                                    decoration: BoxDecoration(
-                                      color: AdminPalette.brand
-                                          .withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(9),
-                                    ),
-                                    child: const Icon(
-                                      Icons.person,
-                                      size: 16,
-                                      color: AdminPalette.brand,
-                                    ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 30,
+                                height: 30,
+                                decoration: BoxDecoration(
+                                  color: AdminPalette.brand.withValues(
+                                    alpha: 0.1,
                                   ),
-                                  const SizedBox(width: 10),
-                                  Flexible(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          doctor['fullname'] ?? 'Unknown',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: context.fs(13.5),
-                                            fontWeight: FontWeight.w500,
-                                            color: AdminPalette.textPrimary,
-                                          ),
-                                        ),
-                                        Text(
-                                          'ID: ${doctor['doctorId']}',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: AdminPalette.textMuted,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                                  borderRadius: BorderRadius.circular(9),
+                                ),
+                                child: const Icon(
+                                  Icons.person,
+                                  size: 16,
+                                  color: AdminPalette.brand,
+                                ),
                               ),
+                              const SizedBox(width: 10),
+                              Flexible(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      doctor['fullname'] ?? 'Unknown',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: context.fs(13.5),
+                                        fontWeight: FontWeight.w500,
+                                        color: AdminPalette.textPrimary,
+                                      ),
+                                    ),
+                                    Text(
+                                      'ID: ${doctor['doctorId']}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AdminPalette.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     }).toList(),
@@ -535,10 +550,7 @@ class _DoctorOnlineHistoryScreenState
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 11,
-                color: AdminPalette.textMuted,
-              ),
+              style: TextStyle(fontSize: 11, color: AdminPalette.textMuted),
             ),
           ],
         ),

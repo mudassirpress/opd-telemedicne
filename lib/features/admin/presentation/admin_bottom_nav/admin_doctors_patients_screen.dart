@@ -57,10 +57,12 @@ class _AdminDoctorsPatientsScreenState
   /// in the tabs' error states — a `setState(() {})` alone re-subscribes to the
   /// *same errored* stream instance, so Retry could never recover.
   void _reloadStreams() {
-    _doctorsStream =
-        ref.read(doctorControllerProvider).streamAllDoctorsWithStatus();
-    _patientsStream =
-        ref.read(patientControllerProvider).streamAllPatientsWithStatus();
+    _doctorsStream = ref
+        .read(doctorControllerProvider)
+        .streamAllDoctorsWithStatus();
+    _patientsStream = ref
+        .read(patientControllerProvider)
+        .streamAllPatientsWithStatus();
   }
 
   @override
@@ -80,7 +82,11 @@ class _AdminDoctorsPatientsScreenState
           value: _section,
           onChanged: (value) => setState(() => _section = value),
           options: const [
-            AdminSegmentOption('doctors', 'Doctors', Icons.medical_services_outlined),
+            AdminSegmentOption(
+              'doctors',
+              'Doctors',
+              Icons.medical_services_outlined,
+            ),
             AdminSegmentOption('patients', 'Patients', Icons.people_outline),
           ],
         ),
@@ -121,9 +127,7 @@ class _AdminDoctorsPatientsScreenState
                   AdminFilterChip(
                     label: entry.value,
                     selected: _lifecycleFilter == entry.key,
-                    onTap: () => setState(
-                      () => _lifecycleFilter = entry.key,
-                    ),
+                    onTap: () => setState(() => _lifecycleFilter = entry.key),
                   ),
               ],
             ),
@@ -245,7 +249,8 @@ class _AdminDoctorsPatientsScreenState
               CircleAvatar(
                 radius: 22,
                 backgroundColor: AdminPalette.brand.withValues(alpha: 0.1),
-                backgroundImage: (doctor['imageUrl'] ?? '').toString().isNotEmpty
+                backgroundImage:
+                    (doctor['imageUrl'] ?? '').toString().isNotEmpty
                     ? NetworkImage((doctor['imageUrl'] ?? '').toString())
                     : null,
                 child: (doctor['imageUrl'] ?? '').toString().isEmpty
@@ -298,33 +303,43 @@ class _AdminDoctorsPatientsScreenState
             value: isOnline
                 ? 'ONLINE (Available)'
                 : (presenceData?.manualAvailability == true
-                    ? 'OFFLINE (Stale Heartbeat)'
-                    : 'OFFLINE (Manual OFF)'),
+                      ? 'OFFLINE (Stale Heartbeat)'
+                      : 'OFFLINE (Manual OFF)'),
             color: isOnline ? AdminPalette.success : AdminPalette.textMuted,
-            valueColor: isOnline ? AdminPalette.success : AdminPalette.textMuted,
+            valueColor: isOnline
+                ? AdminPalette.success
+                : AdminPalette.textMuted,
           ),
           AdminInfoRow(
             icon: Icons.access_time,
             label: 'Last Seen',
-            value: lastSeen != null ? _formatDateTime(lastSeen.toDate()) : 'Never',
+            value: lastSeen != null
+                ? _formatDateTime(lastSeen.toDate())
+                : 'Never',
             color: AdminPalette.textMuted,
           ),
           AdminInfoRow(
             icon: Icons.login,
             label: 'Last Login',
-            value: lastLogin != null ? _formatDateTime(lastLogin.toDate()) : 'Never',
+            value: lastLogin != null
+                ? _formatDateTime(lastLogin.toDate())
+                : 'Never',
             color: AdminPalette.textMuted,
           ),
           AdminInfoRow(
             icon: Icons.logout,
             label: 'Last Logout',
-            value: lastLogout != null ? _formatDateTime(lastLogout.toDate()) : 'Never',
+            value: lastLogout != null
+                ? _formatDateTime(lastLogout.toDate())
+                : 'Never',
             color: AdminPalette.textMuted,
           ),
           AdminInfoRow(
             icon: Icons.calendar_today,
             label: 'Created',
-            value: createdAt != null ? _formatDateTime(createdAt.toDate()) : 'Unknown',
+            value: createdAt != null
+                ? _formatDateTime(createdAt.toDate())
+                : 'Unknown',
             color: AdminPalette.textMuted,
           ),
           ..._deletionInfoRows(doctor),
@@ -473,30 +488,40 @@ class _AdminDoctorsPatientsScreenState
             label: 'Login Status',
             value: isOnline ? 'Online' : loginStatus,
             color: isOnline ? AdminPalette.success : AdminPalette.textMuted,
-            valueColor: isOnline ? AdminPalette.success : AdminPalette.textMuted,
+            valueColor: isOnline
+                ? AdminPalette.success
+                : AdminPalette.textMuted,
           ),
           AdminInfoRow(
             icon: Icons.access_time,
             label: 'Last Seen',
-            value: lastSeen != null ? _formatDateTime(lastSeen.toDate()) : 'Never',
+            value: lastSeen != null
+                ? _formatDateTime(lastSeen.toDate())
+                : 'Never',
             color: AdminPalette.textMuted,
           ),
           AdminInfoRow(
             icon: Icons.login,
             label: 'Last Login',
-            value: lastLogin != null ? _formatDateTime(lastLogin.toDate()) : 'Never',
+            value: lastLogin != null
+                ? _formatDateTime(lastLogin.toDate())
+                : 'Never',
             color: AdminPalette.textMuted,
           ),
           AdminInfoRow(
             icon: Icons.logout,
             label: 'Last Logout',
-            value: lastLogout != null ? _formatDateTime(lastLogout.toDate()) : 'Never',
+            value: lastLogout != null
+                ? _formatDateTime(lastLogout.toDate())
+                : 'Never',
             color: AdminPalette.textMuted,
           ),
           AdminInfoRow(
             icon: Icons.calendar_today,
             label: 'Created',
-            value: createdAt != null ? _formatDateTime(createdAt.toDate()) : 'Unknown',
+            value: createdAt != null
+                ? _formatDateTime(createdAt.toDate())
+                : 'Unknown',
             color: AdminPalette.textMuted,
           ),
           ..._deletionInfoRows(patient),
@@ -585,6 +610,7 @@ class _AdminDoctorsPatientsScreenState
         ),
     ];
   }
+
   Widget _buildStatusChip(String status) {
     Color color;
     switch (status) {
@@ -647,10 +673,26 @@ class _AdminDoctorsPatientsScreenState
         // that only make sense for a live account are not offered.
         if (!isDeleted) {
           if (currentStatus == 'Active') {
-            items.add(_buildMenuItem('block', Icons.block, 'Block', AdminPalette.error));
-            items.add(_buildMenuItem('freeze', Icons.lock_clock, 'Freeze ID', AdminPalette.frozen));
+            items.add(
+              _buildMenuItem('block', Icons.block, 'Block', AdminPalette.error),
+            );
+            items.add(
+              _buildMenuItem(
+                'freeze',
+                Icons.lock_clock,
+                'Freeze ID',
+                AdminPalette.frozen,
+              ),
+            );
           } else {
-            items.add(_buildMenuItem('activate', Icons.check_circle_outline, 'Activate / Unblock', AdminPalette.success));
+            items.add(
+              _buildMenuItem(
+                'activate',
+                Icons.check_circle_outline,
+                'Activate / Unblock',
+                AdminPalette.success,
+              ),
+            );
           }
 
           items.add(const PopupMenuDivider());
@@ -678,21 +720,33 @@ class _AdminDoctorsPatientsScreenState
     );
   }
 
-  PopupMenuItem<String> _buildMenuItem(String value, IconData icon, String label, Color color) {
+  PopupMenuItem<String> _buildMenuItem(
+    String value,
+    IconData icon,
+    String label,
+    Color color,
+  ) {
     return PopupMenuItem(
       value: value,
       child: Row(
         children: [
           Icon(icon, size: 18, color: color),
           const SizedBox(width: 10),
-          Text(label, style: TextStyle(fontSize: context.fs(13), color: color)),
+          Text(
+            label,
+            style: TextStyle(fontSize: context.fs(13), color: color),
+          ),
         ],
       ),
     );
   }
 
   // ── Menu Action Handler ──────────────────────────────────────────────
-  void _handleMenuAction(String action, Map<String, dynamic> user, String userType) {
+  void _handleMenuAction(
+    String action,
+    Map<String, dynamic> user,
+    String userType,
+  ) {
     final label = userType == 'doctor' ? 'Doctor' : 'Patient';
     final name = (user['fullname'] ?? 'this $label').toString();
 
@@ -700,7 +754,8 @@ class _AdminDoctorsPatientsScreenState
       case 'block':
         _showConfirmDialog(
           title: 'Block $label',
-          content: 'Are you sure you want to block this $userType? They will not be able to log in.',
+          content:
+              'Are you sure you want to block this $userType? They will not be able to log in.',
           confirmText: 'Block',
           confirmColor: AdminPalette.error,
           onConfirm: () => _updateStatus(user, userType, 'Blocked'),
@@ -709,7 +764,8 @@ class _AdminDoctorsPatientsScreenState
       case 'freeze':
         _showConfirmDialog(
           title: 'Freeze ${userType == 'doctor' ? 'Doctor ID' : 'Patient ID'}',
-          content: 'Are you sure you want to freeze this ID? The ID cannot be used to access the application.',
+          content:
+              'Are you sure you want to freeze this ID? The ID cannot be used to access the application.',
           confirmText: 'Freeze',
           confirmColor: AdminPalette.frozen,
           onConfirm: () => _updateStatus(user, userType, 'Frozen'),
@@ -772,15 +828,13 @@ class _AdminDoctorsPatientsScreenState
 
     final bool success;
     if (userType == 'doctor') {
-      success = await ref.read(doctorControllerProvider).deleteDoctorProfile(
-        userId,
-        performedBy: adminId,
-      );
+      success = await ref
+          .read(doctorControllerProvider)
+          .deleteDoctorProfile(userId, performedBy: adminId);
     } else {
-      success = await ref.read(patientControllerProvider).softDeletePatient(
-        userId,
-        performedBy: adminId,
-      );
+      success = await ref
+          .read(patientControllerProvider)
+          .softDeletePatient(userId, performedBy: adminId);
     }
 
     if (!mounted) return;
@@ -816,15 +870,13 @@ class _AdminDoctorsPatientsScreenState
 
     final bool success;
     if (userType == 'doctor') {
-      success = await ref.read(doctorControllerProvider).restoreDoctorProfile(
-        userId,
-        performedBy: adminId,
-      );
+      success = await ref
+          .read(doctorControllerProvider)
+          .restoreDoctorProfile(userId, performedBy: adminId);
     } else {
-      success = await ref.read(patientControllerProvider).restorePatient(
-        userId,
-        performedBy: adminId,
-      );
+      success = await ref
+          .read(patientControllerProvider)
+          .restorePatient(userId, performedBy: adminId);
     }
 
     if (!mounted) return;
@@ -837,7 +889,11 @@ class _AdminDoctorsPatientsScreenState
     }
   }
 
-  Future<void> _updateStatus(Map<String, dynamic> user, String userType, String status) async {
+  Future<void> _updateStatus(
+    Map<String, dynamic> user,
+    String userType,
+    String status,
+  ) async {
     final userId = user['id']?.toString() ?? '';
     if (userId.isEmpty) {
       ToastService.instance.showError('Invalid user ID');
@@ -846,19 +902,23 @@ class _AdminDoctorsPatientsScreenState
 
     bool success;
     if (userType == 'doctor') {
-      success = await ref.read(doctorControllerProvider).updateDoctorAccountStatus(userId, status);
+      success = await ref
+          .read(doctorControllerProvider)
+          .updateDoctorAccountStatus(userId, status);
     } else {
-      success = await ref.read(patientControllerProvider).updatePatientAccountStatus(userId, status);
+      success = await ref
+          .read(patientControllerProvider)
+          .updatePatientAccountStatus(userId, status);
     }
 
     if (success) {
       final label = status == 'Active'
           ? 'Activated'
           : status == 'Blocked'
-              ? 'Blocked'
-              : status == 'Frozen'
-                  ? 'Frozen'
-                  : 'Deleted';
+          ? 'Blocked'
+          : status == 'Frozen'
+          ? 'Frozen'
+          : 'Deleted';
       ToastService.instance.showSuccess('Account $label successfully');
     } else {
       ToastService.instance.showError('Failed to update account status');

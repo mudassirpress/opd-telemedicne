@@ -102,8 +102,9 @@ class _CustomTextFieldState extends State<CustomTextField> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (hasError ? Colors.red : Colors.grey)
-                        .withValues(alpha: 0.1),
+                    color: (hasError ? Colors.red : Colors.grey).withValues(
+                      alpha: 0.1,
+                    ),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -163,7 +164,8 @@ class _CustomTextFieldState extends State<CustomTextField> {
                   focusedErrorBorder: InputBorder.none,
                   disabledBorder: InputBorder.none,
                   errorStyle: const TextStyle(fontSize: 0, height: 0),
-                  contentPadding: widget.contentPadding ??
+                  contentPadding:
+                      widget.contentPadding ??
                       EdgeInsets.symmetric(
                         vertical: context.rsp(14),
                         horizontal: context.rsp(18),

@@ -257,8 +257,7 @@ class _AdminChatViewScreenState extends ConsumerState<AdminChatViewScreen> {
                   ),
                   Text(
                     'Admin Viewing Mode',
-                    style:
-                        TextStyle(color: Colors.white70, fontSize: 11),
+                    style: TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                 ],
               ),
@@ -288,8 +287,7 @@ class _AdminChatViewScreenState extends ConsumerState<AdminChatViewScreen> {
                     widget.adminName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style:
-                        TextStyle(color: Colors.white, fontSize: 12),
+                    style: TextStyle(color: Colors.white, fontSize: 12),
                   ),
                 ),
               ],
@@ -351,9 +349,7 @@ class _AdminChatViewScreenState extends ConsumerState<AdminChatViewScreen> {
                           const SizedBox(height: 16),
                           Text(
                             'Error loading messages',
-                            style: TextStyle(
-                              color: const Color(0xFF657991),
-                            ),
+                            style: TextStyle(color: const Color(0xFF657991)),
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -393,7 +389,10 @@ class _AdminChatViewScreenState extends ConsumerState<AdminChatViewScreen> {
                           ),
                           Text(
                             'This conversation will appear once they start chatting',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF7E90A6)),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF7E90A6),
+                            ),
                           ),
                         ],
                       ),
@@ -521,9 +520,7 @@ class _AdminChatViewScreenState extends ConsumerState<AdminChatViewScreen> {
       alignment: isFromDoctor ? Alignment.centerLeft : Alignment.centerRight,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
-        constraints: BoxConstraints(
-          maxWidth: math.min(context.sw * 0.78, 460),
-        ),
+        constraints: BoxConstraints(maxWidth: math.min(context.sw * 0.78, 460)),
         child: Column(
           crossAxisAlignment: isFromDoctor
               ? CrossAxisAlignment.start
@@ -612,9 +609,7 @@ class _AdminChatViewScreenState extends ConsumerState<AdminChatViewScreen> {
       alignment: isFromDoctor ? Alignment.centerLeft : Alignment.centerRight,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
-        constraints: BoxConstraints(
-          maxWidth: math.min(context.sw * 0.78, 460),
-        ),
+        constraints: BoxConstraints(maxWidth: math.min(context.sw * 0.78, 460)),
         child: Column(
           crossAxisAlignment: isFromDoctor
               ? CrossAxisAlignment.start
@@ -825,9 +820,7 @@ class _AdminChatViewScreenState extends ConsumerState<AdminChatViewScreen> {
       alignment: isFromDoctor ? Alignment.centerLeft : Alignment.centerRight,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
-        constraints: BoxConstraints(
-          maxWidth: math.min(context.sw * 0.78, 460),
-        ),
+        constraints: BoxConstraints(maxWidth: math.min(context.sw * 0.78, 460)),
         child: Column(
           crossAxisAlignment: isFromDoctor
               ? CrossAxisAlignment.start
@@ -881,9 +874,7 @@ class _AdminChatViewScreenState extends ConsumerState<AdminChatViewScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: context.fs(13.5),
-                            color: isFromDoctor
-                                ? Colors.black87
-                                : Colors.white,
+                            color: isFromDoctor ? Colors.black87 : Colors.white,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -943,7 +934,10 @@ class _AdminChatViewScreenState extends ConsumerState<AdminChatViewScreen> {
                       ],
                     ),
                     borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: const Color(0xFFBAC7D8), width: 1.5),
+                    border: Border.all(
+                      color: const Color(0xFFBAC7D8),
+                      width: 1.5,
+                    ),
                   ),
                   child: Container(
                     padding: EdgeInsets.symmetric(
@@ -1019,11 +1013,7 @@ class _AdminChatViewScreenState extends ConsumerState<AdminChatViewScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : const Icon(
-                          Icons.send,
-                          color: Colors.white,
-                          size: 20,
-                        ),
+                      : const Icon(Icons.send, color: Colors.white, size: 20),
                 ),
               ),
             ],

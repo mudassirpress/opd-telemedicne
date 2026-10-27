@@ -121,7 +121,9 @@ MessageDeliveryState deriveDeliveryState({
   if (local == MessageDeliveryState.delivered) {
     return MessageDeliveryState.delivered;
   }
-  return isDelivered ? MessageDeliveryState.delivered : MessageDeliveryState.sent;
+  return isDelivered
+      ? MessageDeliveryState.delivered
+      : MessageDeliveryState.sent;
 }
 
 /// Reads a date field written by either side: Firestore `Timestamp`, a Dart
@@ -191,7 +193,6 @@ class ChatMessageModel {
   /// so the banner and the appointment record can be reconciled.
   final String? appointmentId;
 
-
   /// Authoritative delivery state.
   ///
   /// Present on the wire for messages written after this field was introduced.
@@ -211,7 +212,6 @@ class ChatMessageModel {
 
   /// The user ID of the receiver who listened to the voice message.
   final String? listenedBy;
-
 
   ChatMessageModel({
     required this.id,
@@ -253,16 +253,20 @@ class ChatMessageModel {
     final isRead = map['isRead'] == true || map['is_read'] == true;
     final isDelivered = map['isDelivered'] ?? false;
     final rawStatus = map['deliveryStatus'];
-    final rawDeleted = map['isDeleted'] == true ||
-        map['isDeletedForEveryone'] == true;
+    final rawDeleted =
+        map['isDeleted'] == true || map['isDeletedForEveryone'] == true;
 
     return ChatMessageModel(
       id: map['id'] ?? '',
       senderId: map['senderId'] ?? map['sender_id'] ?? '',
-      receiverId: map['receiverId'] ?? map['recipient_id'] ?? map['receiver_id'] ?? '',
+      receiverId:
+          map['receiverId'] ?? map['recipient_id'] ?? map['receiver_id'] ?? '',
       message: map['message'] ?? '',
       messageType: map['messageType'] ?? 'text',
-      timestamp: readDateTime(map['serverTimestamp'] ?? map['timestamp'] ?? map['createdAt']) ??
+      timestamp:
+          readDateTime(
+            map['serverTimestamp'] ?? map['timestamp'] ?? map['createdAt'],
+          ) ??
           DateTime.now(),
       isRead: isRead,
       isDelivered: isDelivered,
@@ -287,7 +291,7 @@ class ChatMessageModel {
       deletedBy: map['deletedBy'],
       isForwarded: map['isForwarded'] ?? false,
       deletedAt: readDateTime(map['deletedAt']),
-       fileName: map['fileName'],
+      fileName: map['fileName'],
       prescriptionId: map['prescriptionId'],
       prescriptionNotePreview: map['prescriptionNotePreview'],
       isPinned: map['isPinned'] ?? false,
@@ -466,8 +470,8 @@ class ChatMessageModel {
       isForwarded: isForwarded ?? this.isForwarded,
       deletedAt: deletedAt ?? this.deletedAt,
       prescriptionId: prescriptionId ?? this.prescriptionId,
-      prescriptionNotePreview: prescriptionNotePreview ??
-          this.prescriptionNotePreview,
+      prescriptionNotePreview:
+          prescriptionNotePreview ?? this.prescriptionNotePreview,
       isPinned: isPinned ?? this.isPinned,
       appointmentId: appointmentId ?? this.appointmentId,
       deliveryStatus: deliveryStatus ?? this.deliveryStatus,
@@ -482,7 +486,6 @@ class ChatMessageModel {
   /// `isDeletedForEveryone` is only ever written as a mirror of [isDeleted],
   /// so either flag alone means the same thing on any code version.
   bool get isDeletedForEveryone => isDeleted;
-
 
   // Helper method to get display message
   String getDisplayMessage() {

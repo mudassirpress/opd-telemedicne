@@ -104,13 +104,17 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFD6E4F0).withValues(alpha: 0.4),
+                              color: const Color(
+                                0xFFD6E4F0,
+                              ).withValues(alpha: 0.4),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
                               Icons.person_off_outlined,
                               size: 64,
-                              color: const Color(0xFF062B72).withValues(alpha: 0.4),
+                              color: const Color(
+                                0xFF062B72,
+                              ).withValues(alpha: 0.4),
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -127,7 +131,6 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
                       ),
                     ),
                   ),
-                  
                 ],
               ),
             ),
@@ -188,7 +191,8 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
                       key: ValueKey('call_history_${user.id}'),
                       stream: _callController.getCallHistory(user.id),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
                           return _buildShimmerLoading();
                         }
                         if (snapshot.hasError) {
@@ -215,7 +219,6 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
                     ),
                   ),
                 ),
-                
               ],
             ),
           ),
@@ -306,11 +309,7 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFFF3F7FB),
-                    Colors.white,
-                    Color(0xFFF0F4F9),
-                  ],
+                  colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -339,11 +338,23 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            Container(width: 14, height: 14, color: Colors.white),
+                            Container(
+                              width: 14,
+                              height: 14,
+                              color: Colors.white,
+                            ),
                             const SizedBox(width: 4),
-                            Container(width: 60, height: 12, color: Colors.white),
+                            Container(
+                              width: 60,
+                              height: 12,
+                              color: Colors.white,
+                            ),
                             const SizedBox(width: 8),
-                            Container(width: 50, height: 12, color: Colors.white),
+                            Container(
+                              width: 50,
+                              height: 12,
+                              color: Colors.white,
+                            ),
                           ],
                         ),
                       ],
@@ -424,7 +435,9 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
     String statusText;
     if (isMissed) {
       statusColor = const Color(0xFFDC3545);
-      statusIcon = isCaller ? Icons.call_made_rounded : Icons.call_received_rounded;
+      statusIcon = isCaller
+          ? Icons.call_made_rounded
+          : Icons.call_received_rounded;
       statusText = 'Missed';
     } else if (isRejected) {
       statusColor = const Color(0xFFE8890C);
@@ -432,7 +445,9 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
       statusText = 'Rejected';
     } else {
       statusColor = const Color(0xFF28A745);
-      statusIcon = isCaller ? Icons.call_made_rounded : Icons.call_received_rounded;
+      statusIcon = isCaller
+          ? Icons.call_made_rounded
+          : Icons.call_received_rounded;
       statusText = call.duration != null && call.duration! > 0
           ? _formatDuration(call.duration!)
           : 'Completed';
@@ -446,10 +461,7 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Colors.red.withValues(alpha: 0.8),
-              Colors.red,
-            ],
+            colors: [Colors.red.withValues(alpha: 0.8), Colors.red],
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
           ),
@@ -485,9 +497,7 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
                   onPressed: () => Navigator.of(context).pop(false),
                   child: Text(
                     'Cancel',
-                    style: TextStyle(
-                      color: const Color(0xFF6B7B8D),
-                    ),
+                    style: TextStyle(color: const Color(0xFF6B7B8D)),
                   ),
                 ),
                 TextButton(
@@ -508,10 +518,7 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                'Call history deleted',
-                style: TextStyle(),
-              ),
+              content: Text('Call history deleted', style: TextStyle()),
               backgroundColor: const Color(0xFF062B72),
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
@@ -526,11 +533,7 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFFE3EAF2),
-              Color(0xFFF5F8FC),
-              Color(0xFFE2E9F2),
-            ],
+            colors: [Color(0xFFE3EAF2), Color(0xFFF5F8FC), Color(0xFFE2E9F2)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -548,11 +551,7 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [
-                Color(0xFFF3F7FB),
-                Colors.white,
-                Color(0xFFF0F4F9),
-              ],
+              colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -565,13 +564,17 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
                 // Avatar
                 CircleAvatar(
                   radius: 26,
-                  backgroundColor: const Color(0xFFD6E4F0).withValues(alpha: 0.4),
+                  backgroundColor: const Color(
+                    0xFFD6E4F0,
+                  ).withValues(alpha: 0.4),
                   backgroundImage: otherImage != null && otherImage.isNotEmpty
                       ? NetworkImage(otherImage)
                       : null,
                   child: otherImage == null || otherImage.isEmpty
                       ? Text(
-                          otherName.isNotEmpty ? otherName[0].toUpperCase() : '?',
+                          otherName.isNotEmpty
+                              ? otherName[0].toUpperCase()
+                              : '?',
                           style: TextStyle(
                             color: const Color(0xFF062B72),
                             fontWeight: FontWeight.w700,

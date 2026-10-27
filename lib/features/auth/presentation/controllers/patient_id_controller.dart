@@ -191,8 +191,7 @@ class PatientIdController extends ChangeNotifier {
       }
 
       // ── Step 4: Split into Firestore batches and commit ───────────────
-      final totalBatches =
-          (docs.length / _firestoreBatchLimit).ceil();
+      final totalBatches = (docs.length / _firestoreBatchLimit).ceil();
       int generatedCount = 0;
       int failedCount = 0;
       final failedBatchIndices = <int>[];
@@ -292,8 +291,7 @@ class PatientIdController extends ChangeNotifier {
     _clearError();
 
     try {
-      final totalBatches =
-          (failedDocs.length / _firestoreBatchLimit).ceil();
+      final totalBatches = (failedDocs.length / _firestoreBatchLimit).ceil();
       int generatedCount = 0;
       int failedCount = 0;
       final failedBatchIndices = <int>[];
@@ -318,15 +316,17 @@ class PatientIdController extends ChangeNotifier {
           debugPrint('Retry batch $batchIdx failed: $e');
         }
 
-        onProgress?.call(GenerationProgress(
-          totalRequested: failedDocs.length,
-          generated: generatedCount,
-          failed: failedCount,
-          currentBatch: batchIdx + 1,
-          totalBatches: totalBatches,
-          batchNumber: batchNumber,
-          failedBatchIndices: failedBatchIndices,
-        ));
+        onProgress?.call(
+          GenerationProgress(
+            totalRequested: failedDocs.length,
+            generated: generatedCount,
+            failed: failedCount,
+            currentBatch: batchIdx + 1,
+            totalBatches: totalBatches,
+            batchNumber: batchNumber,
+            failedBatchIndices: failedBatchIndices,
+          ),
+        );
         notifyListeners();
 
         await Future<void>.delayed(Duration.zero);
@@ -489,11 +489,16 @@ class PatientIdController extends ChangeNotifier {
       int? months = durationMonths ?? plan?.durationMonths;
 
       if (planId == null || months == null) {
-        final doc = await _firestore.collection('patient_ids').doc(patientIdDocId).get();
+        final doc = await _firestore
+            .collection('patient_ids')
+            .doc(patientIdDocId)
+            .get();
         if (doc.exists) {
           final data = doc.data() ?? {};
           planId ??= data['subscriptionPlan']?.toString();
-          months ??= data['durationMonths'] is int ? data['durationMonths'] as int : null;
+          months ??= data['durationMonths'] is int
+              ? data['durationMonths'] as int
+              : null;
         }
       }
 
@@ -683,8 +688,7 @@ class PatientIdController extends ChangeNotifier {
           final data = doc.data() as Map<String, dynamic>?;
           if (data == null) continue;
           if (data['isActive'] == true) {
-            results.add(
-                PatientIdModel.fromMap({...data, 'id': doc.id}));
+            results.add(PatientIdModel.fromMap({...data, 'id': doc.id}));
           }
         }
 
@@ -708,10 +712,13 @@ class PatientIdController extends ChangeNotifier {
         .collection('patient_ids')
         .where('isActive', isEqualTo: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) =>
-                PatientIdModel.fromMap({...doc.data(), 'id': doc.id}))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => PatientIdModel.fromMap({...doc.data(), 'id': doc.id}),
+              )
+              .toList(),
+        );
   }
 
   /// Generate a unique batch number.

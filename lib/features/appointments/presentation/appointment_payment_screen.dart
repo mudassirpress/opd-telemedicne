@@ -163,7 +163,8 @@ class _AppointmentPaymentScreenState
   Future<void> _submit() async {
     final user = ref.read(userProvider);
     final doctor = ref.read(doctorBookingProvider(widget.doctorId)).valueOrNull;
-    final watched = ref
+    final watched =
+        ref
             .read(appointmentVideoWatchedProvider(widget.doctorId))
             .valueOrNull ??
         false;
@@ -178,7 +179,9 @@ class _AppointmentPaymentScreenState
     }
     if (_proof == null) {
       setState(() => _error = 'Please attach your payment screenshot.');
-      ToastService.instance.showWarning('Please attach your payment screenshot');
+      ToastService.instance.showWarning(
+        'Please attach your payment screenshot',
+      );
       return;
     }
 
@@ -241,12 +244,14 @@ class _AppointmentPaymentScreenState
   @override
   Widget build(BuildContext context) {
     final doctorAsync = ref.watch(doctorBookingProvider(widget.doctorId));
-    final watched = ref
+    final watched =
+        ref
             .watch(appointmentVideoWatchedProvider(widget.doctorId))
             .valueOrNull ??
         false;
-    final payment =
-        ref.watch(appointmentPaymentProvider(widget.doctorId)).valueOrNull;
+    final payment = ref
+        .watch(appointmentPaymentProvider(widget.doctorId))
+        .valueOrNull;
 
     // A failed doctor read used to be collapsed by `.valueOrNull` into a
     // permanent "Loading payment details…" spinner. Surface it instead.
@@ -347,7 +352,11 @@ class _AppointmentPaymentScreenState
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Column(
               children: [
-                _bankRow('Bank Name', _bankName, () => _copy(_bankName, 'Bank name')),
+                _bankRow(
+                  'Bank Name',
+                  _bankName,
+                  () => _copy(_bankName, 'Bank name'),
+                ),
                 const Divider(height: 1, color: Color(0xFFDCE6F2)),
                 _bankRow(
                   'Account Title',
@@ -364,7 +373,8 @@ class _AppointmentPaymentScreenState
                 _bankRow(
                   'Amount',
                   pricing.payableLabel,
-                  () => _copy(pricing.payableAmount.toStringAsFixed(0), 'Amount'),
+                  () =>
+                      _copy(pricing.payableAmount.toStringAsFixed(0), 'Amount'),
                   highlighted: true,
                 ),
               ],
@@ -458,7 +468,8 @@ class _AppointmentPaymentScreenState
       return const OpdInfoPanel(
         icon: Icons.upload_file_rounded,
         title: 'No payment submitted yet',
-        description: 'Upload your transaction screenshot to start verification.',
+        description:
+            'Upload your transaction screenshot to start verification.',
         accent: Color(0xFF7E90A6),
       );
     }
@@ -466,23 +477,23 @@ class _AppointmentPaymentScreenState
     final color = payment.isApproved
         ? const Color(0xFF1E8E5A)
         : payment.isRejected
-            ? const Color(0xFFD64545)
-            : const Color(0xFFE9A400);
+        ? const Color(0xFFD64545)
+        : const Color(0xFFE9A400);
 
     final title = payment.isApproved
         ? 'Payment approved'
         : payment.isRejected
-            ? 'Payment rejected'
-            : 'Awaiting admin approval';
+        ? 'Payment rejected'
+        : 'Awaiting admin approval';
 
     final body = payment.isApproved
         ? 'Verified on ${payment.reviewedAt != null ? _formatDate(payment.reviewedAt!) : 'a recent date'}.'
         : payment.isRejected
-            ? (payment.rejectionReason?.isNotEmpty ?? false)
-                ? 'Reason: ${payment.rejectionReason}'
-                : 'Please review the details and submit again.'
-            : 'Your proof is with the admin team. This screen updates '
-                'automatically once a decision is made.';
+        ? (payment.rejectionReason?.isNotEmpty ?? false)
+              ? 'Reason: ${payment.rejectionReason}'
+              : 'Please review the details and submit again.'
+        : 'Your proof is with the admin team. This screen updates '
+              'automatically once a decision is made.';
 
     return OpdCard(
       padding: const EdgeInsets.all(16),
@@ -503,8 +514,8 @@ class _AppointmentPaymentScreenState
                   payment.isApproved
                       ? Icons.check_circle_rounded
                       : payment.isRejected
-                          ? Icons.cancel_rounded
-                          : Icons.hourglass_top_rounded,
+                      ? Icons.cancel_rounded
+                      : Icons.hourglass_top_rounded,
                   size: 20,
                   color: color,
                 ),
@@ -523,8 +534,10 @@ class _AppointmentPaymentScreenState
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(30),
@@ -534,8 +547,8 @@ class _AppointmentPaymentScreenState
                   payment.isApproved
                       ? 'APPROVED'
                       : payment.isRejected
-                          ? 'REJECTED'
-                          : 'PENDING',
+                      ? 'REJECTED'
+                      : 'PENDING',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
@@ -714,7 +727,11 @@ class _AppointmentPaymentScreenState
                 ),
                 borderRadius: BorderRadius.circular(9),
               ),
-              child: const Icon(Icons.copy_rounded, size: 13, color: Colors.white),
+              child: const Icon(
+                Icons.copy_rounded,
+                size: 13,
+                color: Colors.white,
+              ),
             ),
           ),
         ],

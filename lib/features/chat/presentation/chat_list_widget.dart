@@ -115,9 +115,10 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
   }
 
   Widget _buildAdminDoctorPatientsView() {
-    final patientsStateAsync =
-        ref.watch(doctorPatientsStateProvider(widget.doctorId!));
-    
+    final patientsStateAsync = ref.watch(
+      doctorPatientsStateProvider(widget.doctorId!),
+    );
+
     return patientsStateAsync.when(
       skipLoadingOnReload: true,
       skipLoadingOnRefresh: true,
@@ -125,20 +126,22 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
       // list when one exists rather than a full-screen spinner (the spinner
       // stays for a genuine first-ever load with an empty local cache).
       loading: () {
-        final cached = OfflineChatService.instance.getChatList(widget.doctorId!);
+        final cached = OfflineChatService.instance.getChatList(
+          widget.doctorId!,
+        );
         if (cached != null && cached.isNotEmpty) {
           return _buildPatientsBody(cached, isSyncing: true);
         }
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
+        return const Center(child: CircularProgressIndicator());
       },
       error: (error, stack) {
         // Offline / Firestore outage on a device that already has this list
         // cached: keep serving the cached conversations instead of replacing
         // a usable list with an error screen. The error state is only shown
         // when there is genuinely nothing local to render.
-        final cached = OfflineChatService.instance.getChatList(widget.doctorId!);
+        final cached = OfflineChatService.instance.getChatList(
+          widget.doctorId!,
+        );
         if (cached != null && cached.isNotEmpty) {
           return _buildPatientsBody(cached, isSyncing: false);
         }
@@ -167,10 +170,8 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
           ),
         );
       },
-      data: (state) => _buildPatientsBody(
-        state.chats,
-        isSyncing: state.isSyncing,
-      ),
+      data: (state) =>
+          _buildPatientsBody(state.chats, isSyncing: state.isSyncing),
     );
   }
 
@@ -197,19 +198,13 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
     if (filteredPatients.isEmpty) {
       // Do not flash the empty view if remote sync is actively in flight
       if (patients.isEmpty && isSyncing) {
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
+        return const Center(child: CircularProgressIndicator());
       }
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              size: 48,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[400]),
             const SizedBox(height: 12),
             Text(
               patients.isEmpty
@@ -238,8 +233,7 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
     // older builds, where a missing key would otherwise crash the list with a
     // null-comparison error.
     final String patientId = (patient['patientId'] ?? '').toString();
-    final String patientName =
-        (patient['patientName'] ?? 'Patient').toString();
+    final String patientName = (patient['patientName'] ?? 'Patient').toString();
     final String patientImage = (patient['patientImage'] ?? '').toString();
     final String lastMessage = (patient['lastMessage'] ?? '').toString();
     final int unreadCount = ((patient['unreadCount'] as num?) ?? 0).toInt();
@@ -279,11 +273,7 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
                       ? NetworkImage(patientImage)
                       : null,
                   child: patientImage.isEmpty
-                      ? Icon(
-                          Icons.person,
-                          color: AdminPalette.brand,
-                          size: 28,
-                        )
+                      ? Icon(Icons.person, color: AdminPalette.brand, size: 28)
                       : null,
                 ),
                 // Green online status dot
@@ -436,7 +426,7 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
     // Shared with the chat screen overflow menu, so a favourite toggled there
     // is reflected in this list (and the Favourite tab) right away.
     final favouriteChatIds = ref.watch(chatFavouritesProvider);
-    
+
     final body = chatStateAsync.when(
       skipLoadingOnReload: true,
       skipLoadingOnRefresh: true,
@@ -449,9 +439,7 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
         if (cached != null && cached.isNotEmpty) {
           return _buildChatsBody(cached, favouriteChatIds, isSyncing: true);
         }
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
+        return const Center(child: CircularProgressIndicator());
       },
       error: (error, stack) {
         // Offline / Firestore outage with a local cache: show the cached
@@ -518,10 +506,12 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
         ? chats
         : chats.where((chat) {
             final name = (chat['otherUserName'] ?? '').toString().toLowerCase();
-            final patientName =
-                (chat['patientName'] ?? '').toString().toLowerCase();
-            final doctorName =
-                (chat['doctorName'] ?? '').toString().toLowerCase();
+            final patientName = (chat['patientName'] ?? '')
+                .toString()
+                .toLowerCase();
+            final doctorName = (chat['doctorName'] ?? '')
+                .toString()
+                .toLowerCase();
             return name.contains(query) ||
                 patientName.contains(query) ||
                 doctorName.contains(query);
@@ -542,9 +532,7 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
     if (tabFilteredChats.isEmpty) {
       // Do not flash the empty view if remote sync is actively in flight
       if (chats.isEmpty && isSyncing) {
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
+        return const Center(child: CircularProgressIndicator());
       }
       return Center(
         child: Column(
@@ -554,8 +542,8 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
               _activeTab == 'favourite'
                   ? Icons.star_border_rounded
                   : _activeTab == 'unread'
-                      ? Icons.mark_email_unread_outlined
-                      : Icons.chat_bubble_outline,
+                  ? Icons.mark_email_unread_outlined
+                  : Icons.chat_bubble_outline,
               size: 48,
               color: Colors.grey[400],
             ),
@@ -564,10 +552,10 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
               _activeTab == 'favourite'
                   ? 'No favourite chats yet.\nTap the star on a chat to pin it.'
                   : _activeTab == 'unread'
-                      ? 'You\'re all caught up!\nNo unread chats.'
-                      : widget.searchQuery.isEmpty
-                          ? 'No conversations yet.\nStart chatting with patients!'
-                          : 'No matches found',
+                  ? 'You\'re all caught up!\nNo unread chats.'
+                  : widget.searchQuery.isEmpty
+                  ? 'No conversations yet.\nStart chatting with patients!'
+                  : 'No matches found',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey[600]),
             ),
@@ -715,15 +703,14 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
     required String otherUserRole,
   }) {
     final String otherUserId = (chat['otherUserId'] ?? '').toString();
-    final String otherUserName =
-        (chat['otherUserName'] ?? 'Unknown').toString();
+    final String otherUserName = (chat['otherUserName'] ?? 'Unknown')
+        .toString();
     final String otherUserImage = (chat['otherUserImage'] ?? '').toString();
     final String lastMessage = (chat['lastMessage'] ?? '').toString();
     final int unreadCount = ((chat['unreadCount'] as num?) ?? 0).toInt();
     final DateTime? lastMessageTime = _parseTime(chat['lastMessageTime']);
 
     return Container(
-      
       child: InkWell(
         onTap: () {
           final chatId = (chat['chatId'] ?? '').toString();
@@ -764,7 +751,9 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
                 children: [
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: AppColors.primaryRed.withValues(alpha: 0.1),
+                    backgroundColor: AppColors.primaryRed.withValues(
+                      alpha: 0.1,
+                    ),
                     backgroundImage: otherUserImage.isNotEmpty
                         ? NetworkImage(otherUserImage)
                         : null,
@@ -839,15 +828,23 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
                         ],
                         if (_isFavouriteChat(chat)) ...[
                           const SizedBox(width: 4),
-                          const Icon(Icons.star_rounded, size: 16, color: AppColors.secondaryYellow),
+                          const Icon(
+                            Icons.star_rounded,
+                            size: 16,
+                            color: AppColors.secondaryYellow,
+                          ),
                         ],
                         const Spacer(),
                         Text(
                           _formatTime(lastMessageTime),
                           style: TextStyle(
                             fontSize: context.fs(11),
-                            color: unreadCount > 0 ? AppColors.primaryRed : Colors.grey[500],
-                            fontWeight: unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
+                            color: unreadCount > 0
+                                ? AppColors.primaryRed
+                                : Colors.grey[500],
+                            fontWeight: unreadCount > 0
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                           ),
                         ),
                       ],
@@ -867,8 +864,8 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
                                   (isLastMessageRead
                                       ? 'read'
                                       : (isLastMessageDelivered
-                                          ? 'delivered'
-                                          : 'sent')),
+                                            ? 'delivered'
+                                            : 'sent')),
                             ),
                             size: 16,
                             color: const Color(0xFF7E90A6),
@@ -883,7 +880,9 @@ class _ChatListWidgetState extends ConsumerState<ChatListWidget> {
                                   maxLines: 1,
                                   style: TextStyle(
                                     fontSize: context.fs(12.5),
-                                    color: const Color(0xFF4ADE80), // WhatsApp green
+                                    color: const Color(
+                                      0xFF4ADE80,
+                                    ), // WhatsApp green
                                     fontWeight: FontWeight.w600,
                                     fontStyle: FontStyle.italic,
                                   ),

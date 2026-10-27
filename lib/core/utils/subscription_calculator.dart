@@ -76,7 +76,9 @@ class SubscriptionCalculator {
 
     // In Dart, day 0 of (targetMonth + 1) is the last day of targetMonth.
     final int daysInTargetMonth = DateTime(targetYear, targetMonth + 1, 0).day;
-    final int targetDay = from.day > daysInTargetMonth ? daysInTargetMonth : from.day;
+    final int targetDay = from.day > daysInTargetMonth
+        ? daysInTargetMonth
+        : from.day;
 
     return DateTime(
       targetYear,
@@ -110,7 +112,8 @@ class SubscriptionCalculator {
     required DateTime now,
     required int durationMonths,
   }) {
-    final bool isStillActive = currentExpiry != null && now.isBefore(currentExpiry);
+    final bool isStillActive =
+        currentExpiry != null && now.isBefore(currentExpiry);
     final DateTime baseDate = isStillActive ? currentExpiry : now;
     return addCalendarMonths(baseDate, durationMonths);
   }

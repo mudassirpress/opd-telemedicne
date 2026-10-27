@@ -19,14 +19,8 @@ void main() {
     test('a whole-conversation read always lands on exactly zero', () {
       // The drift-repair case: the counter says 3 even though nothing is
       // actually unread, and opening the chat must still clear the badge.
-      expect(
-        ChatController.resolveNextUnreadCount(current: 3, absolute: 0),
-        0,
-      );
-      expect(
-        ChatController.resolveNextUnreadCount(current: 0, absolute: 0),
-        0,
-      );
+      expect(ChatController.resolveNextUnreadCount(current: 3, absolute: 0), 0);
+      expect(ChatController.resolveNextUnreadCount(current: 0, absolute: 0), 0);
       expect(
         ChatController.resolveNextUnreadCount(current: 99, absolute: 0),
         0,
@@ -147,77 +141,87 @@ void main() {
       expect(afterReopen, 0);
     });
 
-    test('Patient badge counter stuck at 7 resolves to 0 immediately upon screen open', () {
-      var patientBadge = 7; // Stuck at 7 due to earlier drift or admin message increment
+    test(
+      'Patient badge counter stuck at 7 resolves to 0 immediately upon screen open',
+      () {
+        var patientBadge =
+            7; // Stuck at 7 due to earlier drift or admin message increment
 
-      // On screen open, whole-conversation mark-as-read unconditionally asserts absolute 0
-      final resolved = ChatController.resolveNextUnreadCount(
-        current: patientBadge,
-        absolute: 0,
-      );
-      expect(resolved, 0);
-    });
+        // On screen open, whole-conversation mark-as-read unconditionally asserts absolute 0
+        final resolved = ChatController.resolveNextUnreadCount(
+          current: patientBadge,
+          absolute: 0,
+        );
+        expect(resolved, 0);
+      },
+    );
 
-    test('Incoming unread filter strictly counts incoming messages and rejects outgoing messages', () {
-      const patientId = 'patient_123';
-      const doctorId = 'doctor_456';
+    test(
+      'Incoming unread filter strictly counts incoming messages and rejects outgoing messages',
+      () {
+        const patientId = 'patient_123';
+        const doctorId = 'doctor_456';
 
-      final messages = [
-        // Incoming unread message (should be counted)
-        {
-          'id': 'm1',
-          'senderId': doctorId,
-          'receiverId': patientId,
-          'recipient_id': patientId,
-          'is_read': false,
-          'isRead': false,
-        },
-        // Incoming read message (should NOT be counted)
-        {
-          'id': 'm2',
-          'senderId': doctorId,
-          'receiverId': patientId,
-          'recipient_id': patientId,
-          'is_read': true,
-          'isRead': true,
-        },
-        // Outgoing message sent by the patient (should NEVER be counted)
-        {
-          'id': 'm3',
-          'senderId': patientId,
-          'receiverId': doctorId,
-          'recipient_id': doctorId,
-          'is_read': false,
-          'isRead': false,
-        },
-        // Another outgoing message sent by the patient with is_read == false
-        {
-          'id': 'm4',
-          'sender_id': patientId,
-          'recipient_id': doctorId,
-          'is_read': false,
-        },
-        // Another incoming unread message with snake_case schema (should be counted)
-        {
-          'id': 'm5',
-          'sender_id': doctorId,
-          'recipient_id': patientId,
-          'is_read': false,
-        },
-      ];
+        final messages = [
+          // Incoming unread message (should be counted)
+          {
+            'id': 'm1',
+            'senderId': doctorId,
+            'receiverId': patientId,
+            'recipient_id': patientId,
+            'is_read': false,
+            'isRead': false,
+          },
+          // Incoming read message (should NOT be counted)
+          {
+            'id': 'm2',
+            'senderId': doctorId,
+            'receiverId': patientId,
+            'recipient_id': patientId,
+            'is_read': true,
+            'isRead': true,
+          },
+          // Outgoing message sent by the patient (should NEVER be counted)
+          {
+            'id': 'm3',
+            'senderId': patientId,
+            'receiverId': doctorId,
+            'recipient_id': doctorId,
+            'is_read': false,
+            'isRead': false,
+          },
+          // Another outgoing message sent by the patient with is_read == false
+          {
+            'id': 'm4',
+            'sender_id': patientId,
+            'recipient_id': doctorId,
+            'is_read': false,
+          },
+          // Another incoming unread message with snake_case schema (should be counted)
+          {
+            'id': 'm5',
+            'sender_id': doctorId,
+            'recipient_id': patientId,
+            'is_read': false,
+          },
+        ];
 
-      // Pure filter logic conforming to the required changes
-      final unreadIncoming = messages.where((data) {
-        final sender = (data['senderId'] ?? data['sender_id'] ?? '').toString();
-        if (sender == patientId) return false; // Patient's own outgoing messages must NOT be counted
-        final receiver = (data['receiverId'] ?? data['recipient_id'] ?? '').toString();
-        if (receiver != patientId) return false;
-        final isRead = data['isRead'] == true || data['is_read'] == true;
-        return !isRead;
-      }).toList();
+        // Pure filter logic conforming to the required changes
+        final unreadIncoming = messages.where((data) {
+          final sender = (data['senderId'] ?? data['sender_id'] ?? '')
+              .toString();
+          if (sender == patientId)
+            return false; // Patient's own outgoing messages must NOT be counted
+          final receiver = (data['receiverId'] ?? data['recipient_id'] ?? '')
+              .toString();
+          if (receiver != patientId) return false;
+          final isRead = data['isRead'] == true || data['is_read'] == true;
+          return !isRead;
+        }).toList();
 
-      expect(unreadIncoming.length, 2);
-      expect(unreadIncoming.map((m) => m['id']).toList(), ['m1', 'm5']);
-    });
+        expect(unreadIncoming.length, 2);
+        expect(unreadIncoming.map((m) => m['id']).toList(), ['m1', 'm5']);
+      },
+    );
   });
 }

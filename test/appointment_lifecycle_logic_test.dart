@@ -44,8 +44,7 @@ void main() {
         );
       }
     });
-    test('an unscheduled request waits — there is no slot to reason about',
-        () {
+    test('an unscheduled request waits — there is no slot to reason about', () {
       final s = slot();
       expect(
         resolveAppointmentPhase(
@@ -75,43 +74,47 @@ void main() {
       );
     });
 
-    test('before the start: scheduled, then starting_soon inside the window',
-        () {
-      expect(
-        phase(now: s.start.subtract(const Duration(minutes: 90))),
-        AppointmentPhase.scheduled,
-      );
-      expect(
-        phase(now: s.start.subtract(const Duration(minutes: 60))),
-        AppointmentPhase.startingSoon,
-      );
-      expect(
-        phase(now: s.start.subtract(const Duration(minutes: 2))),
-        AppointmentPhase.startingSoon,
-      );
-    });
+    test(
+      'before the start: scheduled, then starting_soon inside the window',
+      () {
+        expect(
+          phase(now: s.start.subtract(const Duration(minutes: 90))),
+          AppointmentPhase.scheduled,
+        );
+        expect(
+          phase(now: s.start.subtract(const Duration(minutes: 60))),
+          AppointmentPhase.startingSoon,
+        );
+        expect(
+          phase(now: s.start.subtract(const Duration(minutes: 2))),
+          AppointmentPhase.startingSoon,
+        );
+      },
+    );
 
     test('the start boundary itself is no longer "before the start"', () {
       expect(phase(now: s.start), isNot(AppointmentPhase.scheduled));
       expect(phase(now: s.start), isNot(AppointmentPhase.startingSoon));
     });
 
-    test('inside the slot with nobody in: waiting for the doctor, then late',
-        () {
-      expect(
-        phase(now: s.start.add(const Duration(minutes: 5))),
-        AppointmentPhase.waitingForDoctor,
-      );
-      expect(
-        phase(now: s.start.add(const Duration(minutes: 15))),
-        AppointmentPhase.waitingForDoctor,
-        reason: 'grace is strictly greater than 15 minutes',
-      );
-      expect(
-        phase(now: s.start.add(const Duration(minutes: 16))),
-        AppointmentPhase.doctorLate,
-      );
-    });
+    test(
+      'inside the slot with nobody in: waiting for the doctor, then late',
+      () {
+        expect(
+          phase(now: s.start.add(const Duration(minutes: 5))),
+          AppointmentPhase.waitingForDoctor,
+        );
+        expect(
+          phase(now: s.start.add(const Duration(minutes: 15))),
+          AppointmentPhase.waitingForDoctor,
+          reason: 'grace is strictly greater than 15 minutes',
+        );
+        expect(
+          phase(now: s.start.add(const Duration(minutes: 16))),
+          AppointmentPhase.doctorLate,
+        );
+      },
+    );
 
     test('the doctor is in, the patient has their own grace window', () {
       final doctorIn = s.start.add(const Duration(minutes: 1));
@@ -180,7 +183,8 @@ void main() {
           doctorJoinedAt: doctorIn,
         ),
         AppointmentPhase.inProgress,
-        reason: 'the grace-ending window only matters while someone is '
+        reason:
+            'the grace-ending window only matters while someone is '
             'missing',
       );
     });
@@ -216,28 +220,29 @@ void main() {
         AppointmentPhase.doctorLate,
       );
       expect(
-        phase(now: s.start.subtract(const Duration(minutes: 20)), config: config),
+        phase(
+          now: s.start.subtract(const Duration(minutes: 20)),
+          config: config,
+        ),
         AppointmentPhase.scheduled,
         reason: 'the default 60-minute window would have said starting_soon',
       );
       expect(
-        phase(now: s.start.subtract(const Duration(minutes: 9)), config: config),
+        phase(
+          now: s.start.subtract(const Duration(minutes: 9)),
+          config: config,
+        ),
         AppointmentPhase.startingSoon,
       );
       expect(
-        phase(
-          now: s.end.subtract(const Duration(seconds: 90)),
-          config: config,
-        ),
+        phase(now: s.end.subtract(const Duration(seconds: 90)), config: config),
         isNot(AppointmentPhase.graceEnding),
-        reason: 'the override is 1 minute, so 90 seconds left is outside it '
+        reason:
+            'the override is 1 minute, so 90 seconds left is outside it '
             '— the 5-minute default would have said grace_ending',
       );
       expect(
-        phase(
-          now: s.end.subtract(const Duration(seconds: 30)),
-          config: config,
-        ),
+        phase(now: s.end.subtract(const Duration(seconds: 30)), config: config),
         AppointmentPhase.graceEnding,
       );
     });
@@ -295,15 +300,14 @@ void main() {
       int offset = 60,
       bool sent = false,
       String status = AppointmentStatus.confirmed,
-    }) =>
-        isReminderDue(
-          status: status,
-          startAt: start,
-          endAt: end,
-          alreadySent: sent,
-          offsetMinutes: offset,
-          now: now,
-        );
+    }) => isReminderDue(
+      status: status,
+      startAt: start,
+      endAt: end,
+      alreadySent: sent,
+      offsetMinutes: offset,
+      now: now,
+    );
 
     test('fires inside the window and nowhere else', () {
       expect(due(now: start.subtract(const Duration(minutes: 61))), isFalse);
@@ -314,22 +318,30 @@ void main() {
       expect(due(now: end), isFalse);
     });
 
-    test('never fires twice, or for a terminal appointment, or for offset 0',
-        () {
-      expect(due(now: start.subtract(const Duration(minutes: 10)), sent: true),
-          isFalse);
-      expect(
-        due(
-          now: start.subtract(const Duration(minutes: 10)),
-          status: AppointmentStatus.cancelled,
-        ),
-        isFalse,
-      );
-      expect(due(now: start.subtract(const Duration(minutes: 10)), offset: 0),
-          isFalse);
-      expect(due(now: start.subtract(const Duration(minutes: 10)), offset: -5),
-          isFalse);
-    });
+    test(
+      'never fires twice, or for a terminal appointment, or for offset 0',
+      () {
+        expect(
+          due(now: start.subtract(const Duration(minutes: 10)), sent: true),
+          isFalse,
+        );
+        expect(
+          due(
+            now: start.subtract(const Duration(minutes: 10)),
+            status: AppointmentStatus.cancelled,
+          ),
+          isFalse,
+        );
+        expect(
+          due(now: start.subtract(const Duration(minutes: 10)), offset: 0),
+          isFalse,
+        );
+        expect(
+          due(now: start.subtract(const Duration(minutes: 10)), offset: -5),
+          isFalse,
+        );
+      },
+    );
 
     test('a request without a schedule never reminds', () {
       expect(
@@ -372,17 +384,19 @@ void main() {
       }
     });
 
-    test('a doctor rejects an unscheduled request instead of cancelling it',
-        () {
-      final result = evaluateCancellation(
-        status: AppointmentStatus.requested,
-        actorRole: AppointmentActors.doctor,
-        warningCount: 0,
-        warningLimit: 2,
-      );
-      expect(result.allowed, isFalse);
-      expect(result.blockReason, contains('Reject'));
-    });
+    test(
+      'a doctor rejects an unscheduled request instead of cancelling it',
+      () {
+        final result = evaluateCancellation(
+          status: AppointmentStatus.requested,
+          actorRole: AppointmentActors.doctor,
+          warningCount: 0,
+          warningLimit: 2,
+        );
+        expect(result.allowed, isFalse);
+        expect(result.blockReason, contains('Reject'));
+      },
+    );
 
     test('the first patient cancellation warns but does not freeze', () {
       final result = evaluateCancellation(
@@ -465,10 +479,7 @@ void main() {
     });
 
     test('only a freeze still in the future blocks a booking', () {
-      expect(
-        bookingFreezeMessage(frozenUntil: null, now: now),
-        isNull,
-      );
+      expect(bookingFreezeMessage(frozenUntil: null, now: now), isNull);
       expect(
         bookingFreezeMessage(frozenUntil: now, now: now),
         isNull,
@@ -488,10 +499,14 @@ void main() {
     test('a missing document is the defaults', () {
       final config = AppointmentConfig.fromMap(null);
       expect(config.graceMinutes, AppointmentDefaults.graceMinutes);
-      expect(config.cancellationWarningLimit,
-          AppointmentDefaults.cancellationWarningLimit);
-      expect(config.reminderOffsetsMinutes,
-          AppointmentDefaults.reminderOffsetsMinutes);
+      expect(
+        config.cancellationWarningLimit,
+        AppointmentDefaults.cancellationWarningLimit,
+      );
+      expect(
+        config.reminderOffsetsMinutes,
+        AppointmentDefaults.reminderOffsetsMinutes,
+      );
       expect(config.refundableOnPatientCancel, isFalse);
     });
 
@@ -511,7 +526,10 @@ void main() {
       expect(config.patientGraceMinutes, fallback.patientGraceMinutes);
       expect(config.startingSoonMinutes, fallback.startingSoonMinutes);
       expect(config.graceEndingMinutes, fallback.graceEndingMinutes);
-      expect(config.cancellationWarningLimit, fallback.cancellationWarningLimit);
+      expect(
+        config.cancellationWarningLimit,
+        fallback.cancellationWarningLimit,
+      );
       expect(config.freezeDurationDays, fallback.freezeDurationDays);
       expect(config.reminderOffsetsMinutes, fallback.reminderOffsetsMinutes);
       expect(config.refundableOnPatientCancel, isFalse);
@@ -537,11 +555,13 @@ void main() {
     });
 
     test('an empty offsets array degrades to the defaults', () {
-      final config = AppointmentConfig.fromMap(
-        const {'reminderOffsetsMinutes': <dynamic>[]},
+      final config = AppointmentConfig.fromMap(const {
+        'reminderOffsetsMinutes': <dynamic>[],
+      });
+      expect(
+        config.reminderOffsetsMinutes,
+        AppointmentDefaults.reminderOffsetsMinutes,
       );
-      expect(config.reminderOffsetsMinutes,
-          AppointmentDefaults.reminderOffsetsMinutes);
     });
 
     test('toMap round-trips through fromMap', () {

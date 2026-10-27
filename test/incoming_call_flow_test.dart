@@ -117,13 +117,11 @@ void main() {
       expect(fromChannel!.roomId, 'room-1');
       expect(fromChannel.channelId, 'room-1');
 
-      final fromRoom = IncomingCallPayload.tryParse(
-        <String, dynamic>{
-          ..._fcmCallPayload(),
-          CallPayloadKeys.channelId: '',
-          CallPayloadKeys.roomId: 'room-9',
-        },
-      );
+      final fromRoom = IncomingCallPayload.tryParse(<String, dynamic>{
+        ..._fcmCallPayload(),
+        CallPayloadKeys.channelId: '',
+        CallPayloadKeys.roomId: 'room-9',
+      });
       expect(fromRoom!.channelId, 'room-9');
       expect(fromRoom.roomId, 'room-9');
     });
@@ -149,18 +147,21 @@ void main() {
 
     test('normalizes the call type and the caller role', () {
       expect(
-        IncomingCallPayload.tryParse(_fcmCallPayload(callType: 'VIDEO'))!
-            .callType,
+        IncomingCallPayload.tryParse(
+          _fcmCallPayload(callType: 'VIDEO'),
+        )!.callType,
         'video',
       );
       expect(
-        IncomingCallPayload.tryParse(_fcmCallPayload(callType: 'garbage'))!
-            .callType,
+        IncomingCallPayload.tryParse(
+          _fcmCallPayload(callType: 'garbage'),
+        )!.callType,
         'audio',
       );
       expect(
-        IncomingCallPayload.tryParse(_fcmCallPayload(callerType: 'patient'))!
-            .callerType,
+        IncomingCallPayload.tryParse(
+          _fcmCallPayload(callerType: 'patient'),
+        )!.callerType,
         'patient',
       );
     });

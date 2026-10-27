@@ -206,8 +206,11 @@ class _DoctorListState extends ConsumerState<DoctorList> {
     // Real-time rating from the single source of truth, gracefully falling back
     // to the cached projected value on the doctor document while loading.
     final ratingAsync = ref.watch(doctorRatingSummaryProvider(doctorId));
-    final averageRating = ratingAsync.valueOrNull?.average ?? (doctor['averageRating'] ?? 0.0).toDouble();
-    final totalRatings = ratingAsync.valueOrNull?.total ?? (doctor['totalRatings'] ?? 0).toInt();
+    final averageRating =
+        ratingAsync.valueOrNull?.average ??
+        (doctor['averageRating'] ?? 0.0).toDouble();
+    final totalRatings =
+        ratingAsync.valueOrNull?.total ?? (doctor['totalRatings'] ?? 0).toInt();
 
     return Container(
       width: 85,
@@ -375,7 +378,8 @@ class _DoctorListState extends ConsumerState<DoctorList> {
       return;
     }
 
-    final isRestrictedPatient = currentUser.role == 'patient' &&
+    final isRestrictedPatient =
+        currentUser.role == 'patient' &&
         !currentUser.isPatientIdUser &&
         currentUser.paymentStatus != 'approved' &&
         currentUser.paymentStatus != 'completed';
@@ -419,7 +423,9 @@ class _DoctorListState extends ConsumerState<DoctorList> {
   }
 
   void _showRestrictedPatientPrompt(
-      BuildContext context, String? paymentStatus) {
+    BuildContext context,
+    String? paymentStatus,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -446,7 +452,8 @@ class _DoctorListState extends ConsumerState<DoctorList> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryRed,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () {
               Navigator.pop(ctx);
@@ -587,10 +594,7 @@ class _DoctorGridViewState extends ConsumerState<DoctorGridView> {
                 const SizedBox(height: 16),
                 Text(
                   'Could not load doctors',
-                  style: TextStyle(
-                    fontSize: context.fs(14),
-                    color: Colors.red,
-                  ),
+                  style: TextStyle(fontSize: context.fs(14), color: Colors.red),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
@@ -694,8 +698,11 @@ class _DoctorGridViewState extends ConsumerState<DoctorGridView> {
     // Real-time rating from the single source of truth, gracefully falling back
     // to the cached projected value on the doctor document while loading.
     final ratingAsync = ref.watch(doctorRatingSummaryProvider(doctorId));
-    final averageRating = ratingAsync.valueOrNull?.average ?? (doctor['averageRating'] ?? 0.0).toDouble();
-    final totalRatings = ratingAsync.valueOrNull?.total ?? (doctor['totalRatings'] ?? 0).toInt();
+    final averageRating =
+        ratingAsync.valueOrNull?.average ??
+        (doctor['averageRating'] ?? 0.0).toDouble();
+    final totalRatings =
+        ratingAsync.valueOrNull?.total ?? (doctor['totalRatings'] ?? 0).toInt();
 
     return Card(
       elevation: 2,

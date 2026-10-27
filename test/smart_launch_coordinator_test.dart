@@ -63,10 +63,7 @@ void main() {
       const target = LaunchTarget(
         type: LaunchTargetType.declineCall,
         actionId: CallActionIds.decline,
-        data: <String, dynamic>{
-          'type': 'call',
-          'callId': 'call_abc',
-        },
+        data: <String, dynamic>{'type': 'call', 'callId': 'call_abc'},
       );
       expect(target.isDeclineCall, isTrue);
       expect(target.actionId, CallActionIds.decline);
@@ -78,29 +75,30 @@ void main() {
       expect(widget, isA<FirstSplashScreen>());
     });
 
-    test('buildRootWidget returns SmartDirectLaunchWrapper for chat notification', () {
-      const chatTarget = LaunchTarget(
-        type: LaunchTargetType.chat,
-        data: <String, dynamic>{
-          'chatId': 'c1',
-          'senderId': 's1',
-        },
-      );
-      final widget = SmartLaunchCoordinator.buildRootWidget(chatTarget);
-      expect(widget, isA<SmartDirectLaunchWrapper>());
-      expect(widget is FirstSplashScreen, isFalse);
-    });
+    test(
+      'buildRootWidget returns SmartDirectLaunchWrapper for chat notification',
+      () {
+        const chatTarget = LaunchTarget(
+          type: LaunchTargetType.chat,
+          data: <String, dynamic>{'chatId': 'c1', 'senderId': 's1'},
+        );
+        final widget = SmartLaunchCoordinator.buildRootWidget(chatTarget);
+        expect(widget, isA<SmartDirectLaunchWrapper>());
+        expect(widget is FirstSplashScreen, isFalse);
+      },
+    );
 
-    test('buildRootWidget returns SmartDirectLaunchWrapper for incoming call notification', () {
-      const callTarget = LaunchTarget(
-        type: LaunchTargetType.incomingCall,
-        data: <String, dynamic>{
-          'callId': 'call_xyz',
-        },
-      );
-      final widget = SmartLaunchCoordinator.buildRootWidget(callTarget);
-      expect(widget, isA<SmartDirectLaunchWrapper>());
-      expect(widget is FirstSplashScreen, isFalse);
-    });
+    test(
+      'buildRootWidget returns SmartDirectLaunchWrapper for incoming call notification',
+      () {
+        const callTarget = LaunchTarget(
+          type: LaunchTargetType.incomingCall,
+          data: <String, dynamic>{'callId': 'call_xyz'},
+        );
+        final widget = SmartLaunchCoordinator.buildRootWidget(callTarget);
+        expect(widget, isA<SmartDirectLaunchWrapper>());
+        expect(widget is FirstSplashScreen, isFalse);
+      },
+    );
   });
 }

@@ -41,7 +41,10 @@ class _AdminDoctorVideosScreenState
     super.dispose();
   }
 
-  Map<String, dynamic>? _findDoctor(List<Map<String, dynamic>> doctors, String? id) {
+  Map<String, dynamic>? _findDoctor(
+    List<Map<String, dynamic>> doctors,
+    String? id,
+  ) {
     if (id == null) return null;
     for (final d in doctors) {
       if ((d['id'] ?? '').toString() == id) return d;
@@ -61,7 +64,8 @@ class _AdminDoctorVideosScreenState
           // A stream error with nothing cached used to fall through to the
           // "No doctors found" empty state. Only swap in the error state when
           // there is genuinely nothing to render.
-          if (snapshot.hasError && snapshot.data == null &&
+          if (snapshot.hasError &&
+              snapshot.data == null &&
               (_doctorController?.cachedDoctors ?? const []).isEmpty) {
             return AdminErrorState(
               message: 'Could not load doctors. Check your connection.',
@@ -73,15 +77,16 @@ class _AdminDoctorVideosScreenState
               }),
             );
           }
-          final doctors = snapshot.data ?? _doctorController?.cachedDoctors ?? const [];
+          final doctors =
+              snapshot.data ?? _doctorController?.cachedDoctors ?? const [];
           if (_selectedDoctorId == null && doctors.isNotEmpty) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted) return;
               setState(() {
                 _selectedDoctorId = doctors.first['id'].toString();
                 _selectedDoctor = doctors.first;
-                _urlController.text =
-                    (doctors.first['youtubeVideoUrl'] ?? '').toString();
+                _urlController.text = (doctors.first['youtubeVideoUrl'] ?? '')
+                    .toString();
               });
             });
           }
@@ -118,7 +123,8 @@ class _AdminDoctorVideosScreenState
                                 _selectedDoctorId = id;
                                 _selectedDoctor = doctor;
                                 _urlController.text =
-                                    (doctor['youtubeVideoUrl'] ?? '').toString();
+                                    (doctor['youtubeVideoUrl'] ?? '')
+                                        .toString();
                               }),
                               child: Container(
                                 width: 150,
@@ -139,19 +145,22 @@ class _AdminDoctorVideosScreenState
                                   children: [
                                     CircleAvatar(
                                       radius: 18,
-                                      backgroundColor:
-                                          AdminPalette.brand.withValues(alpha: 0.1),
+                                      backgroundColor: AdminPalette.brand
+                                          .withValues(alpha: 0.1),
                                       backgroundImage: image.isNotEmpty
                                           ? CachedNetworkImageProvider(image)
                                           : null,
                                       child: image.isEmpty
-                                          ? Icon(Icons.person,
-                                              color: AdminPalette.brand)
+                                          ? Icon(
+                                              Icons.person,
+                                              color: AdminPalette.brand,
+                                            )
                                           : null,
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      (doctor['fullname'] ?? 'Doctor').toString(),
+                                      (doctor['fullname'] ?? 'Doctor')
+                                          .toString(),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
@@ -185,16 +194,22 @@ class _AdminDoctorVideosScreenState
                           children: [
                             CircleAvatar(
                               radius: 22,
-                              backgroundImage: (_selectedDoctor!['imageUrl'] ?? '')
+                              backgroundImage:
+                                  (_selectedDoctor!['imageUrl'] ?? '')
                                       .toString()
                                       .isNotEmpty
                                   ? CachedNetworkImageProvider(
-                                      _selectedDoctor!['imageUrl'].toString())
+                                      _selectedDoctor!['imageUrl'].toString(),
+                                    )
                                   : null,
-                              child: (_selectedDoctor!['imageUrl'] ?? '')
+                              child:
+                                  (_selectedDoctor!['imageUrl'] ?? '')
                                       .toString()
                                       .isEmpty
-                                  ? Icon(Icons.person, color: AdminPalette.brand)
+                                  ? Icon(
+                                      Icons.person,
+                                      color: AdminPalette.brand,
+                                    )
                                   : null,
                             ),
                             const SizedBox(width: 12),
@@ -205,7 +220,8 @@ class _AdminDoctorVideosScreenState
                                   Text(
                                     'Dr. ${(_selectedDoctor!['fullname'] ?? '').toString()}',
                                     style: AdminTextStyles.heading(
-                                        size: context.fs(14.5)),
+                                      size: context.fs(14.5),
+                                    ),
                                   ),
                                   Text(
                                     'ID: ${(_selectedDoctor!['doctorId'] ?? 'N/A')} • ${(_selectedDoctor!['highestDegree'] ?? 'General Physician')}',
@@ -220,7 +236,8 @@ class _AdminDoctorVideosScreenState
                         AdminInfoRow(
                           icon: Icons.link_rounded,
                           label: 'Current video',
-                          value: (_selectedDoctor!['youtubeVideoUrl'] ?? '')
+                          value:
+                              (_selectedDoctor!['youtubeVideoUrl'] ?? '')
                                   .toString()
                                   .isEmpty
                               ? 'None assigned'
@@ -238,12 +255,15 @@ class _AdminDoctorVideosScreenState
                             gradient: AdminPalette.inputOuterGradient,
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                                color: AdminPalette.inputOuterBorder,
-                                width: 1.5),
+                              color: AdminPalette.inputOuterBorder,
+                              width: 1.5,
+                            ),
                           ),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
                             decoration: BoxDecoration(
                               gradient: AdminPalette.inputInnerGradient,
                               borderRadius: BorderRadius.circular(11),
@@ -255,8 +275,7 @@ class _AdminDoctorVideosScreenState
                                 color: AdminPalette.textInput,
                               ),
                               decoration: InputDecoration(
-                                hintText:
-                                    'https://www.youtube.com/watch?v=...',
+                                hintText: 'https://www.youtube.com/watch?v=...',
                                 hintStyle: TextStyle(
                                   color: AdminPalette.textMuted,
                                   fontSize: context.fs(12.5),
@@ -270,7 +289,9 @@ class _AdminDoctorVideosScreenState
                         ),
                         const SizedBox(height: 14),
                         AdminPrimaryButton(
-                          label: _saving ? 'Saving...' : 'Assign / Update Video',
+                          label: _saving
+                              ? 'Saving...'
+                              : 'Assign / Update Video',
                           icon: Icons.check_rounded,
                           isLoading: _saving,
                           onPressed: _saving ? null : _save,
@@ -297,7 +318,9 @@ class _AdminDoctorVideosScreenState
   Future<void> _save() async {
     if (_selectedDoctorId == null) return;
     setState(() => _saving = true);
-    final error = await ref.read(doctorVideoControllerProvider).saveVideo(
+    final error = await ref
+        .read(doctorVideoControllerProvider)
+        .saveVideo(
           doctorId: _selectedDoctorId!,
           youtubeUrl: _urlController.text,
         );

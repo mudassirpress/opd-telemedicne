@@ -300,7 +300,10 @@ void main() {
       );
 
       expect(PaymentComplaintVisibility.shouldShow(user), isTrue);
-      expect(PaymentComplaintVisibility.isAccountPaymentApprovedAndValid(user), isFalse);
+      expect(
+        PaymentComplaintVisibility.isAccountPaymentApprovedAndValid(user),
+        isFalse,
+      );
     });
 
     test('Shows complaint button when payment is rejected', () {
@@ -320,7 +323,10 @@ void main() {
       );
 
       expect(PaymentComplaintVisibility.shouldShow(user), isTrue);
-      expect(PaymentComplaintVisibility.isAccountPaymentApprovedAndValid(user), isFalse);
+      expect(
+        PaymentComplaintVisibility.isAccountPaymentApprovedAndValid(user),
+        isFalse,
+      );
     });
 
     test('Shows complaint button when payment has not been submitted yet', () {
@@ -339,28 +345,37 @@ void main() {
       );
 
       expect(PaymentComplaintVisibility.shouldShow(user), isTrue);
-      expect(PaymentComplaintVisibility.isAccountPaymentApprovedAndValid(user), isFalse);
-    });
-
-    test('Hides complaint button when payment is approved and account is valid', () {
-      final user = UserModel(
-        id: 'pat_approved',
-        fullname: 'Approved Patient',
-        deviceId: 'd4',
-        idcard: 'c4',
-        password: 'p4',
-        token: 't4',
-        role: 'patient',
-        phoneNumber: '+923004444444',
-        ispayment: true,
-        totalPayment: 300.0,
-        paymentStatus: 'approved',
-        expiryDate: DateTime.now().add(const Duration(days: 30)),
+      expect(
+        PaymentComplaintVisibility.isAccountPaymentApprovedAndValid(user),
+        isFalse,
       );
-
-      expect(PaymentComplaintVisibility.shouldShow(user), isFalse);
-      expect(PaymentComplaintVisibility.isAccountPaymentApprovedAndValid(user), isTrue);
     });
+
+    test(
+      'Hides complaint button when payment is approved and account is valid',
+      () {
+        final user = UserModel(
+          id: 'pat_approved',
+          fullname: 'Approved Patient',
+          deviceId: 'd4',
+          idcard: 'c4',
+          password: 'p4',
+          token: 't4',
+          role: 'patient',
+          phoneNumber: '+923004444444',
+          ispayment: true,
+          totalPayment: 300.0,
+          paymentStatus: 'approved',
+          expiryDate: DateTime.now().add(const Duration(days: 30)),
+        );
+
+        expect(PaymentComplaintVisibility.shouldShow(user), isFalse);
+        expect(
+          PaymentComplaintVisibility.isAccountPaymentApprovedAndValid(user),
+          isTrue,
+        );
+      },
+    );
 
     test('Shows complaint button again when account validity expires', () {
       final user = UserModel(
@@ -381,7 +396,10 @@ void main() {
       expect(user.isExpired, isTrue);
       // Even though payment was approved in the past, validity expired -> complaint button must show!
       expect(PaymentComplaintVisibility.shouldShow(user), isTrue);
-      expect(PaymentComplaintVisibility.isAccountPaymentApprovedAndValid(user), isFalse);
+      expect(
+        PaymentComplaintVisibility.isAccountPaymentApprovedAndValid(user),
+        isFalse,
+      );
     });
 
     test('Hides complaint button for active valid Patient ID (Card) user', () {
@@ -406,26 +424,29 @@ void main() {
       expect(PaymentComplaintVisibility.shouldShow(user), isFalse);
     });
 
-    test('Shows complaint button for expired Patient ID user needing reactivation', () {
-      final user = UserModel(
-        id: 'pat_card_expired',
-        fullname: 'Card Expired Patient',
-        deviceId: 'd7',
-        idcard: 'c7',
-        password: 'p7',
-        token: 't7',
-        role: 'patient',
-        phoneNumber: '+923007777777',
-        ispayment: false,
-        totalPayment: 0.0,
-        loginType: 'patientId',
-        patientId: 'PT-111222333444',
-        expiryDate: DateTime.now().subtract(const Duration(days: 5)),
-      );
+    test(
+      'Shows complaint button for expired Patient ID user needing reactivation',
+      () {
+        final user = UserModel(
+          id: 'pat_card_expired',
+          fullname: 'Card Expired Patient',
+          deviceId: 'd7',
+          idcard: 'c7',
+          password: 'p7',
+          token: 't7',
+          role: 'patient',
+          phoneNumber: '+923007777777',
+          ispayment: false,
+          totalPayment: 0.0,
+          loginType: 'patientId',
+          patientId: 'PT-111222333444',
+          expiryDate: DateTime.now().subtract(const Duration(days: 5)),
+        );
 
-      expect(user.isExpired, isTrue);
-      expect(PaymentComplaintVisibility.shouldShow(user), isTrue);
-    });
+        expect(user.isExpired, isTrue);
+        expect(PaymentComplaintVisibility.shouldShow(user), isTrue);
+      },
+    );
 
     test('Hides complaint button for doctors and guests', () {
       final doctor = UserModel(

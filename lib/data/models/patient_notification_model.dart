@@ -5,12 +5,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class PatientNotificationModel {
   final String notificationId;
   final String recipientUid;
-  final String type; // 'payment_approved', 'payment_rejected', 'complaint_reply', etc.
+  final String
+  type; // 'payment_approved', 'payment_rejected', 'complaint_reply', etc.
   final String title;
   final String body;
   final String senderName; // 'OPD Telemedicine Admin'
   final String? paymentId;
-  final String? paymentType; // 'account_activation', 'account_reactivation', 'appointment_booking'
+  final String?
+  paymentType; // 'account_activation', 'account_reactivation', 'appointment_booking'
   final String? complaintId;
   final String? appointmentId;
   final bool isRead;
@@ -48,7 +50,10 @@ class PatientNotificationModel {
     };
   }
 
-  factory PatientNotificationModel.fromMap(Map<String, dynamic> map, String id) {
+  factory PatientNotificationModel.fromMap(
+    Map<String, dynamic> map,
+    String id,
+  ) {
     DateTime parseDate(dynamic value) {
       if (value is Timestamp) return value.toDate();
       if (value is DateTime) return value;

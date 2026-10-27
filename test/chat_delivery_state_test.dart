@@ -37,8 +37,10 @@ void main() {
 
     test('falls back to `sent` for an unknown or missing value', () {
       // A document written by a future client must not crash the reader.
-      expect(MessageDeliveryState.parse('something-else'),
-          MessageDeliveryState.sent);
+      expect(
+        MessageDeliveryState.parse('something-else'),
+        MessageDeliveryState.sent,
+      );
       expect(MessageDeliveryState.parse(null), MessageDeliveryState.sent);
     });
   });
@@ -74,10 +76,7 @@ void main() {
 
     test('fromMap applies the migration when the field is absent', () {
       expect(_message().deliveryStatus, MessageDeliveryState.sent);
-      expect(
-        _message(isRead: true).deliveryStatus,
-        MessageDeliveryState.read,
-      );
+      expect(_message(isRead: true).deliveryStatus, MessageDeliveryState.read);
       expect(
         _message(isDelivered: true).deliveryStatus,
         MessageDeliveryState.delivered,
@@ -94,16 +93,16 @@ void main() {
 
   group('OfflineConverters round trip', () {
     OfflineChatMessage _offline(String delivery) => OfflineChatMessage(
-          messageId: 'm1',
-          senderId: 'me',
-          receiverId: 'you',
-          message: 'hello',
-          timestamp: DateTime(2026, 1, 1, 12),
-          messageType: 'text',
-          deliveryStatus: delivery,
-          readStatus: 'unread',
-          chatId: 'me_you',
-        );
+      messageId: 'm1',
+      senderId: 'me',
+      receiverId: 'you',
+      message: 'hello',
+      timestamp: DateTime(2026, 1, 1, 12),
+      messageType: 'text',
+      deliveryStatus: delivery,
+      readStatus: 'unread',
+      chatId: 'me_you',
+    );
 
     test('a flushed message shows ONE tick, not two', () {
       // Regression: `toDomain` used to treat `sent` as delivered, so every
@@ -138,20 +137,22 @@ void main() {
       );
     });
 
-    test('deriveDeliveryState: the local row is authoritative for queueing',
-        () {
-      // Regression: a "most advanced wins" rule promoted this to `sent`,
-      // because the row's booleans are derived from its status and so carry
-      // no independent evidence that an upload happened.
-      expect(
-        deriveDeliveryState(
-          localStatus: 'pending',
-          isRead: false,
-          isDelivered: false,
-        ),
-        MessageDeliveryState.pending,
-      );
-    });
+    test(
+      'deriveDeliveryState: the local row is authoritative for queueing',
+      () {
+        // Regression: a "most advanced wins" rule promoted this to `sent`,
+        // because the row's booleans are derived from its status and so carry
+        // no independent evidence that an upload happened.
+        expect(
+          deriveDeliveryState(
+            localStatus: 'pending',
+            isRead: false,
+            isDelivered: false,
+          ),
+          MessageDeliveryState.pending,
+        );
+      },
+    );
 
     test('deriveDeliveryState: a stale boolean cannot un-queue a message', () {
       expect(
@@ -164,25 +165,27 @@ void main() {
       );
     });
 
-    test('deriveDeliveryState: local sent is not promoted by a stale boolean',
-        () {
-      expect(
-        deriveDeliveryState(
-          localStatus: 'sent',
-          isRead: false,
-          isDelivered: false,
-        ),
-        MessageDeliveryState.sent,
-      );
-      expect(
-        deriveDeliveryState(
-          localStatus: 'delivered',
-          isRead: false,
-          isDelivered: false,
-        ),
-        MessageDeliveryState.delivered,
-      );
-    });
+    test(
+      'deriveDeliveryState: local sent is not promoted by a stale boolean',
+      () {
+        expect(
+          deriveDeliveryState(
+            localStatus: 'sent',
+            isRead: false,
+            isDelivered: false,
+          ),
+          MessageDeliveryState.sent,
+        );
+        expect(
+          deriveDeliveryState(
+            localStatus: 'delivered',
+            isRead: false,
+            isDelivered: false,
+          ),
+          MessageDeliveryState.delivered,
+        );
+      },
+    );
 
     test('toOffline does not collapse sent into delivered', () {
       final offline = OfflineConverters.toOffline(
@@ -237,10 +240,7 @@ void main() {
       // Firestore snapshots can arrive out of order; a late `sent` must not
       // downgrade a message the receiver has already read.
       final read = _message(deliveryStatus: 'read');
-      expect(
-        read.withDeliveryStatus(MessageDeliveryState.sent),
-        same(read),
-      );
+      expect(read.withDeliveryStatus(MessageDeliveryState.sent), same(read));
       expect(
         read.withDeliveryStatus(MessageDeliveryState.delivered),
         same(read),
@@ -249,10 +249,7 @@ void main() {
 
     test('staying put is a no-op', () {
       final sent = _message(deliveryStatus: 'sent');
-      expect(
-        sent.withDeliveryStatus(MessageDeliveryState.sent),
-        same(sent),
-      );
+      expect(sent.withDeliveryStatus(MessageDeliveryState.sent), same(sent));
     });
   });
 
@@ -328,25 +325,30 @@ void main() {
       expect(flushed.deliveryStatus, MessageDeliveryState.sent);
     });
 
-    test('sent -> delivered -> read as the receiver comes online then reads', () {
-      var message = _message(deliveryStatus: 'sent');
-      expect(message.deliveryStatus, MessageDeliveryState.sent);
+    test(
+      'sent -> delivered -> read as the receiver comes online then reads',
+      () {
+        var message = _message(deliveryStatus: 'sent');
+        expect(message.deliveryStatus, MessageDeliveryState.sent);
 
-      message = message.withDeliveryStatus(MessageDeliveryState.delivered);
-      expect(message.deliveryStatus, MessageDeliveryState.delivered);
+        message = message.withDeliveryStatus(MessageDeliveryState.delivered);
+        expect(message.deliveryStatus, MessageDeliveryState.delivered);
 
-      message = message.withDeliveryStatus(MessageDeliveryState.read);
-      expect(message.deliveryStatus, MessageDeliveryState.read);
-    });
+        message = message.withDeliveryStatus(MessageDeliveryState.read);
+        expect(message.deliveryStatus, MessageDeliveryState.read);
+      },
+    );
 
-    test('a message sent while the receiver is online is delivered immediately',
-        () {
-      final message = _message(
-        isDelivered: true,
-        deliveryStatus: 'delivered',
-      );
-      expect(message.deliveryStatus, MessageDeliveryState.delivered);
-      expect(message.isPending, isFalse);
-    });
+    test(
+      'a message sent while the receiver is online is delivered immediately',
+      () {
+        final message = _message(
+          isDelivered: true,
+          deliveryStatus: 'delivered',
+        );
+        expect(message.deliveryStatus, MessageDeliveryState.delivered);
+        expect(message.isPending, isFalse);
+      },
+    );
   });
 }

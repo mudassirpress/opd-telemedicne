@@ -93,9 +93,7 @@ class DoctorVideoController {
     }
     try {
       await for (final doc in _videos.doc(doctorId).snapshots()) {
-        yield doc.exists
-            ? DoctorVideoModel.fromMap(doc.id, doc.data()!)
-            : null;
+        yield doc.exists ? DoctorVideoModel.fromMap(doc.id, doc.data()!) : null;
       }
     } catch (_) {
       yield null;
@@ -176,16 +174,18 @@ class DoctorVideoController {
   }) async {
     final completed = watchProgress >= 0.9;
     try {
-      await _watches.doc(watchIdFor(patientId: patientId, doctorId: doctorId)).set({
-        'patientId': patientId,
-        'doctorId': doctorId,
-        'videoAssignmentId': videoAssignmentId,
-        'youtubeVideoId': youtubeVideoId,
-        'watchProgress': watchProgress.clamp(0.0, 1.0),
-        'completed': completed,
-        if (completed) 'completedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      await _watches
+          .doc(watchIdFor(patientId: patientId, doctorId: doctorId))
+          .set({
+            'patientId': patientId,
+            'doctorId': doctorId,
+            'videoAssignmentId': videoAssignmentId,
+            'youtubeVideoId': youtubeVideoId,
+            'watchProgress': watchProgress.clamp(0.0, 1.0),
+            'completed': completed,
+            if (completed) 'completedAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
     } catch (_) {
       // Tracking is best-effort; it must never block booking.
     }
@@ -196,7 +196,7 @@ final doctorVideoControllerProvider = Provider<DoctorVideoController>((ref) {
   return DoctorVideoController();
 });
 
-final doctorVideoProvider =
-    StreamProvider.autoDispose.family<DoctorVideoModel?, String>((ref, doctorId) {
-  return ref.read(doctorVideoControllerProvider).watchDoctorVideo(doctorId);
-});
+final doctorVideoProvider = StreamProvider.autoDispose
+    .family<DoctorVideoModel?, String>((ref, doctorId) {
+      return ref.read(doctorVideoControllerProvider).watchDoctorVideo(doctorId);
+    });

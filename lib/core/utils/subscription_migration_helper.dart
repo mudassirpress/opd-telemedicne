@@ -24,7 +24,8 @@ class SubscriptionMigrationHelper {
 
       for (final doc in pidSnapshot.docs) {
         final data = doc.data();
-        if (data['subscriptionPlan'] == null || data['durationMonths'] == null) {
+        if (data['subscriptionPlan'] == null ||
+            data['durationMonths'] == null) {
           if (!dryRun) {
             pidBatch.update(doc.reference, {
               'subscriptionPlan': data['subscriptionPlan'] ?? 'six_months',
@@ -46,18 +47,22 @@ class SubscriptionMigrationHelper {
       }
 
       // 2. Backfill telemedicine_patient
-      final patientSnapshot = await firestore.collection('telemedicine_patient').get();
+      final patientSnapshot = await firestore
+          .collection('telemedicine_patient')
+          .get();
       WriteBatch patientBatch = firestore.batch();
       int patientBatchCount = 0;
 
       for (final doc in patientSnapshot.docs) {
         final data = doc.data();
-        final bool isCardPatient = data['patientId'] != null ||
+        final bool isCardPatient =
+            data['patientId'] != null ||
             data['expiryDate'] != null ||
             data['loginType'] == 'patientId';
 
         if (isCardPatient &&
-            (data['subscriptionPlan'] == null || data['durationMonths'] == null)) {
+            (data['subscriptionPlan'] == null ||
+                data['durationMonths'] == null)) {
           if (!dryRun) {
             patientBatch.update(doc.reference, {
               'subscriptionPlan': data['subscriptionPlan'] ?? 'six_months',

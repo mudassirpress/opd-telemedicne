@@ -25,11 +25,8 @@ class OfflineCallService {
   /// sorted descending by start time (most recent first).
   List<OfflineCallRecord> getCallHistory(String userId) {
     if (!_ready) return const [];
-    final results = _box!
-        .values
-        .where(
-          (c) => c.callerId == userId || c.receiverId == userId,
-        )
+    final results = _box!.values
+        .where((c) => c.callerId == userId || c.receiverId == userId)
         .toList();
     results.sort((a, b) => b.startTime.compareTo(a.startTime));
     return results;
@@ -69,9 +66,7 @@ class OfflineCallService {
   Future<int> mergeServerCalls(List<OfflineCallRecord> serverCalls) async {
     if (serverCalls.isEmpty) return 0;
     if (!_ready) return 0;
-    await _box!.putAll({
-      for (final c in serverCalls) c.callId: c,
-    });
+    await _box!.putAll({for (final c in serverCalls) c.callId: c});
     return serverCalls.length;
   }
 

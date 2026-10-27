@@ -10,7 +10,8 @@ class CallModel {
   final String? callerType;
   final String channelId;
   final String callType; // 'audio', 'video'
-  final String callStatus; // 'calling', 'ringing', 'accepted', 'connected', 'rejected', 'missed', 'ended', 'cancelled', 'failed'
+  final String
+  callStatus; // 'calling', 'ringing', 'accepted', 'connected', 'rejected', 'missed', 'ended', 'cancelled', 'failed'
   final DateTime startTime;
   final DateTime? acceptedAt;
   final DateTime? endedAt;

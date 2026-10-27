@@ -59,52 +59,32 @@ abstract final class AdminPalette {
   static const LinearGradient inputOuterGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [
-      Color(0xFFE3EAF2),
-      Color(0xFFF5F8FC),
-      Color(0xFFE2E9F2),
-    ],
+    colors: [Color(0xFFE3EAF2), Color(0xFFF5F8FC), Color(0xFFE2E9F2)],
   );
   static const Color inputOuterBorder = Color(0xFFBAC7D8);
   static const LinearGradient inputInnerGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [
-      Color(0xFFF3F7FB),
-      Colors.white,
-      Color(0xFFF0F4F9),
-    ],
+    colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
   );
 
   // Segmented selector (Sign In tabs)
   static const LinearGradient selectedGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [
-      Color(0xFF183359),
-      Color(0xFF0F2445),
-      Color(0xFF08162D),
-    ],
+    colors: [Color(0xFF183359), Color(0xFF0F2445), Color(0xFF08162D)],
   );
   static const LinearGradient segmentGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [
-      Color(0xFFD4DCE6),
-      Color(0xFFE8EEF5),
-      Color(0xFFC2CDDC),
-    ],
+    colors: [Color(0xFFD4DCE6), Color(0xFFE8EEF5), Color(0xFFC2CDDC)],
   );
   static const Color segmentBorder = Color(0xFFBAC6D5);
   static const Color unselectedText = Color(0xFF384C66);
   static const LinearGradient unselectedSegmentGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [
-      Color(0xFFE9EFF6),
-      Color(0xFFDBE4EF),
-      Color(0xFFCAD6E4),
-    ],
+    colors: [Color(0xFFE9EFF6), Color(0xFFDBE4EF), Color(0xFFCAD6E4)],
   );
 
   // Info / help card (Sign In patient-card helper)
@@ -125,48 +105,46 @@ abstract final class AdminPalette {
 
 abstract final class AdminTextStyles {
   // Headings use the same font family as the Sign In title (Quicksand)
-  static TextStyle title({double size = 16, Color color = AdminPalette.textPrimary}) =>
-      TextStyle(
-        fontSize: size,
-        fontWeight: FontWeight.bold,
-        color: color,
-        letterSpacing: -0.4,
-      );
+  static TextStyle title({
+    double size = 16,
+    Color color = AdminPalette.textPrimary,
+  }) => TextStyle(
+    fontSize: size,
+    fontWeight: FontWeight.bold,
+    color: color,
+    letterSpacing: -0.4,
+  );
 
   // Body / headings use Poppins (same as rest of Sign In)
   static TextStyle heading({
     double size = 14,
     Color color = AdminPalette.textPrimary,
     FontWeight weight = FontWeight.w600,
-  }) =>
-      TextStyle(fontSize: size, fontWeight: weight, color: color);
+  }) => TextStyle(fontSize: size, fontWeight: weight, color: color);
 
   static TextStyle body({
     double size = 13,
     Color color = AdminPalette.textSecondary,
     FontWeight weight = FontWeight.w500,
     double? height,
-  }) =>
-      TextStyle(
-        fontSize: size,
-        fontWeight: weight,
-        color: color,
-        height: height,
-      );
+  }) => TextStyle(
+    fontSize: size,
+    fontWeight: weight,
+    color: color,
+    height: height,
+  );
 
   static TextStyle label({
     double size = 12,
     Color color = AdminPalette.textMuted,
     FontWeight weight = FontWeight.w500,
-  }) =>
-      TextStyle(fontSize: size, fontWeight: weight, color: color);
+  }) => TextStyle(fontSize: size, fontWeight: weight, color: color);
 
   static TextStyle small({
     double size = 11,
     Color color = AdminPalette.textMuted,
     FontWeight weight = FontWeight.w500,
-  }) =>
-      TextStyle(fontSize: size, fontWeight: weight, color: color);
+  }) => TextStyle(fontSize: size, fontWeight: weight, color: color);
 }
 
 /// A sign-in-style screen shell: ECG watermark, gradient navy header with
@@ -291,10 +269,7 @@ class AdminScreen extends StatelessWidget {
                 ],
               ),
             ),
-            if (bottom != null) ...[
-              SizedBox(height: context.rsp(12)),
-              bottom!,
-            ],
+            if (bottom != null) ...[SizedBox(height: context.rsp(12)), bottom!],
             SizedBox(height: context.rsp(14)),
           ],
         ),
@@ -425,10 +400,7 @@ class AdminSectionTitle extends StatelessWidget {
         ),
         if (subtitle != null) ...[
           const SizedBox(height: 6),
-          Text(
-            subtitle!,
-            style: AdminTextStyles.body(size: context.fs(12.5)),
-          ),
+          Text(subtitle!, style: AdminTextStyles.body(size: context.fs(12.5))),
         ],
       ],
     );
@@ -440,7 +412,11 @@ class AdminSectionLabel extends StatelessWidget {
   final String title;
   final EdgeInsetsGeometry padding;
 
-  const AdminSectionLabel(this.title, {super.key, this.padding = const EdgeInsets.all(0)});
+  const AdminSectionLabel(
+    this.title, {
+    super.key,
+    this.padding = const EdgeInsets.all(0),
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -585,7 +561,9 @@ class AdminSolidButton extends StatelessWidget {
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
         onPressed: isLoading ? null : onPressed,
         child: isLoading
@@ -655,7 +633,9 @@ class AdminOutlineButton extends StatelessWidget {
           backgroundColor: Colors.transparent,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           side: BorderSide.none,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
         onPressed: onPressed,
         child: Row(
@@ -837,7 +817,9 @@ class AdminSegmentedControl<T> extends StatelessWidget {
                 style: TextStyle(
                   fontSize: context.fs(12),
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                  color: isSelected ? Colors.white : AdminPalette.unselectedText,
+                  color: isSelected
+                      ? Colors.white
+                      : AdminPalette.unselectedText,
                 ),
               ),
             ),
@@ -896,8 +878,7 @@ class AdminFilterChip extends StatelessWidget {
           style: TextStyle(
             fontSize: context.fs(12),
             fontWeight: selected ? FontWeight.bold : FontWeight.w600,
-            color:
-                selected ? Colors.white : AdminPalette.unselectedText,
+            color: selected ? Colors.white : AdminPalette.unselectedText,
           ),
         ),
       ),
@@ -950,7 +931,11 @@ class AdminSearchField extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.search_rounded, color: AdminPalette.iconPrimary, size: 18),
+            const Icon(
+              Icons.search_rounded,
+              color: AdminPalette.iconPrimary,
+              size: 18,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: TextFormField(
@@ -1193,10 +1178,7 @@ class AdminConfirmDialog extends StatelessWidget {
             Text(
               content,
               textAlign: TextAlign.center,
-              style: AdminTextStyles.body(
-                size: context.fs(13),
-                height: 1.4,
-              ),
+              style: AdminTextStyles.body(size: context.fs(13), height: 1.4),
             ),
             if (extraContent != null) ...[
               const SizedBox(height: 14),
@@ -1245,8 +1227,7 @@ class AdminConfirmDialog extends StatelessWidget {
                   gradient: color == AdminPalette.brand
                       ? AdminPalette.brandGradient
                       : null,
-                  color:
-                      color == AdminPalette.brand ? null : color,
+                  color: color == AdminPalette.brand ? null : color,
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
                     color: color == AdminPalette.brand
@@ -1334,10 +1315,7 @@ class AdminReasonDialog extends StatelessWidget {
             children: [
               Text(
                 prompt,
-                style: AdminTextStyles.body(
-                  size: context.fs(13),
-                  height: 1.4,
-                ),
+                style: AdminTextStyles.body(size: context.fs(13), height: 1.4),
               ),
               const SizedBox(height: 14),
               Container(
@@ -1380,9 +1358,7 @@ class AdminReasonDialog extends StatelessWidget {
                     ),
                     validator: (v) =>
                         (v == null || v.trim().isEmpty) ? 'Required' : null,
-                    inputFormatters: [
-                      LengthLimitingTextInputFormatter(200),
-                    ],
+                    inputFormatters: [LengthLimitingTextInputFormatter(200)],
                   ),
                 ),
               ),
@@ -1533,10 +1509,7 @@ class AdminEmptyState extends StatelessWidget {
                 style: AdminTextStyles.body(size: context.fs(12.5)),
               ),
             ],
-            if (action != null) ...[
-              const SizedBox(height: 20),
-              action!,
-            ],
+            if (action != null) ...[const SizedBox(height: 20), action!],
           ],
         ),
       ),

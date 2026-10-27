@@ -35,7 +35,8 @@ class PaymentModel {
   final String patientUid;
   final String? patientId;
   final String patientName;
-  final String paymentType; // 'account_activation', 'account_reactivation', 'appointment_booking'
+  final String
+  paymentType; // 'account_activation', 'account_reactivation', 'appointment_booking'
   final double amount;
   final String currency;
   final String proofReference; // URL or document reference to the proof
@@ -88,7 +89,8 @@ class PaymentModel {
       'currency': currency,
       'proofReference': proofReference,
       'status': status,
-      if (relatedAppointmentId != null) 'relatedAppointmentId': relatedAppointmentId,
+      if (relatedAppointmentId != null)
+        'relatedAppointmentId': relatedAppointmentId,
       if (doctorId != null) 'doctorId': doctorId,
       if (doctorName != null) 'doctorName': doctorName,
       'createdAt': Timestamp.fromDate(createdAt),
@@ -111,19 +113,35 @@ class PaymentModel {
 
     return PaymentModel(
       paymentId: (map['paymentId'] ?? id).toString(),
-      patientUid: (map['patientUid'] ?? map['patientUserId'] ?? map['userId'] ?? '').toString(),
+      patientUid:
+          (map['patientUid'] ?? map['patientUserId'] ?? map['userId'] ?? '')
+              .toString(),
       patientId: map['patientId'] as String?,
-      patientName: (map['patientName'] ?? map['fullname'] ?? 'Patient').toString(),
-      paymentType: (map['paymentType'] ?? PaymentType.accountActivation).toString(),
-      amount: (map['amount'] ?? map['payableAmount'] ?? map['totalPayment'] ?? 0.0).toDouble(),
+      patientName: (map['patientName'] ?? map['fullname'] ?? 'Patient')
+          .toString(),
+      paymentType: (map['paymentType'] ?? PaymentType.accountActivation)
+          .toString(),
+      amount:
+          (map['amount'] ?? map['payableAmount'] ?? map['totalPayment'] ?? 0.0)
+              .toDouble(),
       currency: (map['currency'] ?? 'PKR').toString(),
-      proofReference: (map['proofReference'] ?? map['paymentImage'] ?? map['paymentProofUrl'] ?? '').toString(),
+      proofReference:
+          (map['proofReference'] ??
+                  map['paymentImage'] ??
+                  map['paymentProofUrl'] ??
+                  '')
+              .toString(),
       status: (map['status'] ?? map['paymentStatus'] ?? 'pending').toString(),
-      relatedAppointmentId: (map['relatedAppointmentId'] ?? map['appointmentId']) as String?,
+      relatedAppointmentId:
+          (map['relatedAppointmentId'] ?? map['appointmentId']) as String?,
       doctorId: map['doctorId'] as String?,
       doctorName: map['doctorName'] as String?,
-      createdAt: parseDate(map['createdAt'] ?? map['submittedAt'] ?? map['paymentSubmittedAt']),
-      reviewedAt: map['reviewedAt'] != null ? parseDate(map['reviewedAt']) : null,
+      createdAt: parseDate(
+        map['createdAt'] ?? map['submittedAt'] ?? map['paymentSubmittedAt'],
+      ),
+      reviewedAt: map['reviewedAt'] != null
+          ? parseDate(map['reviewedAt'])
+          : null,
       reviewedBy: map['reviewedBy'] as String?,
       rejectionReason: map['rejectionReason'] as String?,
       updatedAt: map['updatedAt'] != null ? parseDate(map['updatedAt']) : null,

@@ -133,11 +133,12 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
         'paymentId=${widget.focusPaymentId} status=$status',
       );
 
-      final filter = <String>[
-        PaymentStatus.pending,
-        PaymentStatus.approved,
-        PaymentStatus.rejected,
-      ].contains(status)
+      final filter =
+          <String>[
+            PaymentStatus.pending,
+            PaymentStatus.approved,
+            PaymentStatus.rejected,
+          ].contains(status)
           ? status
           : 'all';
 
@@ -193,7 +194,12 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
         children: [
           // Account / Appointment switch.
           Padding(
-            padding: EdgeInsets.fromLTRB(context.rsp(16), 14, context.rsp(16), 0),
+            padding: EdgeInsets.fromLTRB(
+              context.rsp(16),
+              14,
+              context.rsp(16),
+              0,
+            ),
             child: AdminSegmentedControl<AdminPaymentSegment>(
               options: const [
                 AdminSegmentOption(
@@ -243,8 +249,9 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
     if (_accountPaymentsFilter != selectedFilter ||
         _accountPaymentsStream == null) {
       _accountPaymentsFilter = selectedFilter;
-      _accountPaymentsStream =
-          patientController.getFilteredPaymentRequests(selectedFilter);
+      _accountPaymentsStream = patientController.getFilteredPaymentRequests(
+        selectedFilter,
+      );
     }
     return StreamBuilder<List<UserModel>>(
       stream: _accountPaymentsStream,
@@ -257,8 +264,8 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
           return AdminErrorState(
             message: 'Error loading payment requests',
             onRetry: () => setState(() {
-              _accountPaymentsStream =
-                  patientController.getFilteredPaymentRequests(selectedFilter);
+              _accountPaymentsStream = patientController
+                  .getFilteredPaymentRequests(selectedFilter);
             }),
           );
         }
@@ -302,18 +309,20 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
     final paymentsAsync = ref.watch(appointmentPaymentsProvider);
 
     return paymentsAsync.when(
-      loading: () => const AdminLoading(label: 'Loading appointment payments...'),
+      loading: () =>
+          const AdminLoading(label: 'Loading appointment payments...'),
       error: (_, __) => AdminErrorState(
         message: 'Error loading appointment payments',
         // Invalidate the provider to actually re-subscribe; setState alone
         // re-watched the same errored provider value.
-        onRetry: () =>
-            ref.invalidate(appointmentPaymentsProvider),
+        onRetry: () => ref.invalidate(appointmentPaymentsProvider),
       ),
       data: (all) {
         final payments = all
-            .where((p) =>
-                selectedFilter == 'all' || p.paymentStatus == selectedFilter)
+            .where(
+              (p) =>
+                  selectedFilter == 'all' || p.paymentStatus == selectedFilter,
+            )
             .toList();
 
         if (payments.isEmpty) {
@@ -336,7 +345,8 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
 
   Widget _buildAppointmentPaymentCard(AppointmentPaymentModel payment) {
     final statusColor = _getStatusColor(payment.paymentStatus);
-    final isFocused = payment.patientId == widget.focusPatientId &&
+    final isFocused =
+        payment.patientId == widget.focusPatientId &&
         _segment == AdminPaymentSegment.appointment;
 
     return AdminCard(
@@ -402,9 +412,7 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
                         payment.patientName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: AdminTextStyles.heading(
-                          size: context.fs(14.5),
-                        ),
+                        style: AdminTextStyles.heading(size: context.fs(14.5)),
                       ),
                       Text(
                         'Dr. ${payment.doctorName} • ${payment.doctorSpecialization}',
@@ -437,16 +445,25 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
               children: [
                 Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: AdminPalette.brand.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AdminPalette.brand.withValues(alpha: 0.2)),
+                    border: Border.all(
+                      color: AdminPalette.brand.withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.calendar_today_rounded, size: 14, color: AdminPalette.brand),
+                      const Icon(
+                        Icons.calendar_today_rounded,
+                        size: 14,
+                        color: AdminPalette.brand,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Purpose: Appointment Booking',
@@ -478,8 +495,7 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
                           ),
                         ),
                       ],
-                      _amountRow('Original fee',
-                          payment.consultationFee),
+                      _amountRow('Original fee', payment.consultationFee),
                       if (payment.discountPercentage > 0) ...[
                         const SizedBox(height: 6),
                         _amountRow(
@@ -488,12 +504,17 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
                           color: AdminPalette.success,
                         ),
                         const SizedBox(height: 6),
-                        _amountRow('Discount amount',
-                            payment.discountAmount,
-                            color: AdminPalette.success),
+                        _amountRow(
+                          'Discount amount',
+                          payment.discountAmount,
+                          color: AdminPalette.success,
+                        ),
                         const SizedBox(height: 6),
-                        _amountRow('You save', payment.discountAmount,
-                            color: AdminPalette.success),
+                        _amountRow(
+                          'You save',
+                          payment.discountAmount,
+                          color: AdminPalette.success,
+                        ),
                       ],
                       const Divider(height: 14),
                       Row(
@@ -546,14 +567,13 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
                 ),
                 if (payment.videoWatched) ...[
                   const SizedBox(height: 10),
-                  AdminPill(
-                    text: 'VIDEO WATCHED',
-                    color: AdminPalette.success,
-                  ),
+                  AdminPill(text: 'VIDEO WATCHED', color: AdminPalette.success),
                 ],
                 const SizedBox(height: 16),
-                Text('Payment Proof:',
-                    style: AdminTextStyles.heading(size: context.fs(13))),
+                Text(
+                  'Payment Proof:',
+                  style: AdminTextStyles.heading(size: context.fs(13)),
+                ),
                 const SizedBox(height: 8),
                 if ((payment.paymentImage ?? '').isNotEmpty)
                   GestureDetector(
@@ -593,8 +613,11 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline,
-                            color: AdminPalette.error, size: 20),
+                        const Icon(
+                          Icons.error_outline,
+                          color: AdminPalette.error,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -637,8 +660,7 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
                           label: 'Approve',
                           icon: Icons.check_circle,
                           color: AdminPalette.success,
-                          onPressed: () =>
-                              _approveAppointmentPayment(payment),
+                          onPressed: () => _approveAppointmentPayment(payment),
                         ),
                       ),
                     ],
@@ -680,7 +702,9 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
     );
   }
 
-  Future<void> _approveAppointmentPayment(AppointmentPaymentModel payment) async {
+  Future<void> _approveAppointmentPayment(
+    AppointmentPaymentModel payment,
+  ) async {
     final confirmed = await showAdminConfirmDialog(
       context: context,
       title: 'Approve Appointment Payment',
@@ -712,10 +736,9 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
       confirmColor: AdminPalette.error,
       onConfirm: (reason) async {
         ToastService.instance.showInfo('Rejecting payment...');
-        final error = await ref.read(appointmentControllerProvider).rejectAppointmentPayment(
-              payment,
-              reason: reason,
-            );
+        final error = await ref
+            .read(appointmentControllerProvider)
+            .rejectAppointmentPayment(payment, reason: reason);
         if (!mounted) return;
         if (error != null) {
           ToastService.instance.showError(error);
@@ -846,16 +869,25 @@ class _AdminPaymentScreenState extends ConsumerState<AdminPaymentScreen> {
               children: [
                 Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: AdminPalette.brand.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AdminPalette.brand.withValues(alpha: 0.2)),
+                    border: Border.all(
+                      color: AdminPalette.brand.withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.verified_user_outlined, size: 14, color: AdminPalette.brand),
+                      const Icon(
+                        Icons.verified_user_outlined,
+                        size: 14,
+                        color: AdminPalette.brand,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Purpose: ${request.ispayment ? "Account Reactivation" : "Account Activation"}',
@@ -1157,10 +1189,7 @@ class FullScreenImageViewer extends StatelessWidget {
         ),
         title: Text(
           'Payment Proof',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
       ),

@@ -22,7 +22,8 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
   late TabController _tabController;
   final TextEditingController _messageController = TextEditingController();
   final TextEditingController _paymentIdController = TextEditingController();
-  final TextEditingController _appointmentIdController = TextEditingController();
+  final TextEditingController _appointmentIdController =
+      TextEditingController();
 
   static const List<String> _categories = [
     'Account activation payment',
@@ -86,7 +87,8 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
     try {
       final service = ref.read(paymentComplaintServiceProvider);
 
-      final paymentStatus = (currentUser.paymentStatus != null &&
+      final paymentStatus =
+          (currentUser.paymentStatus != null &&
               currentUser.paymentStatus!.isNotEmpty)
           ? currentUser.paymentStatus!
           : 'not_submitted';
@@ -94,7 +96,8 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
       final enteredPaymentId = _paymentIdController.text.trim().isNotEmpty
           ? _paymentIdController.text.trim()
           : currentUser.paymentId;
-      final enteredAppointmentId = _appointmentIdController.text.trim().isNotEmpty
+      final enteredAppointmentId =
+          _appointmentIdController.text.trim().isNotEmpty
           ? _appointmentIdController.text.trim()
           : null;
 
@@ -123,8 +126,9 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
       _tabController.animateTo(1);
     } catch (e) {
       if (!mounted) return;
-      final errorMsg =
-          e is ArgumentError ? e.message.toString() : 'Failed to submit complaint: $e';
+      final errorMsg = e is ArgumentError
+          ? e.message.toString()
+          : 'Failed to submit complaint: $e';
       setState(() {
         _errorMessage = errorMsg;
       });
@@ -141,7 +145,8 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(userProvider);
-    final paymentStatus = (currentUser?.paymentStatus != null &&
+    final paymentStatus =
+        (currentUser?.paymentStatus != null &&
             currentUser!.paymentStatus!.isNotEmpty)
         ? currentUser.paymentStatus!.toUpperCase()
         : 'NOT SUBMITTED';
@@ -187,7 +192,9 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
   }
 
   Widget _buildComplaintForm(String paymentStatus) {
-    final nowFormatted = DateFormat('MMM d, yyyy h:mm a').format(DateTime.now());
+    final nowFormatted = DateFormat(
+      'MMM d, yyyy h:mm a',
+    ).format(DateTime.now());
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -248,8 +255,8 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
                             color: paymentStatus == 'APPROVED'
                                 ? Colors.green[700]
                                 : (paymentStatus == 'PENDING'
-                                    ? Colors.orange[800]
-                                    : AppColors.primaryRed),
+                                      ? Colors.orange[800]
+                                      : AppColors.primaryRed),
                           ),
                         ),
                       ],
@@ -282,8 +289,10 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
                 child: DropdownButton<String>(
                   value: _selectedCategory,
                   isExpanded: true,
-                  icon: const Icon(Icons.arrow_drop_down_rounded,
-                      color: Color(0xFF1F2F44)),
+                  icon: const Icon(
+                    Icons.arrow_drop_down_rounded,
+                    color: Color(0xFF1F2F44),
+                  ),
                   items: _categories.map((category) {
                     return DropdownMenuItem<String>(
                       value: category,
@@ -330,8 +339,10 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
                 ),
                 filled: true,
                 fillColor: Colors.white,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: const BorderSide(color: Color(0xFFDCE6F2)),
@@ -342,7 +353,10 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: AppColors.primaryRed, width: 1.5),
+                  borderSide: BorderSide(
+                    color: AppColors.primaryRed,
+                    width: 1.5,
+                  ),
                 ),
               ),
             ),
@@ -369,8 +383,10 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
                 ),
                 filled: true,
                 fillColor: Colors.white,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: const BorderSide(color: Color(0xFFDCE6F2)),
@@ -381,7 +397,10 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: AppColors.primaryRed, width: 1.5),
+                  borderSide: BorderSide(
+                    color: AppColors.primaryRed,
+                    width: 1.5,
+                  ),
                 ),
               ),
             ),
@@ -402,7 +421,10 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
                 const SizedBox(width: 4),
                 const Text(
                   '*',
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -431,7 +453,10 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: AppColors.primaryRed, width: 1.5),
+                  borderSide: BorderSide(
+                    color: AppColors.primaryRed,
+                    width: 1.5,
+                  ),
                 ),
               ),
             ),
@@ -447,8 +472,11 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline_rounded,
-                        color: Colors.red, size: 20),
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: Colors.red,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -490,9 +518,15 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
                           color: Colors.white,
                         ),
                       )
-                    : const Icon(Icons.send_rounded, size: 20, color: Colors.white),
+                    : const Icon(
+                        Icons.send_rounded,
+                        size: 20,
+                        color: Colors.white,
+                      ),
                 label: Text(
-                  _isSubmitting ? 'Submitting Complaint...' : 'Submit Complaint',
+                  _isSubmitting
+                      ? 'Submitting Complaint...'
+                      : 'Submit Complaint',
                   style: TextStyle(
                     fontSize: context.fs(15),
                     fontWeight: FontWeight.bold,
@@ -571,7 +605,9 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
             final complaint = complaints[index];
-            final dateStr = DateFormat('MMM d, yyyy h:mm a').format(complaint.createdAt);
+            final dateStr = DateFormat(
+              'MMM d, yyyy h:mm a',
+            ).format(complaint.createdAt);
 
             Color statusColor;
             String statusText;
@@ -610,12 +646,15 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color: statusColor.withValues(alpha: 0.3)),
+                            color: statusColor.withValues(alpha: 0.3),
+                          ),
                         ),
                         child: Text(
                           statusText,
@@ -681,8 +720,11 @@ class _SubmitComplaintScreenState extends ConsumerState<SubmitComplaintScreen>
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.admin_panel_settings_rounded,
-                                  size: 16, color: Colors.blue[800]),
+                              Icon(
+                                Icons.admin_panel_settings_rounded,
+                                size: 16,
+                                color: Colors.blue[800],
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 'Admin Response:',

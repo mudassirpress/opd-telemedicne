@@ -21,6 +21,7 @@ class DoctorSharedReportsScreen extends ConsumerStatefulWidget {
   ConsumerState<DoctorSharedReportsScreen> createState() =>
       _DoctorSharedReportsScreenState();
 }
+
 class _DoctorSharedReportsScreenState
     extends ConsumerState<DoctorSharedReportsScreen> {
   bool _isDownloading = false;
@@ -48,10 +49,9 @@ class _DoctorSharedReportsScreenState
       ToastService.instance.showInfo('Refreshing shared reports...');
     }
     setState(() {
-      _sharesStream =
-          ref.read(reportShareControllerProvider).streamDoctorSharedReports(
-        doctorId,
-      );
+      _sharesStream = ref
+          .read(reportShareControllerProvider)
+          .streamDoctorSharedReports(doctorId);
     });
   }
 
@@ -102,8 +102,8 @@ class _DoctorSharedReportsScreenState
 
       if (response.statusCode == 200) {
         final Directory tempDir = await getTemporaryDirectory();
-        final String timestamp =
-            DateTime.now().millisecondsSinceEpoch.toString();
+        final String timestamp = DateTime.now().millisecondsSinceEpoch
+            .toString();
 
         String fileExtension = 'pdf';
         if (fileUrl.contains('.jpg') || fileUrl.contains('.jpeg')) {
@@ -176,7 +176,6 @@ class _DoctorSharedReportsScreenState
                   ),
                   child: Row(
                     children: [
-                       
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,10 +215,7 @@ class _DoctorSharedReportsScreenState
                   ),
                 ),
                 const SizedBox(height: 4),
-                Expanded(
-                  child: _buildContent(doctorId),
-                ),
- 
+                Expanded(child: _buildContent(doctorId)),
               ],
             ),
           ),
@@ -255,10 +251,11 @@ class _DoctorSharedReportsScreenState
       );
     }
 
-    final stream = _sharesStream ??
-        ref.read(reportShareControllerProvider).streamDoctorSharedReports(
-          doctorId,
-        );
+    final stream =
+        _sharesStream ??
+        ref
+            .read(reportShareControllerProvider)
+            .streamDoctorSharedReports(doctorId);
 
     return StreamBuilder<List<SharedReportModel>>(
       stream: stream,
@@ -395,11 +392,7 @@ class _DoctorSharedReportsScreenState
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFFE3EAF2),
-            Color(0xFFF5F8FC),
-            Color(0xFFE2E9F2),
-          ],
+          colors: [Color(0xFFE3EAF2), Color(0xFFF5F8FC), Color(0xFFE2E9F2)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -417,11 +410,7 @@ class _DoctorSharedReportsScreenState
         margin: const EdgeInsets.all(2),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFFF3F7FB),
-              Colors.white,
-              Color(0xFFF0F4F9),
-            ],
+            colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),

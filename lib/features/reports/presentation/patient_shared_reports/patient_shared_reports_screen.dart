@@ -31,9 +31,7 @@ class _PatientSharedReportsScreenState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Revoke Access',
           style: TextStyle(
@@ -77,10 +75,7 @@ class _PatientSharedReportsScreenState
 
     final success = await ref
         .read(reportShareControllerProvider)
-        .revokeReportAccess(
-          reportId: share.reportId,
-          doctorId: share.doctorId,
-        );
+        .revokeReportAccess(reportId: share.reportId, doctorId: share.doctorId);
 
     if (mounted) {
       setState(() => _revokingShareId = null);
@@ -155,7 +150,6 @@ class _PatientSharedReportsScreenState
                   ),
                 ),
                 Expanded(child: _buildContent(patientId)),
-                
               ],
             ),
           ),
@@ -205,7 +199,10 @@ class _PatientSharedReportsScreenState
 
         return ListView.builder(
           physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.symmetric(horizontal: context.rsp(18), vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: context.rsp(18),
+            vertical: 8,
+          ),
           itemCount: shares.length,
           itemBuilder: (context, index) {
             return _buildShareCard(shares[index]);
@@ -271,11 +268,7 @@ class _PatientSharedReportsScreenState
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFFE3EAF2),
-            Color(0xFFF5F8FC),
-            Color(0xFFE2E9F2),
-          ],
+          colors: [Color(0xFFE3EAF2), Color(0xFFF5F8FC), Color(0xFFE2E9F2)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -293,11 +286,7 @@ class _PatientSharedReportsScreenState
         margin: const EdgeInsets.all(2),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFFF3F7FB),
-              Colors.white,
-              Color(0xFFF0F4F9),
-            ],
+            colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),

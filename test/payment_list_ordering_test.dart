@@ -5,30 +5,36 @@ import 'package:telemedicine/data/models/user_model.dart';
 
 /// A raw Firestore reactivation-request document, as the admin list receives it.
 Map<String, dynamic> _request(String id, Object? submittedAt) => {
-      'id': id,
-      'submittedAt': submittedAt,
-    };
+  'id': id,
+  'submittedAt': submittedAt,
+};
 
 /// A patient payment record, as `getFilteredPaymentRequests` sees it.
 UserModel _patient(String id, Object? submittedAt) => UserModel.fromMap({
-      'id': id,
-      'fullname': 'Patient $id',
-      'paymentImage': 'https://example.com/$id.png',
-      'paymentStatus': 'pending',
-      'paymentSubmittedAt': submittedAt,
-    });
+  'id': id,
+  'fullname': 'Patient $id',
+  'paymentImage': 'https://example.com/$id.png',
+  'paymentStatus': 'pending',
+  'paymentSubmittedAt': submittedAt,
+});
 
 void main() {
   group('parseFirestoreTimestamp', () {
     final expected = DateTime(2026, 3, 4, 5, 6, 7);
 
-    test('parses an ISO String (how the patient writes paymentSubmittedAt)', () {
-      expect(parseFirestoreTimestamp(expected.toIso8601String()), expected);
-    });
+    test(
+      'parses an ISO String (how the patient writes paymentSubmittedAt)',
+      () {
+        expect(parseFirestoreTimestamp(expected.toIso8601String()), expected);
+      },
+    );
 
-    test('parses a Firestore Timestamp (how reactivation writes submittedAt)', () {
-      expect(parseFirestoreTimestamp(Timestamp.fromDate(expected)), expected);
-    });
+    test(
+      'parses a Firestore Timestamp (how reactivation writes submittedAt)',
+      () {
+        expect(parseFirestoreTimestamp(Timestamp.fromDate(expected)), expected);
+      },
+    );
 
     test('parses a DateTime and an epoch int', () {
       expect(parseFirestoreTimestamp(expected), expected);
@@ -48,14 +54,11 @@ void main() {
 
   group('sortByTimestampDesc', () {
     test('newest submission is first', () {
-      final result = sortByTimestampDesc<_Doc>(
-        [
-          _Doc('old', DateTime(2026, 1, 1, 9)),
-          _Doc('new', DateTime(2026, 1, 1, 11)),
-          _Doc('mid', DateTime(2026, 1, 1, 10)),
-        ],
-        (d) => d.at,
-      );
+      final result = sortByTimestampDesc<_Doc>([
+        _Doc('old', DateTime(2026, 1, 1, 9)),
+        _Doc('new', DateTime(2026, 1, 1, 11)),
+        _Doc('mid', DateTime(2026, 1, 1, 10)),
+      ], (d) => d.at);
       expect(result.map((d) => d.id), ['new', 'mid', 'old']);
     });
 
@@ -65,14 +68,11 @@ void main() {
       // timestamps are deliberately set so that id order (a, m, z) is the exact
       // reverse of the correct newest-first order — only a real timestamp sort
       // can produce the expected result.
-      final result = sortByTimestampDesc<_Doc>(
-        [
-          _Doc('a', DateTime(2026, 1, 1, 9)), // oldest, first by id
-          _Doc('z', DateTime(2026, 1, 1, 12)), // newest, last by id
-          _Doc('m', DateTime(2026, 1, 1, 10)),
-        ],
-        (d) => d.at,
-      );
+      final result = sortByTimestampDesc<_Doc>([
+        _Doc('a', DateTime(2026, 1, 1, 9)), // oldest, first by id
+        _Doc('z', DateTime(2026, 1, 1, 12)), // newest, last by id
+        _Doc('m', DateTime(2026, 1, 1, 10)),
+      ], (d) => d.at);
       expect(result.map((d) => d.id), ['z', 'm', 'a']);
     });
 
@@ -93,37 +93,28 @@ void main() {
     });
 
     test('a newly submitted item jumps to the top', () {
-      final before = sortByTimestampDesc<_Doc>(
-        [
-          _Doc('a', DateTime(2026, 1, 1, 9)),
-          _Doc('b', DateTime(2026, 1, 1, 10)),
-        ],
-        (d) => d.at,
-      );
+      final before = sortByTimestampDesc<_Doc>([
+        _Doc('a', DateTime(2026, 1, 1, 9)),
+        _Doc('b', DateTime(2026, 1, 1, 10)),
+      ], (d) => d.at);
       expect(before.map((d) => d.id), ['b', 'a']);
 
       // Same list, one new proof arrives.
-      final after = sortByTimestampDesc<_Doc>(
-        [
-          _Doc('a', DateTime(2026, 1, 1, 9)),
-          _Doc('b', DateTime(2026, 1, 1, 10)),
-          _Doc('fresh', DateTime(2026, 1, 1, 11)),
-        ],
-        (d) => d.at,
-      );
+      final after = sortByTimestampDesc<_Doc>([
+        _Doc('a', DateTime(2026, 1, 1, 9)),
+        _Doc('b', DateTime(2026, 1, 1, 10)),
+        _Doc('fresh', DateTime(2026, 1, 1, 11)),
+      ], (d) => d.at);
       expect(after.map((d) => d.id), ['fresh', 'b', 'a']);
     });
 
     test('is stable for equal timestamps (no reshuffle between emissions)', () {
       final same = DateTime(2026, 1, 1, 12);
-      final result = sortByTimestampDesc<_Doc>(
-        [
-          _Doc('one', same),
-          _Doc('two', same),
-          _Doc('three', same),
-        ],
-        (d) => d.at,
-      );
+      final result = sortByTimestampDesc<_Doc>([
+        _Doc('one', same),
+        _Doc('two', same),
+        _Doc('three', same),
+      ], (d) => d.at);
       expect(result.map((d) => d.id), ['one', 'two', 'three']);
     });
 
@@ -139,8 +130,9 @@ void main() {
     test('empty and single-item lists are handled', () {
       expect(sortByTimestampDesc<_Doc>(const [], (_) => null), isEmpty);
       expect(
-        sortByTimestampDesc<_Doc>(const [_Doc('only')], (_) => null)
-            .map((d) => d.id),
+        sortByTimestampDesc<_Doc>(const [
+          _Doc('only'),
+        ], (_) => null).map((d) => d.id),
         ['only'],
       );
     });

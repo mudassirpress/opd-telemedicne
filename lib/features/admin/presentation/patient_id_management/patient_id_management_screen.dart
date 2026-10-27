@@ -302,9 +302,11 @@ class _PatientIdManagementScreenState
         sheet.getRangeByIndex(i + 2, 4).setText(id.plan.displayName);
         sheet.getRangeByIndex(i + 2, 5).setNumber(id.durationMonths.toDouble());
         sheet.getRangeByIndex(i + 2, 6).setText(id.status);
-        sheet.getRangeByIndex(i + 2, 7).setText(
-          '${id.generatedAt.day.toString().padLeft(2, '0')}/${id.generatedAt.month.toString().padLeft(2, '0')}/${id.generatedAt.year} ${id.generatedAt.hour.toString().padLeft(2, '0')}:${id.generatedAt.minute.toString().padLeft(2, '0')}',
-        );
+        sheet
+            .getRangeByIndex(i + 2, 7)
+            .setText(
+              '${id.generatedAt.day.toString().padLeft(2, '0')}/${id.generatedAt.month.toString().padLeft(2, '0')}/${id.generatedAt.year} ${id.generatedAt.hour.toString().padLeft(2, '0')}:${id.generatedAt.minute.toString().padLeft(2, '0')}',
+            );
       }
 
       final List<int> bytes = workbook.saveSync();
@@ -373,10 +375,7 @@ class _PatientIdManagementScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AdminSectionTitle(
-            icon: Icons.analytics,
-            title: 'ID Statistics',
-          ),
+          AdminSectionTitle(icon: Icons.analytics, title: 'ID Statistics'),
           const SizedBox(height: 16),
           if (_isLoadingStats)
             const Padding(
@@ -537,9 +536,7 @@ class _PatientIdManagementScreenState
             SizedBox(height: context.rsp(16)),
             AdminPrimaryButton(
               label: _isGenerating ? 'Generating...' : 'Generate Patient IDs',
-              leadingIcon: _isGenerating
-                  ? null
-                  : Icons.auto_awesome,
+              leadingIcon: _isGenerating ? null : Icons.auto_awesome,
               isLoading: _isGenerating,
               onPressed: _generateIds,
               height: context.rsp(48),
@@ -702,10 +699,7 @@ class _PatientIdManagementScreenState
                 ),
                 Text(
                   'Tap retry to attempt saving the failed records.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AdminPalette.frozen,
-                  ),
+                  style: TextStyle(fontSize: 12, color: AdminPalette.frozen),
                 ),
               ],
             ),
@@ -775,10 +769,7 @@ class _PatientIdManagementScreenState
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Text(
-            '$label: ',
-            style: AdminTextStyles.body(size: context.fs(13)),
-          ),
+          Text('$label: ', style: AdminTextStyles.body(size: context.fs(13))),
           Flexible(
             child: Text(
               value,
@@ -798,9 +789,9 @@ class _PatientIdManagementScreenState
 
   String _formatNumber(int n) {
     return n.toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]},',
-        );
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
   }
 
   Widget _buildBatchesSection() {
@@ -867,7 +858,9 @@ class _PatientIdManagementScreenState
                   isSelected
                       ? Icons.radio_button_checked
                       : Icons.radio_button_unchecked,
-                  color: isSelected ? AdminPalette.brand : AdminPalette.textMuted,
+                  color: isSelected
+                      ? AdminPalette.brand
+                      : AdminPalette.textMuted,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -1052,8 +1045,9 @@ class _PatientIdManagementScreenState
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          color:
-              isSelected ? color.withValues(alpha: 0.12) : AdminPalette.infoBg,
+          color: isSelected
+              ? color.withValues(alpha: 0.12)
+              : AdminPalette.infoBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? color : AdminPalette.cardBorder,
@@ -1079,8 +1073,9 @@ class _PatientIdManagementScreenState
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: context.fs(12.5),
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w600,
                       color: isSelected ? color : AdminPalette.textPrimary,
                     ),
                   ),

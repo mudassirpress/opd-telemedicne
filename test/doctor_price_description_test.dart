@@ -6,16 +6,15 @@ import 'package:telemedicine/features/appointments/presentation/appointment_cont
 /// A doctor document in whatever shape the given keys produce — everything
 /// else falls back to the fields every record has carried forever.
 UserModel doctorFrom(Map<String, dynamic> fields) => UserModel.fromMap({
-      'id': 'doctor-doc-1',
-      'fullname': 'Dr. Amina Khan',
-      'role': 'doctor',
-      'doctorId': '4711',
-      ...fields,
-    });
+  'id': 'doctor-doc-1',
+  'fullname': 'Dr. Amina Khan',
+  'role': 'doctor',
+  'doctorId': '4711',
+  ...fields,
+});
 
 void main() {
-  group('doctor price / description — documents written before the fields',
-      () {
+  group('doctor price / description — documents written before the fields', () {
     test('a document with neither field parses without throwing', () {
       final doctor = doctorFrom(const {});
 
@@ -137,10 +136,7 @@ void main() {
 
   group('appointment payment uses the selected doctor price', () {
     test('priceOf prefers `price`, then the legacy fee, then 0', () {
-      expect(
-        AppointmentController.priceOf(const {'price': 2000}),
-        2000,
-      );
+      expect(AppointmentController.priceOf(const {'price': 2000}), 2000);
       expect(
         AppointmentController.priceOf(const {'consultationFee': 1500}),
         1500,

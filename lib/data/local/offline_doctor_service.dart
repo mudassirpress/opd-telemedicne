@@ -26,10 +26,7 @@ class OfflineDoctorService {
   /// Doctor fields that hold a date. Serialised as ISO 8601 strings because
   /// `jsonEncode` throws outright on a `DateTime`, and the Firestore stream
   /// delivers `lastSeen` as a `Timestamp` and `onlineSince` as a `DateTime`.
-  static const List<String> _dateFields = <String>[
-    'lastSeen',
-    'onlineSince',
-  ];
+  static const List<String> _dateFields = <String>['lastSeen', 'onlineSince'];
 
   Box<String>? get _box => HiveDBService.doctorListBox;
 
@@ -63,23 +60,26 @@ class OfflineDoctorService {
       final decoded = jsonDecode(raw);
       if (decoded is! List) return const <Map<String, dynamic>>[];
 
-      return decoded.map((item) {
-        if (item is! Map) return <String, dynamic>{};
-        final map = Map<String, dynamic>.from(item);
-        // Restore the date fields to `DateTime` so a cached map has the same
-        // shape as a live one. Consumers such as `presenceFromDoctorList`
-        // would cope with either, but keeping the shapes identical means a
-        // cached value and a synced value are indistinguishable downstream.
-        for (final field in _dateFields) {
-          final value = map[field];
-          if (value is String && value.isNotEmpty) {
-            map[field] = DateTime.tryParse(value);
-          } else if (value != null && value is! DateTime) {
-            map[field] = parseFirestoreTimestamp(value);
-          }
-        }
-        return map;
-      }).where((map) => (map['id'] ?? '').toString().isNotEmpty).toList();
+      return decoded
+          .map((item) {
+            if (item is! Map) return <String, dynamic>{};
+            final map = Map<String, dynamic>.from(item);
+            // Restore the date fields to `DateTime` so a cached map has the same
+            // shape as a live one. Consumers such as `presenceFromDoctorList`
+            // would cope with either, but keeping the shapes identical means a
+            // cached value and a synced value are indistinguishable downstream.
+            for (final field in _dateFields) {
+              final value = map[field];
+              if (value is String && value.isNotEmpty) {
+                map[field] = DateTime.tryParse(value);
+              } else if (value != null && value is! DateTime) {
+                map[field] = parseFirestoreTimestamp(value);
+              }
+            }
+            return map;
+          })
+          .where((map) => (map['id'] ?? '').toString().isNotEmpty)
+          .toList();
     } catch (e) {
       // A corrupt or old-format cache must degrade to "empty", never crash the
       // screen that is trying to render from it.

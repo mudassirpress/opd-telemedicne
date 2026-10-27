@@ -69,8 +69,6 @@ class ChatController {
     _unreadMemo.remove('$userId:$chatId');
   }
 
-
-
   String getChatId(String userId1, String userId2) {
     return userId1.compareTo(userId2) < 0
         ? '${userId1}_$userId2'
@@ -750,7 +748,8 @@ class ChatController {
 
     // Format display message based on type
     String displayMessage = message;
-    if ((messageType == 'audio' || messageType == 'voice') && duration != null) {
+    if ((messageType == 'audio' || messageType == 'voice') &&
+        duration != null) {
       final minutes = duration ~/ 60;
       final seconds = duration % 60;
       final durationText = minutes > 0
@@ -983,12 +982,13 @@ class ChatController {
       final chatId = getChatId(senderId, receiverId);
       final messageId = 'doc_${DateTime.now().millisecondsSinceEpoch}';
 
-      final uploadResult = await FirebaseStorageService.instance.uploadChatAttachment(
-        conversationId: chatId,
-        messageId: messageId,
-        file: documentFile,
-        originalFileName: fileName,
-      );
+      final uploadResult = await FirebaseStorageService.instance
+          .uploadChatAttachment(
+            conversationId: chatId,
+            messageId: messageId,
+            file: documentFile,
+            originalFileName: fileName,
+          );
 
       // Send message with document details
       await sendMessage(
@@ -1129,11 +1129,12 @@ class ChatController {
         throw Exception('Invalid image format');
       }
 
-      final uploadResult = await FirebaseStorageService.instance.uploadChatAttachment(
-        conversationId: chatId,
-        messageId: messageId,
-        file: localFile,
-      );
+      final uploadResult = await FirebaseStorageService.instance
+          .uploadChatAttachment(
+            conversationId: chatId,
+            messageId: messageId,
+            file: localFile,
+          );
 
       await sendMessage(
         senderId: senderId,
@@ -1165,11 +1166,12 @@ class ChatController {
       final messageId = 'voice_${DateTime.now().millisecondsSinceEpoch}';
       final file = File(audioPath);
 
-      final uploadResult = await FirebaseStorageService.instance.uploadChatVoice(
-        conversationId: chatId,
-        messageId: messageId,
-        file: file,
-      );
+      final uploadResult = await FirebaseStorageService.instance
+          .uploadChatVoice(
+            conversationId: chatId,
+            messageId: messageId,
+            file: file,
+          );
 
       await sendMessage(
         senderId: senderId,
@@ -1237,7 +1239,9 @@ class ChatController {
         'VOICE_MESSAGE_LISTENED chatId=$chatId messageId=$messageId receiverId=$receiverId',
       );
     } catch (e) {
-      debugPrint('[ChatController] Error marking voice message as listened: $e');
+      debugPrint(
+        '[ChatController] Error marking voice message as listened: $e',
+      );
     }
   }
 
@@ -1666,11 +1670,7 @@ class ChatController {
       if (doctorQuery.docs.isNotEmpty) {
         final doc = doctorQuery.docs.first;
         final data = doc.data();
-        final profile = {
-          ...data,
-          'id': doc.id,
-          'role': 'doctor',
-        };
+        final profile = {...data, 'id': doc.id, 'role': 'doctor'};
         _userProfileCache[cleanId] = profile;
         return profile;
       }
@@ -1713,16 +1713,14 @@ class ChatController {
 
       // 6. Check 'doctors' collection (legacy alias)
       try {
-        final legacyDoc =
-            await _firestore.collection('doctors').doc(cleanId).get();
+        final legacyDoc = await _firestore
+            .collection('doctors')
+            .doc(cleanId)
+            .get();
         if (legacyDoc.exists) {
           final data = legacyDoc.data();
           if (data != null) {
-            final profile = {
-              ...data,
-              'id': legacyDoc.id,
-              'role': 'doctor',
-            };
+            final profile = {...data, 'id': legacyDoc.id, 'role': 'doctor'};
             _userProfileCache[cleanId] = profile;
             return profile;
           }
@@ -1731,7 +1729,9 @@ class ChatController {
 
       // Safe fallback: when document does not exist, return a default placeholder
       // without crashing the UI or spamming the console on every frame/rebuild.
-      debugPrint('ℹ️ User profile not found for ID: $cleanId — using default fallback');
+      debugPrint(
+        'ℹ️ User profile not found for ID: $cleanId — using default fallback',
+      );
       final fallback = <String, dynamic>{
         'id': cleanId,
         'fullname': 'User',

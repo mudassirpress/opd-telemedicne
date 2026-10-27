@@ -117,7 +117,10 @@ void main() {
 
     test('stays open through the final month', () {
       expect(on(DateTime(2026, 6, 20)).isExpiringSoon, isTrue);
-      expect(on(expiry.subtract(const Duration(days: 1))).isExpiringSoon, isTrue);
+      expect(
+        on(expiry.subtract(const Duration(days: 1))).isExpiringSoon,
+        isTrue,
+      );
     });
 
     test('closes once the account is actually expired', () {
@@ -131,7 +134,9 @@ void main() {
     test('never warns for an account already past expiry at evaluation time', () {
       // Mirrors the real sign-in path: a validity that lapsed while the app was
       // closed must route to the expired flow, not the warning.
-      final lapsed = grantValidity(DateTime.now().subtract(const Duration(days: 200)));
+      final lapsed = grantValidity(
+        DateTime.now().subtract(const Duration(days: 200)),
+      );
       final status = AccountExpiryService.evaluate(expiryDate: lapsed);
       expect(status.isExpired, isTrue);
       expect(status.isExpiringSoon, isFalse);
@@ -153,10 +158,7 @@ void main() {
       final renewed = AccountExpiryService.evaluate(
         expiryDate: DateTime(2026, 12, 10),
       );
-      expect(
-        old.periodKeyFor('user1'),
-        isNot(renewed.periodKeyFor('user1')),
-      );
+      expect(old.periodKeyFor('user1'), isNot(renewed.periodKeyFor('user1')));
     });
 
     test('differs per user so accounts cannot suppress each other', () {
@@ -179,10 +181,7 @@ void main() {
     test('formats day counts and falls back to a date past a month', () {
       expect(
         AccountExpiryService.describeRemaining(
-          PatientExpiryStatus(
-            expiryDate: DateTime.now(),
-            daysRemaining: 12,
-          ),
+          PatientExpiryStatus(expiryDate: DateTime.now(), daysRemaining: 12),
         ),
         'in 12 days',
       );

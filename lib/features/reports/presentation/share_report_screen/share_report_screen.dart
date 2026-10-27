@@ -21,7 +21,7 @@ class ShareReportScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<ShareReportScreen> createState() => _ShareReportScreenState();
 }
- 
+
 class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -63,7 +63,9 @@ class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
     );
   }
 
-  List<Map<String, dynamic>> _filterDoctors(List<Map<String, dynamic>> doctors) {
+  List<Map<String, dynamic>> _filterDoctors(
+    List<Map<String, dynamic>> doctors,
+  ) {
     if (_searchQuery.isEmpty) return doctors;
     final q = _searchQuery.toLowerCase();
     return doctors.where((doctor) {
@@ -74,18 +76,14 @@ class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
     }).toList();
   }
 
-  Future<void> _confirmAndShare(
-    Map<String, dynamic> doctor,
-  ) async {
+  Future<void> _confirmAndShare(Map<String, dynamic> doctor) async {
     final doctorId = doctor['id']?.toString() ?? '';
     final doctorName = doctor['fullname']?.toString() ?? 'Doctor';
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Share Report',
           style: TextStyle(
@@ -139,9 +137,7 @@ class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
     }
 
     if (success) {
-      ToastService.instance.showSuccess(
-        'Report shared with Dr. $doctorName',
-      );
+      ToastService.instance.showSuccess('Report shared with Dr. $doctorName');
     }
   }
 
@@ -151,9 +147,7 @@ class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Revoke Access',
           style: TextStyle(
@@ -206,9 +200,7 @@ class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
     }
 
     if (success) {
-      ToastService.instance.showSuccess(
-        'Access revoked for Dr. $doctorName',
-      );
+      ToastService.instance.showSuccess('Access revoked for Dr. $doctorName');
     }
   }
 
@@ -340,7 +332,6 @@ class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
                     },
                   ),
                 ),
-                
               ],
             ),
           ),
@@ -436,8 +427,11 @@ class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
     final doctorId = doctor['id']?.toString() ?? '';
     // Aggregated rating projected onto the doctor profile.
     final ratingAsync = ref.watch(doctorRatingSummaryProvider(doctorId));
-    final averageRating = ratingAsync.valueOrNull?.average ?? (doctor['averageRating'] ?? 0.0).toDouble();
-    final totalRatings = ratingAsync.valueOrNull?.total ?? (doctor['totalRatings'] ?? 0).toInt();
+    final averageRating =
+        ratingAsync.valueOrNull?.average ??
+        (doctor['averageRating'] ?? 0.0).toDouble();
+    final totalRatings =
+        ratingAsync.valueOrNull?.total ?? (doctor['totalRatings'] ?? 0).toInt();
     final bool isShared = share != null;
 
     return Container(
@@ -445,11 +439,7 @@ class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFFF3F7FB),
-            Colors.white,
-            Color(0xFFF0F4F9),
-          ],
+          colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -471,7 +461,9 @@ class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
           CircleAvatar(
             radius: 24,
             backgroundColor: const Color(0xFF062B72).withValues(alpha: 0.1),
-            backgroundImage: imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
+            backgroundImage: imageUrl.isNotEmpty
+                ? NetworkImage(imageUrl)
+                : null,
             child: imageUrl.isEmpty
                 ? Text(
                     doctorName.isNotEmpty ? doctorName[0].toUpperCase() : 'D',
@@ -515,7 +507,9 @@ class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
                 Row(
                   children: [
                     Icon(
-                      totalRatings > 0 ? Icons.star_rounded : Icons.star_border_rounded,
+                      totalRatings > 0
+                          ? Icons.star_rounded
+                          : Icons.star_border_rounded,
                       size: 13,
                       color: totalRatings > 0
                           ? const Color(0xFFE9A400)
@@ -545,8 +539,7 @@ class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
           ),
           if (share != null)
             TextButton(
-              onPressed:
-                  isLoading ? null : () => _confirmAndRevoke(share),
+              onPressed: isLoading ? null : () => _confirmAndRevoke(share),
               style: TextButton.styleFrom(
                 foregroundColor: Colors.redAccent,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -594,15 +587,13 @@ class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF062B72).withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF062B72).withValues(alpha: 0.25)),
+        border: Border.all(
+          color: const Color(0xFF062B72).withValues(alpha: 0.25),
+        ),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.link_rounded,
-            size: 18,
-            color: Color(0xFF062B72),
-          ),
+          const Icon(Icons.link_rounded, size: 18, color: Color(0xFF062B72)),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -657,10 +648,7 @@ class _ShareReportScreenState extends ConsumerState<ShareReportScreen> {
                   const SizedBox(width: 4),
                   Text(
                     'Revoke',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),

@@ -230,7 +230,9 @@ class _CallRecordingWidgetState extends State<CallRecordingWidget> {
                             style: TextStyle(
                               fontSize: context.fs(12),
                               fontWeight: FontWeight.w600,
-                              color: widget.isMe ? Colors.white : Colors.black87,
+                              color: widget.isMe
+                                  ? Colors.white
+                                  : Colors.black87,
                             ),
                           ),
                         ),

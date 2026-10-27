@@ -28,14 +28,14 @@ class AppointmentPricing {
   });
 
   /// The discount is only granted once the required video step completed.
-  bool get discountApplied => videoWatched && discountPercent > 0 && consultationFee > 0;
+  bool get discountApplied =>
+      videoWatched && discountPercent > 0 && consultationFee > 0;
 
   double get discountAmount =>
       discountApplied ? (consultationFee * discountPercent / 100) : 0;
 
-  double get payableAmount => discountApplied
-      ? consultationFee - discountAmount
-      : consultationFee;
+  double get payableAmount =>
+      discountApplied ? consultationFee - discountAmount : consultationFee;
 
   String get currency => AppointmentDefaults.currency;
 
@@ -46,7 +46,8 @@ class AppointmentPricing {
   /// A document written before the `price` field existed resolves to `0`
   /// through `UserModel` / `AppointmentController.priceOf`; rendering that as
   /// "PKR 0" would look like a free consultation instead of an unset one.
-  String get feeLabel => consultationFee > 0 ? format(consultationFee) : 'Not set';
+  String get feeLabel =>
+      consultationFee > 0 ? format(consultationFee) : 'Not set';
 
   String get discountLabel =>
       discountApplied ? '- ${format(discountAmount)}' : '- ${format(0)}';
@@ -126,15 +127,12 @@ class AppointmentPaymentModel {
   bool get isRejected => paymentStatus == PaymentStatus.rejected;
 
   AppointmentPricing get pricing => AppointmentPricing(
-        consultationFee: consultationFee,
-        discountPercent: discountPercentage,
-        videoWatched: videoWatched,
-      );
+    consultationFee: consultationFee,
+    discountPercent: discountPercentage,
+    videoWatched: videoWatched,
+  );
 
-  factory AppointmentPaymentModel.fromMap(
-    String id,
-    Map<String, dynamic> map,
-  ) {
+  factory AppointmentPaymentModel.fromMap(String id, Map<String, dynamic> map) {
     return AppointmentPaymentModel(
       id: id,
       patientId: map['patientId'] ?? '',
@@ -427,7 +425,8 @@ class AppointmentModel {
   }
 
   /// Live right now: confirmed, scheduled, and inside the start/end window.
-  bool isActiveAt(DateTime now) => isConfirmed && hasSchedule && !hasEndedAt(now);
+  bool isActiveAt(DateTime now) =>
+      isConfirmed && hasSchedule && !hasEndedAt(now);
 
   /// A confirmed appointment whose scheduled end has not elapsed yet.
   bool get isUpcoming =>
@@ -474,7 +473,8 @@ class AppointmentModel {
       youtubeVideoUrl: map['youtubeVideoUrl'] ?? '',
       paymentId: map['paymentId'] ?? '',
       paymentStatus: map['paymentStatus'] ?? PaymentStatus.approved,
-      appointmentStatus: map['appointmentStatus'] ?? AppointmentStatus.requested,
+      appointmentStatus:
+          map['appointmentStatus'] ?? AppointmentStatus.requested,
       requestedAt: parseFirestoreTimestamp(map['requestedAt']),
       confirmedAt: parseFirestoreTimestamp(map['confirmedAt']),
       createdAt: parseFirestoreTimestamp(map['createdAt']),
@@ -538,8 +538,7 @@ class AppointmentModel {
       'requestedAt': requestedAt == null
           ? FieldValue.serverTimestamp()
           : Timestamp.fromDate(requestedAt!),
-      if (confirmedAt != null)
-        'confirmedAt': Timestamp.fromDate(confirmedAt!),
+      if (confirmedAt != null) 'confirmedAt': Timestamp.fromDate(confirmedAt!),
       'scheduledDate': scheduledDate,
       'scheduledStartTime': scheduledStartTime,
       'scheduledEndTime': scheduledEndTime,
@@ -654,12 +653,12 @@ class AppointmentEvent {
   }
 
   Map<String, dynamic> toMap() => {
-        'type': type,
-        'actorId': actorId,
-        'actorRole': actorRole,
-        'detail': detail,
-        if (at != null) 'at': Timestamp.fromDate(at!),
-      };
+    'type': type,
+    'actorId': actorId,
+    'actorRole': actorRole,
+    'detail': detail,
+    if (at != null) 'at': Timestamp.fromDate(at!),
+  };
 }
 
 /// A Firestore map of `{"60": true}` → `Map<String, bool>`; anything else
@@ -719,16 +718,15 @@ class AppointmentConfig {
   });
 
   AppointmentConfig.defaults()
-      : graceMinutes = AppointmentDefaults.graceMinutes,
-        patientGraceMinutes = AppointmentDefaults.patientGraceMinutes,
-        startingSoonMinutes = AppointmentDefaults.startingSoonMinutes,
-        graceEndingMinutes = AppointmentDefaults.graceEndingMinutes,
-        cancellationWarningLimit =
-            AppointmentDefaults.cancellationWarningLimit,
-        freezeDurationDays = AppointmentDefaults.freezeDurationDays,
-        reminderOffsetsMinutes = AppointmentDefaults.reminderOffsetsMinutes,
-        refundPolicyPatientCancel =
-            AppointmentDefaults.defaultRefundPolicyPatientCancel;
+    : graceMinutes = AppointmentDefaults.graceMinutes,
+      patientGraceMinutes = AppointmentDefaults.patientGraceMinutes,
+      startingSoonMinutes = AppointmentDefaults.startingSoonMinutes,
+      graceEndingMinutes = AppointmentDefaults.graceEndingMinutes,
+      cancellationWarningLimit = AppointmentDefaults.cancellationWarningLimit,
+      freezeDurationDays = AppointmentDefaults.freezeDurationDays,
+      reminderOffsetsMinutes = AppointmentDefaults.reminderOffsetsMinutes,
+      refundPolicyPatientCancel =
+          AppointmentDefaults.defaultRefundPolicyPatientCancel;
 
   bool get refundableOnPatientCancel =>
       refundPolicyPatientCancel == AppointmentDefaults.refundPolicyRefundable;
@@ -779,11 +777,12 @@ class AppointmentConfig {
         min: 1,
         max: 365,
       ),
-      reminderOffsetsMinutes:
-          _offsetsOr(map['reminderOffsetsMinutes'], fallback),
-      refundPolicyPatientCancel: map['refundPolicyPatientCancel']
-                  ?.toString()
-                  .trim() ==
+      reminderOffsetsMinutes: _offsetsOr(
+        map['reminderOffsetsMinutes'],
+        fallback,
+      ),
+      refundPolicyPatientCancel:
+          map['refundPolicyPatientCancel']?.toString().trim() ==
               AppointmentDefaults.refundPolicyRefundable
           ? AppointmentDefaults.refundPolicyRefundable
           : AppointmentDefaults.refundPolicyNonRefundable,
@@ -791,26 +790,21 @@ class AppointmentConfig {
   }
 
   Map<String, dynamic> toMap() => {
-        'graceMinutes': graceMinutes,
-        'patientGraceMinutes': patientGraceMinutes,
-        'startingSoonMinutes': startingSoonMinutes,
-        'graceEndingMinutes': graceEndingMinutes,
-        'cancellationWarningLimit': cancellationWarningLimit,
-        'freezeDurationDays': freezeDurationDays,
-        'reminderOffsetsMinutes': reminderOffsetsMinutes,
-        'refundPolicyPatientCancel': refundPolicyPatientCancel,
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
+    'graceMinutes': graceMinutes,
+    'patientGraceMinutes': patientGraceMinutes,
+    'startingSoonMinutes': startingSoonMinutes,
+    'graceEndingMinutes': graceEndingMinutes,
+    'cancellationWarningLimit': cancellationWarningLimit,
+    'freezeDurationDays': freezeDurationDays,
+    'reminderOffsetsMinutes': reminderOffsetsMinutes,
+    'refundPolicyPatientCancel': refundPolicyPatientCancel,
+    'updatedAt': FieldValue.serverTimestamp(),
+  };
 }
 
 /// A missing, non-numeric or out-of-range value falls straight back to the
 /// default — an admin typo must never be able to disable the lifecycle.
-int _intOr(
-  dynamic raw,
-  int fallback, {
-  required int min,
-  required int max,
-}) {
+int _intOr(dynamic raw, int fallback, {required int min, required int max}) {
   int? value;
   if (raw is int) {
     value = raw;
@@ -833,8 +827,8 @@ List<int> _offsetsOr(dynamic raw, AppointmentConfig fallback) {
     final minutes = value is int
         ? value
         : value is num
-            ? value.toInt()
-            : int.tryParse('${value ?? ''}'.trim());
+        ? value.toInt()
+        : int.tryParse('${value ?? ''}'.trim());
     if (minutes == null || minutes <= 0 || minutes > 7 * 24 * 60) continue;
     parsed.add(minutes);
   }

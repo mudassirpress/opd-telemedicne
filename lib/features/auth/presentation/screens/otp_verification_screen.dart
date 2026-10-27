@@ -29,7 +29,8 @@ class OtpVerificationScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
+  ConsumerState<OtpVerificationScreen> createState() =>
+      _OtpVerificationScreenState();
 }
 
 class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
@@ -99,7 +100,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
             _isResending = false;
           });
           _startCountdown();
-          ToastService.instance.showSuccess('A new verification code has been sent.');
+          ToastService.instance.showSuccess(
+            'A new verification code has been sent.',
+          );
         },
         onVerificationFailed: (FirebaseAuthException e) {
           if (!mounted) return;
@@ -132,7 +135,8 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   Future<void> _onInstantVerification(PhoneAuthCredential credential) async {
     try {
       setState(() => _isVerifying = true);
-      final userCredential = await PhoneAuthService.instance.signInWithCredential(credential);
+      final userCredential = await PhoneAuthService.instance
+          .signInWithCredential(credential);
       final firebaseUser = userCredential.user;
       if (firebaseUser != null) {
         await _handlePostAuth(firebaseUser);
@@ -181,7 +185,8 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
         if (e.code == 'invalid-verification-code') {
           _errorMessage = 'Invalid code. Please check the SMS and try again.';
         } else if (e.code == 'session-expired') {
-          _errorMessage = 'The verification code has expired. Please request a new code.';
+          _errorMessage =
+              'The verification code has expired. Please request a new code.';
         } else {
           _errorMessage = e.message ?? 'Verification failed. Please try again.';
         }
@@ -284,11 +289,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFFF3F7FB),
-                    Colors.white,
-                    Color(0xFFF0F4F9),
-                  ],
+                  colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),

@@ -57,7 +57,7 @@ class HiveDBService {
   static Box<OfflineChatMessage>? get chatMessagesBox => _chatMessagesBox;
 
   static Box<OfflineCallRecord>? get callHistoryBox => _callHistoryBox;
-  
+
   static Box<String>? get chatListBox => _chatListBox;
 
   /// Local mirror of `telemedicine_doctors`, used to paint doctor pickers

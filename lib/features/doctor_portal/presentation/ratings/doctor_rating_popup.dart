@@ -158,13 +158,8 @@ class _DoctorRatingDialogState extends State<_DoctorRatingDialog> {
               ),
               const SizedBox(height: 10),
               Text(
-                _selected == 0
-                    ? 'Tap a star to rate'
-                    : '$_selected of 5',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: const Color(0xFF7E90A6),
-                ),
+                _selected == 0 ? 'Tap a star to rate' : '$_selected of 5',
+                style: TextStyle(fontSize: 12, color: const Color(0xFF7E90A6)),
               ),
               const SizedBox(height: 18),
               _SubmitButton(

@@ -73,7 +73,8 @@ class LaunchTarget {
   bool get isDeclineCall => type == LaunchTargetType.declineCall;
 
   @override
-  String toString() => 'LaunchTarget(type: $type, actionId: $actionId, data: $data)';
+  String toString() =>
+      'LaunchTarget(type: $type, actionId: $actionId, data: $data)';
 }
 
 /// Central coordinator that determines the launch source before rendering the initial
@@ -93,15 +94,23 @@ class SmartLaunchCoordinator {
     try {
       // 1. Check local notifications launch details (notification body tap, action button, fullScreenIntent)
       final localNotifications = FlutterLocalNotificationsPlugin();
-      final localDetails = await localNotifications.getNotificationAppLaunchDetails();
+      final localDetails = await localNotifications
+          .getNotificationAppLaunchDetails();
 
       if (localDetails != null && localDetails.didNotificationLaunchApp) {
         final response = localDetails.notificationResponse;
-        if (response != null && response.payload != null && response.payload!.isNotEmpty) {
+        if (response != null &&
+            response.payload != null &&
+            response.payload!.isNotEmpty) {
           final data = _parsePayload(response.payload!);
-          final target = _resolveTargetFromData(data, actionId: response.actionId);
+          final target = _resolveTargetFromData(
+            data,
+            actionId: response.actionId,
+          );
           if (target != null) {
-            debugPrint('🚀 [SMART_LAUNCH] Launched from local notification: $target');
+            debugPrint(
+              '🚀 [SMART_LAUNCH] Launched from local notification: $target',
+            );
             _cachedLaunchTarget = target;
             _hasDetermined = true;
             return target;
@@ -122,7 +131,9 @@ class SmartLaunchCoordinator {
                 : <String, dynamic>{};
             final target = _resolveTargetFromData(data, actionId: action);
             if (target != null) {
-              debugPrint('🚀 [SMART_LAUNCH] Launched from pending notification action: $target');
+              debugPrint(
+                '🚀 [SMART_LAUNCH] Launched from pending notification action: $target',
+              );
               _cachedLaunchTarget = target;
               _hasDetermined = true;
               return target;
@@ -130,7 +141,9 @@ class SmartLaunchCoordinator {
           }
         }
       } catch (e) {
-        debugPrint('⚠️ [SMART_LAUNCH] Error inspecting pending notification action: $e');
+        debugPrint(
+          '⚠️ [SMART_LAUNCH] Error inspecting pending notification action: $e',
+        );
       }
 
       // 3. Check FCM initial message (system-rendered notification tap from terminated state)
@@ -138,7 +151,9 @@ class SmartLaunchCoordinator {
       if (fcmInitial != null && fcmInitial.data.isNotEmpty) {
         final target = _resolveTargetFromData(fcmInitial.data);
         if (target != null) {
-          debugPrint('🚀 [SMART_LAUNCH] Launched from FCM initial message: $target');
+          debugPrint(
+            '🚀 [SMART_LAUNCH] Launched from FCM initial message: $target',
+          );
           _cachedLaunchTarget = target;
           _hasDetermined = true;
           return target;
@@ -148,7 +163,9 @@ class SmartLaunchCoordinator {
       debugPrint('⚠️ [SMART_LAUNCH] Error determining launch target: $e');
     }
 
-    debugPrint('🚀 [SMART_LAUNCH] Normal app launch (launcher icon) -> Normal Splash');
+    debugPrint(
+      '🚀 [SMART_LAUNCH] Normal app launch (launcher icon) -> Normal Splash',
+    );
     _cachedLaunchTarget = const LaunchTarget(type: LaunchTargetType.normal);
     _hasDetermined = true;
     return _cachedLaunchTarget!;
@@ -159,7 +176,8 @@ class SmartLaunchCoordinator {
     String? actionId,
   }) {
     final type = (data['type'] ?? '').toString();
-    final isCall = type == 'call' || type == 'incoming_call' || data.containsKey('callId');
+    final isCall =
+        type == 'call' || type == 'incoming_call' || data.containsKey('callId');
 
     if (isCall) {
       if (actionId == CallActionIds.accept) {
@@ -184,23 +202,41 @@ class SmartLaunchCoordinator {
     }
 
     if (FcmMessageType.isPayment(type)) {
-      return LaunchTarget(type: LaunchTargetType.payment, data: data, actionId: actionId);
+      return LaunchTarget(
+        type: LaunchTargetType.payment,
+        data: data,
+        actionId: actionId,
+      );
     }
 
     if (FcmMessageType.isAppointment(type)) {
-      return LaunchTarget(type: LaunchTargetType.appointment, data: data, actionId: actionId);
+      return LaunchTarget(
+        type: LaunchTargetType.appointment,
+        data: data,
+        actionId: actionId,
+      );
     }
 
     if (type == 'report_shared') {
-      return LaunchTarget(type: LaunchTargetType.reportShared, data: data, actionId: actionId);
+      return LaunchTarget(
+        type: LaunchTargetType.reportShared,
+        data: data,
+        actionId: actionId,
+      );
     }
 
-    final isChat = type == 'chat' ||
+    final isChat =
+        type == 'chat' ||
         type == 'chat_message' ||
-        (data.containsKey('chatId') && (data.containsKey('senderId') || data.containsKey('otherUserId')));
+        (data.containsKey('chatId') &&
+            (data.containsKey('senderId') || data.containsKey('otherUserId')));
 
     if (isChat) {
-      return LaunchTarget(type: LaunchTargetType.chat, data: data, actionId: actionId);
+      return LaunchTarget(
+        type: LaunchTargetType.chat,
+        data: data,
+        actionId: actionId,
+      );
     }
 
     return null;
@@ -245,10 +281,7 @@ class SmartLaunchCoordinator {
 class SmartDirectLaunchWrapper extends ConsumerStatefulWidget {
   final LaunchTarget target;
 
-  const SmartDirectLaunchWrapper({
-    super.key,
-    required this.target,
-  });
+  const SmartDirectLaunchWrapper({super.key, required this.target});
 
   @override
   ConsumerState<SmartDirectLaunchWrapper> createState() =>
@@ -284,7 +317,9 @@ class _SmartDirectLaunchWrapperState
 
     // If the user is logged out, route to SignInScreen with preserved destination
     if (!isAuthenticated) {
-      debugPrint('🔒 [SMART_LAUNCH] User not authenticated -> redirecting to SignInScreen');
+      debugPrint(
+        '🔒 [SMART_LAUNCH] User not authenticated -> redirecting to SignInScreen',
+      );
       NotificationService.markAppReady();
       if (mounted) {
         setState(() {
@@ -297,14 +332,17 @@ class _SmartDirectLaunchWrapperState
 
     final String userRole =
         doctorUser != null && (doctorUser.doctorId ?? '').isNotEmpty
-            ? 'doctor'
-            : (patientUser?.role ?? 'patient');
+        ? 'doctor'
+        : (patientUser?.role ?? 'patient');
 
     // Doctor profile completion check
     if (userRole == 'doctor' && doctorUser != null) {
-      final needsCompletion = await doctorController.requiresProfileCompletion();
+      final needsCompletion = await doctorController
+          .requiresProfileCompletion();
       if (needsCompletion) {
-        debugPrint('🩺 [SMART_LAUNCH] Doctor profile incomplete -> redirecting to UpdateDoctorProfileScreen');
+        debugPrint(
+          '🩺 [SMART_LAUNCH] Doctor profile incomplete -> redirecting to UpdateDoctorProfileScreen',
+        );
         NotificationService.markAppReady();
         if (mounted) {
           setState(() {
@@ -320,7 +358,9 @@ class _SmartDirectLaunchWrapperState
     if (userRole == 'patient' && patientUser != null) {
       final dest = AuthRoutingService.evaluatePatientDestination(patientUser);
       if (dest == PatientAuthDestination.cardExpired) {
-        debugPrint('💳 [SMART_LAUNCH] Patient card expired -> ExpiredPatientScreen');
+        debugPrint(
+          '💳 [SMART_LAUNCH] Patient card expired -> ExpiredPatientScreen',
+        );
         NotificationService.markAppReady();
         if (mounted) {
           setState(() {
@@ -331,7 +371,9 @@ class _SmartDirectLaunchWrapperState
         return;
       }
       if (dest == PatientAuthDestination.paymentProof) {
-        debugPrint('💳 [SMART_LAUNCH] Patient payment required -> PaymentScreen');
+        debugPrint(
+          '💳 [SMART_LAUNCH] Patient payment required -> PaymentScreen',
+        );
         NotificationService.markAppReady();
         if (mounted) {
           setState(() {
@@ -346,8 +388,8 @@ class _SmartDirectLaunchWrapperState
     final Widget basePortal = userRole == 'doctor'
         ? const DoctorPortalWrapper()
         : (userRole == 'admin'
-            ? const AdminPortalWrapper()
-            : const PatientPortalWrapper());
+              ? const AdminPortalWrapper()
+              : const PatientPortalWrapper());
 
     // A notification tap that cold-started the app was already dispatched by
     // `NotificationService.initialize()` before `runApp`. That service owns the
@@ -391,12 +433,18 @@ class _SmartDirectLaunchWrapperState
     // 3. Route directly based on the launch target
     if (widget.target.isChat) {
       final data = widget.target.data;
-      final otherUserId = (data['senderId'] ?? data['otherUserId'] ?? '').toString();
-      final otherUserName = (data['senderName'] ?? data['otherUserName'] ?? 'User').toString();
-      final otherUserImage = (data['senderProfileImage'] ?? data['otherUserImage'] ?? '').toString();
+      final otherUserId = (data['senderId'] ?? data['otherUserId'] ?? '')
+          .toString();
+      final otherUserName =
+          (data['senderName'] ?? data['otherUserName'] ?? 'User').toString();
+      final otherUserImage =
+          (data['senderProfileImage'] ?? data['otherUserImage'] ?? '')
+              .toString();
 
       if (otherUserId.isEmpty) {
-        debugPrint('⚠️ [SMART_LAUNCH] Chat target missing otherUserId -> fallback to base portal');
+        debugPrint(
+          '⚠️ [SMART_LAUNCH] Chat target missing otherUserId -> fallback to base portal',
+        );
         NotificationService.markAppReady();
         if (mounted) {
           setState(() {
@@ -433,7 +481,9 @@ class _SmartDirectLaunchWrapperState
       final payload = IncomingCallPayload.tryParse(data);
 
       if (payload == null) {
-        debugPrint('⚠️ [SMART_LAUNCH] Malformed call payload -> fallback to base portal');
+        debugPrint(
+          '⚠️ [SMART_LAUNCH] Malformed call payload -> fallback to base portal',
+        );
         NotificationService.markAppReady();
         if (mounted) {
           setState(() {
@@ -445,15 +495,18 @@ class _SmartDirectLaunchWrapperState
       }
 
       // Check whether call is still ringing
-      final validated = await IncomingCallCoordinator.instance.registerIncomingCall(
-        payload.toMap(),
-        origin: IncomingCallOrigin.notificationTap,
-      );
+      final validated = await IncomingCallCoordinator.instance
+          .registerIncomingCall(
+            payload.toMap(),
+            origin: IncomingCallOrigin.notificationTap,
+          );
 
       NotificationService.markAppReady();
 
       if (validated == null) {
-        debugPrint('⚠️ [SMART_LAUNCH] Tapped call no longer ringing -> safe home screen');
+        debugPrint(
+          '⚠️ [SMART_LAUNCH] Tapped call no longer ringing -> safe home screen',
+        );
         ToastService.instance.showInfo('This call has ended or expired.');
         if (mounted) {
           setState(() {
@@ -464,7 +517,9 @@ class _SmartDirectLaunchWrapperState
         return;
       }
 
-      debugPrint('📞 [SMART_LAUNCH] Direct deep link to IncomingCallScreen callId=${payload.callId}');
+      debugPrint(
+        '📞 [SMART_LAUNCH] Direct deep link to IncomingCallScreen callId=${payload.callId}',
+      );
       if (mounted) {
         setState(() {
           _destination = IncomingCallScreen(
@@ -488,16 +543,19 @@ class _SmartDirectLaunchWrapperState
       final payload = IncomingCallPayload.tryParse(data);
 
       if (payload != null) {
-        final currentUserId =
-            await IncomingCallCoordinator.instance.resolveCurrentUserId();
+        final currentUserId = await IncomingCallCoordinator.instance
+            .resolveCurrentUserId();
 
-        final accepted =
-            await IncomingCallCoordinator.instance.accept(payload.callId);
+        final accepted = await IncomingCallCoordinator.instance.accept(
+          payload.callId,
+        );
 
         NotificationService.markAppReady();
 
         if (accepted.handled && currentUserId.isNotEmpty) {
-          debugPrint('📞 [SMART_LAUNCH] Direct deep link to CallScreen callId=${payload.callId}');
+          debugPrint(
+            '📞 [SMART_LAUNCH] Direct deep link to CallScreen callId=${payload.callId}',
+          );
           if (mounted) {
             setState(() {
               _destination = CallScreen(
@@ -557,10 +615,7 @@ class _StackWithBasePortal extends StatelessWidget {
   final Widget basePortal;
   final Widget child;
 
-  const _StackWithBasePortal({
-    required this.basePortal,
-    required this.child,
-  });
+  const _StackWithBasePortal({required this.basePortal, required this.child});
 
   @override
   Widget build(BuildContext context) {

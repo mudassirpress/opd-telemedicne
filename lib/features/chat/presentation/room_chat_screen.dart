@@ -154,7 +154,8 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
     if (user == null) return false;
     if (user.role == 'doctor') return false;
     if (user.isPatientIdUser) return false;
-    return user.paymentStatus != 'approved' && user.paymentStatus != 'completed';
+    return user.paymentStatus != 'approved' &&
+        user.paymentStatus != 'completed';
   }
 
   bool get _blocksBackNavigation {
@@ -170,7 +171,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
 
   Future<void> _initializeScreen() async {
     try {
-      await ref.read(patientControllerProvider).loadSavedUser(forceRefresh: true);
+      await ref
+          .read(patientControllerProvider)
+          .loadSavedUser(forceRefresh: true);
 
       final currentUser = ref.read(userProvider);
       if (currentUser?.isGuest == true) {
@@ -644,7 +647,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
       ),
       // The FAB is the entry point to Upload Reports / Report History. It must
       // not exist at all while the payment is pending or rejected, or for guests.
-      floatingActionButton: (isLocked || currentUser.isGuest) ? null : _buildFab(),
+      floatingActionButton: (isLocked || currentUser.isGuest)
+          ? null
+          : _buildFab(),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
 
@@ -705,7 +710,10 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
                 transitionBuilder: (Widget child, Animation<double> animation) {
                   return RotationTransition(
                     turns: Tween<double>(begin: 0, end: 1).animate(
-                      CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+                      CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeInOut,
+                      ),
                     ),
                     child: FadeTransition(opacity: animation, child: child),
                   );
@@ -1105,7 +1113,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
     final currentUser = ref.watch(userProvider)!;
     final isPaymentPending = currentUser.paymentStatus == 'pending';
     final isPaymentRejected = currentUser.paymentStatus == 'rejected';
-    final showComplaintButton = PaymentComplaintVisibility.shouldShow(currentUser);
+    final showComplaintButton = PaymentComplaintVisibility.shouldShow(
+      currentUser,
+    );
 
     return Column(
       children: [
@@ -1275,7 +1285,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
                       onPressed: () {
                         Navigator.pushAndRemoveUntil(
                           context,
-                          MaterialPageRoute(builder: (_) => const SignInScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const SignInScreen(),
+                          ),
                           (route) => false,
                         );
                       },
@@ -1303,22 +1315,22 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
                         color: isPaymentPending
                             ? Colors.orange.withValues(alpha: 0.12)
                             : (isPaymentRejected
-                                ? Colors.red.withValues(alpha: 0.12)
-                                : const Color(0xFFE8EDF3)),
+                                  ? Colors.red.withValues(alpha: 0.12)
+                                  : const Color(0xFFE8EDF3)),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         isPaymentPending
                             ? Icons.pending_actions_rounded
                             : (isPaymentRejected
-                                ? Icons.cancel_rounded
-                                : Icons.lock_outline_rounded),
+                                  ? Icons.cancel_rounded
+                                  : Icons.lock_outline_rounded),
                         size: 32,
                         color: isPaymentPending
                             ? Colors.orange[800]
                             : (isPaymentRejected
-                                ? Colors.red[700]
-                                : AppColors.primaryRed),
+                                  ? Colors.red[700]
+                                  : AppColors.primaryRed),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -1326,8 +1338,8 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
                       isPaymentPending
                           ? 'Payment Verification Pending'
                           : (isPaymentRejected
-                              ? 'Payment Proof Rejected'
-                              : 'Account in Restricted Mode'),
+                                ? 'Payment Proof Rejected'
+                                : 'Account in Restricted Mode'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: context.fs(16),
@@ -1362,8 +1374,8 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
                       isPaymentPending
                           ? 'Your payment proof has been submitted and is currently being reviewed by administrators. You can browse doctors, but doctor chat and calls remain locked until approval.'
                           : (isPaymentRejected
-                              ? 'Your submitted payment proof was rejected. Please submit a valid payment proof to restore full access, or tap Help / Complaint if you need assistance.'
-                              : 'Payment proof has not been submitted yet. You can browse doctor profiles in restricted mode. Submit payment proof to unlock chatting and consultations.'),
+                                ? 'Your submitted payment proof was rejected. Please submit a valid payment proof to restore full access, or tap Help / Complaint if you need assistance.'
+                                : 'Payment proof has not been submitted yet. You can browse doctor profiles in restricted mode. Submit payment proof to unlock chatting and consultations.'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: context.fs(13),
@@ -1395,16 +1407,20 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 10),
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
                             ),
                             onPressed: _refreshPaymentStatus,
                           )
                         else
                           ElevatedButton.icon(
                             icon: const Icon(Icons.payment_rounded, size: 16),
-                            label: Text(isPaymentRejected
-                                ? 'Resubmit Payment'
-                                : 'Make Payment'),
+                            label: Text(
+                              isPaymentRejected
+                                  ? 'Resubmit Payment'
+                                  : 'Make Payment',
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primaryRed,
                               foregroundColor: Colors.white,
@@ -1412,7 +1428,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 10),
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
                             ),
                             onPressed: () async {
                               final result = await Navigator.push(
@@ -1429,7 +1447,10 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
                         if (showComplaintButton) ...[
                           const SizedBox(width: 10),
                           OutlinedButton.icon(
-                            icon: const Icon(Icons.help_outline_rounded, size: 16),
+                            icon: const Icon(
+                              Icons.help_outline_rounded,
+                              size: 16,
+                            ),
                             label: const Text('Help / Complaint'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFF1F2F44),
@@ -1438,7 +1459,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 10),
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
                             ),
                             onPressed: () {
                               Navigator.push(
@@ -1474,11 +1497,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.visibility_rounded,
-              size: 13,
-              color: Color(0xFF475569),
-            ),
+            Icon(Icons.visibility_rounded, size: 13, color: Color(0xFF475569)),
             SizedBox(width: 5),
             Text(
               'Guest',
