@@ -1,4 +1,4 @@
-// lib/widgets/image_picker_widget.dart
+// lib/shared/widgets/image_picker/image_picker_widget.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

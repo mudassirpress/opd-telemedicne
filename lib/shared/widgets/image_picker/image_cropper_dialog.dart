@@ -1,4 +1,4 @@
-// lib/widgets/image_cropper_dialog.dart
+// lib/shared/widgets/image_picker/image_cropper_dialog.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';

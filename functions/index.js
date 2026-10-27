@@ -1280,7 +1280,7 @@ async function unpinAppointmentMessage(data) {
 // Lifecycle configuration, phase and outcome.
 //
 // A line-for-line mirror of
-// lib/features/appointment/appointment_lifecycle_logic.dart: the foreground
+// lib/features/appointments/presentation/appointment_lifecycle_logic.dart: the foreground
 // clock, a screen's own pass and this scheduled function must reach the same
 // conclusion from the same document, or the status flip-flops and every
 // notification duplicates. The numbers and the copy come from the same

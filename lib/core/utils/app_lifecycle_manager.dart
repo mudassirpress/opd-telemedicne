@@ -1,4 +1,4 @@
-// lib/utils/app_lifecycle_manager.dart
+// lib/core/utils/app_lifecycle_manager.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';

@@ -1,4 +1,4 @@
-// lib/model/call_model.dart
+// lib/data/models/call_model.dart
 class CallModel {
   final String id;
   final String callerId;

@@ -1,4 +1,4 @@
-// lib/auth/doctor_profile/update_doctor_profile.dart
+// lib/features/doctors/presentation/screens/update_doctor_profile_screen.dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';

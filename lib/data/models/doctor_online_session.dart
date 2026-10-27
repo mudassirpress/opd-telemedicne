@@ -1,4 +1,4 @@
-// lib/admin_portal/models/doctor_online_history_model.dart
+// lib/data/models/doctor_online_session.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DoctorOnlineSession {
