@@ -124,35 +124,7 @@ class _ChatContactScreenState extends State<ChatContactScreen> {
               ),
             ),
             SizedBox(height: context.rsp(22)),
-            const OpdSectionLabel('Account'),
-            OpdCard(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Column(
-                children: [
-                  OpdDetailRow(
-                    icon: Icons.badge_rounded,
-                    label: _isDoctor ? 'Doctor ID' : 'Patient ID',
-                    value: _text(
-                      _profile?[_isDoctor ? 'doctorId' : 'patientId'],
-                    ),
-                  ),
-                  OpdDetailRow(
-                    icon: Icons.login_rounded,
-                    label: 'Login Type',
-                    value: _text(
-                      _profile?['loginType'],
-                      fallback: 'Phone number',
-                    ),
-                  ),
-                  OpdDetailRow(
-                    icon: Icons.verified_user_rounded,
-                    label: 'Role',
-                    value: _roleLabel,
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: context.rsp(22)),
+
             OpdInfoPanel(
               icon: Icons.privacy_tip_outlined,
               title: 'Your contact details stay private',

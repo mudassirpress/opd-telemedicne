@@ -11,6 +11,8 @@ import 'package:telemedicine/core/services/doctor_presence_service.dart';
 import 'package:telemedicine/features/appointments/presentation/appointment_controller.dart';
 import 'package:telemedicine/features/appointments/presentation/appointment_payment_screen.dart';
 import 'package:telemedicine/features/appointments/presentation/appointment_status_widgets.dart';
+import 'package:telemedicine/features/calling/controllers/call_controller.dart';
+import 'package:telemedicine/features/calling/screens/outgoing_call_screen.dart';
 import 'package:telemedicine/shared/widgets/auth_layout.dart';
 import 'package:telemedicine/shared/widgets/opd_design_system.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -183,6 +185,82 @@ class _DoctorDetailsState extends ConsumerState<_DoctorDetails> {
     );
   }
 
+  Future<void> _initiateVoiceCall() async {
+    final user = ref.read(userProvider);
+    if (user == null || user.isGuest) {
+      GuestGuard.showLoginPrompt(
+        context,
+        message: 'Please log in to make voice calls.',
+      );
+      return;
+    }
+
+    if (user.isExpired) {
+      ToastService.instance.showError(
+        'Your account has expired. Please renew your subscription to make calls.',
+      );
+      return;
+    }
+
+    final isRestrictedPatient =
+        user.role == 'patient' &&
+        !user.isPatientIdUser &&
+        user.paymentStatus != 'approved' &&
+        user.paymentStatus != 'completed';
+
+    if (isRestrictedPatient) {
+      ToastService.instance.showWarning(
+        'Please complete your payment verification before placing calls.',
+      );
+      return;
+    }
+
+    final doctorId = (doctor['id'] ?? '').toString();
+    final isOnline = ref.read(doctorOnlineProvider(doctorId));
+    if (!isOnline) {
+      ToastService.instance.showWarning(
+        'Doctor is currently offline and unavailable for calls.',
+      );
+      return;
+    }
+
+    ToastService.instance.showInfo('Checking doctor availability...');
+
+    final result = await CallController.instance.initiateVoiceCall(
+      callerId: user.id,
+      callerName: user.fullname,
+      callerRole: user.role,
+      callerImage: user.image,
+      receiverId: doctorId,
+      receiverName: _name,
+      receiverRole: 'doctor',
+      receiverImage: (doctor['imageUrl'] ?? '').toString(),
+    );
+
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OutgoingCallScreen(
+            callId: result['callId'],
+            receiverId: doctorId,
+            receiverName: _name,
+            receiverRole: 'doctor',
+            receiverImage: (doctor['imageUrl'] ?? '').toString(),
+            currentUserId: user.id,
+            currentUserName: user.fullname,
+          ),
+        ),
+      );
+    } else {
+      ToastService.instance.showError(
+        result['error'] ?? 'Could not place call to doctor.',
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final watched =
@@ -223,11 +301,39 @@ class _DoctorDetailsState extends ConsumerState<_DoctorDetails> {
     return OpdScreenShell(
       title: 'Dr. $_name',
       subtitle: _specialization.isEmpty ? 'General Physician' : _specialization,
-      bottom: GradientButton(
-        text: _checking ? 'Checking...' : 'Book Appointment',
-        icon: Icons.calendar_month_rounded,
-        isLoading: _checking,
-        onPressed: _checking ? null : _bookAppointment,
+      bottom: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _initiateVoiceCall,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF062B72),
+                side: const BorderSide(color: Color(0xFF062B72), width: 1.5),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(26),
+                ),
+              ),
+              icon: const Icon(Icons.phone_in_talk_rounded, size: 18),
+              label: const Text(
+                'Voice Call',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: GradientButton(
+              text: _checking ? 'Checking...' : 'Appointment',
+              icon: Icons.calendar_month_rounded,
+              isLoading: _checking,
+              onPressed: _checking ? null : _bookAppointment,
+            ),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

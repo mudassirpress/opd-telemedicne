@@ -62,23 +62,8 @@ class OpdScreenShell extends StatelessWidget {
           SafeArea(
             child: Column(
               children: [
-                // ---- Fixed header ----
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                    child: CircularBackButton(
-                      onPressed: () => Navigator.maybePop(context),
-                    ),
-                  ),
-                ),
                 Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    context.rsp(24),
-                    10,
-                    context.rsp(24),
-                    0,
-                  ),
+                  padding: EdgeInsets.fromLTRB(12, 8, context.rsp(24), 0),
                   child: Center(
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
@@ -86,19 +71,25 @@ class OpdScreenShell extends StatelessWidget {
                             ? context.contentMaxWidth
                             : 440,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        mainAxisSize: MainAxisSize.min,
+                      child: Row(
                         children: [
-                          if (showLogo) ...[
-                            const Center(child: LogoCard()),
-                            SizedBox(height: context.rsp(24)),
-                          ],
-                          OpdTitle(title),
-                          if (subtitle != null) ...[
-                            const SizedBox(height: 6),
-                            OpdSubtitle(subtitle!),
-                          ],
+                          CircularBackButton(
+                            onPressed: () => Navigator.maybePop(context),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                OpdTitle(title),
+                                if (subtitle != null) ...[
+                                  const SizedBox(height: 4),
+                                  OpdSubtitle(subtitle!),
+                                ],
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -185,19 +176,16 @@ class OpdSubtitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        maxLines: 3,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: context.fs(13.5),
-          fontWeight: FontWeight.w500,
-          color: const Color(0xFF657991),
-          height: 1.4,
-        ),
+    return Text(
+      text,
+      textAlign: TextAlign.start,
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: context.fs(13.5),
+        fontWeight: FontWeight.w500,
+        color: const Color(0xFF657991),
+        height: 1.4,
       ),
     );
   }
@@ -215,6 +203,7 @@ class OpdSectionLabel extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 10, top: 4),
       child: Row(
+        mainAxisSize: MainAxisSize.max,
         children: [
           Expanded(
             child: Text(

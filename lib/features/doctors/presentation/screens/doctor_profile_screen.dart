@@ -1,22 +1,21 @@
-import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:telemedicine/core/services/firebase_storage_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:telemedicine/data/models/user_model.dart';
-import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
-import 'package:telemedicine/features/auth/presentation/controllers/doctor_controller.dart';
-import 'package:telemedicine/core/constants/app_constants.dart';
+import 'package:telemedicine/core/services/firebase_storage_service.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 import 'package:telemedicine/core/utils/toast_utils.dart';
-import 'package:telemedicine/shared/widgets/auth_layout.dart';
-import 'package:telemedicine/shared/widgets/language_field.dart';
+import 'package:telemedicine/data/models/user_model.dart';
+import 'package:telemedicine/features/auth/presentation/controllers/doctor_controller.dart';
+import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
 import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
+import 'package:telemedicine/features/doctors/presentation/screens/update_doctor_profile_screen.dart';
+import 'package:telemedicine/shared/widgets/auth_layout.dart';
+import 'package:telemedicine/shared/widgets/opd_design_system.dart';
+import 'package:telemedicine/shared/widgets/opd_profile_components.dart';
 
 class DoctorProfileScreen extends ConsumerStatefulWidget {
   const DoctorProfileScreen({super.key});
@@ -27,466 +26,115 @@ class DoctorProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController highestDegreeController = TextEditingController();
-
-  /// The two fields patients read on the doctor detail screen before booking:
-  /// what the consultation costs and who the doctor is.
-  final TextEditingController priceController = TextEditingController();
-  final TextEditingController descriptionController = TextEditingController();
-
-  File? selectedImage;
-  bool isUploading = false;
-  bool isSaving = false;
-  String errorText = '';
-  String? currentImageUrl;
-  bool _isImageRemoved = false;
-  bool isOnline = false;
-
-  /// Price / description exactly as stored on the document when the screen
-  /// opened. `null` description means the document never carried the field —
-  /// a blank box that was never touched must not be saved as `''`.
-  double _savedPrice = 0;
-  String? _savedDescription;
-
-  /// Languages currently shown in the picker.
-  List<String> _selectedLanguages = <String>[];
-
-  /// Set once the doctor touches the picker. A live Firestore snapshot then
-  /// stops overwriting the chips, so a background update cannot silently undo
-  /// a selection that has not been saved yet. Cleared on save and whenever the
-  /// doctor loads a genuinely different value from the server.
-  bool _languagesDirty = false;
-
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _doctorProfileSub;
-
-  final _formKey = GlobalKey<FormState>();
   final ImagePicker _picker = ImagePicker();
+
+  bool _isUploadingPhoto = false;
+  bool _isOnline = false;
+  bool _notificationsEnabled = true;
+  String _selectedLanguage = 'English';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadDoctorData();
-      _loadOnlineStatus();
-      _listenToDoctorProfile();
+      _loadInitialData();
     });
   }
 
-  @override
-  void dispose() {
-    _doctorProfileSub?.cancel();
-    nameController.dispose();
-    highestDegreeController.dispose();
-    priceController.dispose();
-    descriptionController.dispose();
-    super.dispose();
-  }
-
-  void _loadDoctorData() {
-    final doctor = ref.read(doctorControllerProvider).currentDoctor;
-    if (doctor != null) {
-      nameController.text = doctor.fullname;
-      highestDegreeController.text = doctor.highestDegree ?? '';
-      currentImageUrl = doctor.image;
-      _selectedLanguages = List<String>.of(doctor.languages);
-      _languagesDirty = false;
-
-      // `0` / `null` is the normal state for a doctor created before these
-      // fields existed: the boxes simply start empty so they can be filled in.
-      _savedPrice = doctor.consultationPrice;
-      if (_savedPrice > 0) {
-        priceController.text = _savedPrice.toStringAsFixed(0);
-      }
-      _savedDescription = doctor.description;
-      descriptionController.text = doctor.description ?? '';
-    }
-  }
-
-  /// Applies a live snapshot of the doctor's own document to the picker.
-  ///
-  /// Ignored while [_languagesDirty] so an unsaved edit is not clobbered.
-  /// Driven by a subscription rather than a `StreamBuilder` because the sync
-  /// calls `setState`, which is illegal during a build.
-  void _syncLanguagesFromSnapshot(Map<String, dynamic>? data) {
-    if (data == null || _languagesDirty) return;
-    final incoming = DoctorLanguages.parse(
-      data[DoctorLanguages.field] ?? data[DoctorLanguages.legacyField],
-    );
-    if (_sameLanguages(incoming, _selectedLanguages)) return;
-    if (!mounted) return;
-    setState(() {
-      _selectedLanguages = incoming;
-    });
-  }
-
-  /// Watches the doctor's own document so the Languages section always shows
-  /// the latest committed value — e.g. after an edit made on another device,
-  /// or right after [UpdateDoctorProfileScreen] writes it.
-  void _listenToDoctorProfile() {
-    final doctor = ref.read(doctorControllerProvider).currentDoctor;
-    if (doctor == null || doctor.id.isEmpty) return;
-
-    _doctorProfileSub?.cancel();
-    _doctorProfileSub = FirebaseFirestore.instance
-        .collection('telemedicine_doctors')
-        .doc(doctor.id)
-        .snapshots()
-        .listen(
-          (snapshot) => _syncLanguagesFromSnapshot(snapshot.data()),
-          // A failed listener must not break the screen: the cached session
-          // value loaded in `_loadDoctorData` remains on screen.
-          onError: (_) {},
-        );
-  }
-
-  static bool _sameLanguages(List<String> a, List<String> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
-  }
-
-  void _onLanguagesChanged(List<String> value) {
-    setState(() {
-      _selectedLanguages = value;
-      _languagesDirty = true;
-    });
-  }
-
-  void _loadOnlineStatus() {
-    final doctorController = ref.read(doctorControllerProvider);
-    setState(() {
-      isOnline = doctorController.isDoctorOnline;
-    });
-  }
-
-  Future<String?> _uploadImage(File imageFile) async {
-    try {
-      final currentUser = ref.read(userProvider);
-      final doctorUid = currentUser?.id ?? 'temp_doctor';
-      final result = await FirebaseStorageService.instance
-          .uploadDoctorProfileImage(doctorUid: doctorUid, file: imageFile);
-      ToastService.instance.showSuccess('Image uploaded');
-      return result.downloadUrl;
-    } catch (e) {
-      ToastService.instance.showError('Upload failed: ${e.toString()}');
-      return null;
-    }
-  }
-
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      setState(() {
-        isUploading = true;
-        errorText = '';
-      });
-      final XFile? pickedFile = await _picker.pickImage(
-        source: source,
-        imageQuality: 80,
-      );
-      if (pickedFile != null) {
-        setState(() {
-          selectedImage = File(pickedFile.path);
-        });
-      }
-    } catch (e) {
-      setState(() {
-        errorText = 'Failed to pick image';
-      });
-    } finally {
-      setState(() {
-        isUploading = false;
-      });
-    }
-  }
-
-  Future<void> _confirmRemovePhoto() async {
-    final bool? shouldRemove = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Remove Profile Picture',
-          style: TextStyle(
-            fontSize: context.fs(16),
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF1F2F44),
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to remove your profile picture?',
-          style: TextStyle(
-            fontSize: context.fs(13.5),
-            color: const Color(0xFF6B7B8D),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: const Color(0xFF6B7B8D),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(
-              'Remove',
-              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (shouldRemove == true) {
-      // Bust image cache immediately so the default avatar appears instantly
-      PaintingBinding.instance.imageCache.clear();
-      PaintingBinding.instance.imageCache.clearLiveImages();
-      setState(() {
-        selectedImage = null;
-        currentImageUrl = null;
-        _isImageRemoved = true;
-      });
-      ToastService.instance.showInfo('Profile picture removed');
-    }
-  }
-
-  void _showImageSourceDialog() {
-    final hasPhoto =
-        selectedImage != null ||
-        (currentImageUrl != null && currentImageUrl!.isNotEmpty);
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (BuildContext context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD6E4F0),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    'Profile Picture',
-                    style: TextStyle(
-                      fontSize: context.fs(15),
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF1F2F44),
-                    ),
-                  ),
-                ),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEDF2F8),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt_rounded,
-                      color: Color(0xFF062B72),
-                    ),
-                  ),
-                  title: Text(
-                    'Take Photo',
-                    style: TextStyle(
-                      color: const Color(0xFF1F2F44),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.camera);
-                  },
-                ),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEDF2F8),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.photo_library_rounded,
-                      color: Color(0xFF062B72),
-                    ),
-                  ),
-                  title: Text(
-                    'Choose from Gallery',
-                    style: TextStyle(
-                      color: const Color(0xFF1F2F44),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.gallery);
-                  },
-                ),
-                if (hasPhoto)
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFEBEE),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.delete_outline_rounded,
-                        color: Colors.red,
-                      ),
-                    ),
-                    title: Text(
-                      'Remove Photo',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _confirmRemovePhoto();
-                    },
-                  ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _toggleOnlineStatus() async {
-    final doctorController = ref.read(doctorControllerProvider);
-    final targetStatus = !isOnline;
-
-    if (targetStatus) {
-      ToastService.instance.showInfo('Verifying network reachability...');
-    }
-
-    final success = await doctorController.updateDoctorPresence(targetStatus);
-
+  Future<void> _loadInitialData() async {
+    final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
-        isOnline = doctorController.isDoctorOnline;
+        _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+        _selectedLanguage = prefs.getString('app_language') ?? 'English';
       });
+    }
 
-      if (success) {
-        if (targetStatus) {
-          ToastService.instance.showSuccess(
-            'You are now online and ready for calls',
-          );
-        } else {
-          ToastService.instance.showInfo('You are now offline');
+    final doctor = ref.read(currentDoctorProvider) ?? ref.read(userProvider);
+    if (doctor != null) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('telemedicine_doctors')
+            .doc(doctor.id)
+            .get();
+        if (doc.exists && mounted) {
+          setState(() {
+            _isOnline = doc.data()?['isOnline'] ?? false;
+          });
         }
-      } else {
-        if (targetStatus) {
-          ToastService.instance.showWarning(
-            'Unable to go online: Active internet connection or data package not detected.',
-          );
-        }
-      }
+      } catch (_) {}
     }
   }
 
-  Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    // Price is optional here: a doctor who never set one can still fix their
-    // name or degree. Anything typed must be a real amount, because the
-    // booking flow refuses to charge `0`.
-    final rawPrice = priceController.text.trim();
-    double? price;
-    if (rawPrice.isNotEmpty) {
-      price = double.tryParse(rawPrice);
-      if (price == null || price <= 0 || price > 1000000) {
-        setState(() {
-          errorText = 'Enter a valid consultation price (greater than 0)';
-        });
-        ToastService.instance.showError('Enter a valid consultation price');
-        return;
-      }
-    }
-
-    // Written only when it actually differs, so a blank box on an old profile
-    // cannot stamp `''` over a description that is already stored.
-    final description = descriptionController.text.trim();
-    final descriptionChanged = description != (_savedDescription ?? '').trim();
-
+  Future<void> _toggleOnlineStatus(bool targetStatus) async {
     final doctorController = ref.read(doctorControllerProvider);
     final currentDoctor = doctorController.currentDoctor;
+    if (currentDoctor == null) return;
 
-    if (currentDoctor == null) {
-      ToastService.instance.showError('No doctor logged in');
-      return;
+    final success = await doctorController.toggleDoctorStatus(targetStatus);
+
+    if (success && mounted) {
+      setState(() {
+        _isOnline = targetStatus;
+      });
+      if (targetStatus) {
+        ToastService.instance.showSuccess(
+          'You are now online and ready for consultations',
+        );
+      } else {
+        ToastService.instance.showInfo('You are now offline');
+      }
+    } else if (mounted) {
+      ToastService.instance.showWarning(
+        'Unable to change status. Please check internet connection.',
+      );
     }
+  }
 
+  Future<void> _toggleNotifications(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notifications_enabled', value);
+    if (!mounted) return;
     setState(() {
-      isSaving = true;
-      errorText = '';
+      _notificationsEnabled = value;
     });
+    ToastService.instance.showInfo(
+      value ? 'Notifications enabled' : 'Notifications disabled',
+    );
+  }
+
+  Future<void> _setLanguage(String lang) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_language', lang);
+    if (!mounted) return;
+    setState(() {
+      _selectedLanguage = lang;
+    });
+    ToastService.instance.showSuccess('Language set to $lang');
+  }
+
+  Future<void> _pickAndUploadPhoto(ImageSource source) async {
+    final doctorController = ref.read(doctorControllerProvider);
+    final currentDoctor = doctorController.currentDoctor;
+    if (currentDoctor == null) return;
 
     try {
-      String? uploadedImageUrl = _isImageRemoved ? null : currentImageUrl;
+      final picked = await _picker.pickImage(source: source, imageQuality: 80);
+      if (picked == null) return;
 
-      if (selectedImage != null) {
-        ToastService.instance.showInfo('Uploading...');
-        final uploadedUrl = await _uploadImage(selectedImage!);
-        if (!mounted) return;
-        if (uploadedUrl != null) {
-          uploadedImageUrl = uploadedUrl;
-          _isImageRemoved = false;
-        } else {
-          throw Exception('Failed to upload image');
-        }
-      }
+      setState(() => _isUploadingPhoto = true);
+      ToastService.instance.showInfo('Uploading doctor photo...');
 
-      final bool isRemovingImage = _isImageRemoved && selectedImage == null;
+      final uploadResult = await FirebaseStorageService.instance
+          .uploadDoctorProfileImage(
+            doctorUid: currentDoctor.id,
+            file: File(picked.path),
+          );
 
       final updateData = {
-        'fullname': nameController.text.trim(),
-        'highestDegree': highestDegreeController.text.trim(),
-        'imageUrl': uploadedImageUrl,
-        'image': uploadedImageUrl,
-        'profile_image':
-            uploadedImageUrl, // Explicit null when removed, never string "null"
-        if (isRemovingImage) 'remove_profile_image': true,
-        // A plain list: `DoctorLanguages.parse` hands back an unmodifiable
-        // view, which is fine for the model but not something to hand to the
-        // Firestore encoder.
-        DoctorLanguages.field: List<String>.from(_selectedLanguages),
-        if (price != null) ...{
-          // Both spellings: `price` is what the app reads now, the legacy key
-          // keeps older builds and hand-written queries working.
-          'price': price,
-          'consultationFee': price,
-        },
-        if (descriptionChanged) 'description': description,
+        'imageUrl': uploadResult.downloadUrl,
+        'image': uploadResult.downloadUrl,
+        'profile_image': uploadResult.downloadUrl,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
@@ -494,119 +142,384 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
           .collection('telemedicine_doctors')
           .doc(currentDoctor.id)
           .update(updateData);
-      if (!mounted) return;
 
-      if (isRemovingImage) {
-        PaintingBinding.instance.imageCache.clear();
-        PaintingBinding.instance.imageCache.clearLiveImages();
-      }
-
-      // Copy instead of rebuilding field-by-field: the old reconstruction left
-      // out `paymentStatus`, `isDeleted`, `age`, `gender`, `expiryDate` and the
-      // rest, so every save was silently wiping them from the local session.
       final updatedDoctor = currentDoctor.copyWith(
-        fullname: nameController.text.trim(),
-        highestDegree: highestDegreeController.text.trim(),
-        image: uploadedImageUrl,
-        clearImage: isRemovingImage,
-        languages: _selectedLanguages,
-        price: price,
-        consultationFee: price,
-        description: descriptionChanged ? description : null,
+        image: uploadResult.downloadUrl,
       );
 
-      if (price != null) {
-        _savedPrice = price;
-      }
-      if (descriptionChanged) {
-        _savedDescription = description;
-      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'current_doctor',
+        json.encode(updatedDoctor.toMap()),
+      );
 
-      await _saveDoctorToLocalStorage(updatedDoctor);
-      if (!mounted) return;
       doctorController.updateDoctor(updatedDoctor);
-
-      _isImageRemoved = false;
-      currentImageUrl = uploadedImageUrl;
-      _languagesDirty = false;
       ref.invalidate(userProvider);
 
-      ToastService.instance.showSuccess('Profile updated!');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Text('Profile updated successfully!'),
-            ],
-          ),
-          backgroundColor: Color(0xFF2E7D32),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 3),
-        ),
-      );
-
-      // Safe navigation: If embedded in DoctorPortalWrapper (bottom nav), popping
-      // would pop the root portal wrapper and leave an empty black screen.
-      // Only pop if this screen was pushed onto an existing route stack.
-      if (Navigator.of(context).canPop()) {
-        Navigator.pop(context, true);
-      } else {
-        // Refresh local state without popping
-        setState(() {
-          currentImageUrl = uploadedImageUrl;
-          selectedImage = null;
-        });
+      if (mounted) {
+        ToastService.instance.showSuccess('Profile photo updated');
       }
     } catch (e) {
-      if (!mounted) return;
-      ToastService.instance.showError('Update failed');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Expanded(child: Text('Update failed: ${e.toString()}')),
-            ],
-          ),
-          backgroundColor: const Color(0xFFD32F2F),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
       if (mounted) {
-        setState(() {
-          isSaving = false;
-        });
+        ToastService.instance.showError('Upload failed: ${e.toString()}');
       }
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
     }
   }
 
-  Future<void> _saveDoctorToLocalStorage(UserModel doctor) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('current_doctor', json.encode(doctor.toMap()));
+  Future<void> _removePhoto() async {
+    final doctorController = ref.read(doctorControllerProvider);
+    final currentDoctor = doctorController.currentDoctor;
+    if (currentDoctor == null) return;
+
+    setState(() => _isUploadingPhoto = true);
+    try {
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+
+      await FirebaseFirestore.instance
+          .collection('telemedicine_doctors')
+          .doc(currentDoctor.id)
+          .update({
+            'imageUrl': null,
+            'image': null,
+            'profile_image': null,
+            'remove_profile_image': true,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+      final updatedDoctor = currentDoctor.copyWith(clearImage: true);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'current_doctor',
+        json.encode(updatedDoctor.toMap()),
+      );
+
+      doctorController.updateDoctor(updatedDoctor);
+      ref.invalidate(userProvider);
+
+      if (mounted) {
+        ToastService.instance.showInfo('Profile picture removed');
+      }
+    } catch (_) {
+      if (mounted) ToastService.instance.showError('Failed to remove photo');
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
+  void _showPhotoOptionsDialog() {
+    final doctor = ref.read(currentDoctorProvider) ?? ref.read(userProvider);
+    final hasPhoto = doctor?.image != null && doctor!.image!.isNotEmpty;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD6E4F0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(
+                'Doctor Profile Photo',
+                style: TextStyle(
+                  fontSize: context.fs(16),
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1F2F44),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDF2F8),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_rounded,
+                    color: Color(0xFF062B72),
+                  ),
+                ),
+                title: const Text(
+                  'Take Photo',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadPhoto(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDF2F8),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library_rounded,
+                    color: Color(0xFF062B72),
+                  ),
+                ),
+                title: const Text(
+                  'Choose from Gallery',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadPhoto(ImageSource.gallery);
+                },
+              ),
+              if (hasPhoto)
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.red,
+                    ),
+                  ),
+                  title: const Text(
+                    'Remove Photo',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.red,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _removePhoto();
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDoctorAccountDetailsModal(UserModel doctor) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD6E4F0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEDF2F8),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.badge_outlined,
+                      color: Color(0xFF062B72),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Doctor Account Details',
+                          style: TextStyle(
+                            fontSize: context.fs(16),
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1F2F44),
+                          ),
+                        ),
+                        Text(
+                          'Official verified credentials on file',
+                          style: TextStyle(
+                            fontSize: context.fs(12.5),
+                            color: const Color(0xFF657991),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              _buildDetailItem(
+                label: 'Doctor ID',
+                value: (doctor.doctorId != null && doctor.doctorId!.isNotEmpty)
+                    ? 'DOC-${doctor.doctorId}'
+                    : 'Verified Doctor',
+                icon: Icons.tag_rounded,
+              ),
+              const SizedBox(height: 10),
+
+              _buildDetailItem(
+                label: 'Consultation Fee',
+                value: doctor.consultationPrice > 0
+                    ? 'Rs. ${doctor.consultationPrice.toStringAsFixed(0)}'
+                    : 'Not configured',
+                icon: Icons.payments_outlined,
+              ),
+              const SizedBox(height: 10),
+
+              _buildDetailItem(
+                label: 'Highest Qualification / Degree',
+                value: doctor.highestDegree?.trim().isNotEmpty == true
+                    ? doctor.highestDegree!
+                    : 'MBBS',
+                icon: Icons.school_outlined,
+              ),
+              const SizedBox(height: 10),
+
+              _buildDetailItem(
+                label: 'Languages',
+                value: doctor.languages.isNotEmpty
+                    ? doctor.languages.join(', ')
+                    : 'English, Urdu',
+                icon: Icons.language_rounded,
+              ),
+              const SizedBox(height: 10),
+
+              if (doctor.description?.trim().isNotEmpty == true) ...[
+                _buildDetailItem(
+                  label: 'Professional Summary',
+                  value: doctor.description!,
+                  icon: Icons.description_outlined,
+                ),
+                const SizedBox(height: 10),
+              ],
+
+              const SizedBox(height: 16),
+
+              GradientButton(
+                text: 'Edit Professional Details',
+                icon: Icons.edit_note_rounded,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const UpdateDoctorProfileScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailItem({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: const Color(0xFF062B72)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF657991),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F2F44),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _logout() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: Text(
           'Logout',
           style: TextStyle(
-            fontSize: context.fs(15),
+            fontSize: context.fs(16),
             fontWeight: FontWeight.w700,
             color: const Color(0xFF1F2F44),
           ),
         ),
         content: Text(
-          'Are you sure you want to logout?',
+          'Are you sure you want to sign out of doctor portal?',
           style: TextStyle(
-            fontSize: context.fs(13),
-            color: const Color(0xFF6B7B8D),
+            fontSize: context.fs(13.5),
+            color: const Color(0xFF657991),
           ),
         ),
         actions: [
@@ -614,7 +527,10 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text(
               'Cancel',
-              style: TextStyle(color: Color(0xFF6B7B8D)),
+              style: TextStyle(
+                color: Color(0xFF657991),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           TextButton(
@@ -622,7 +538,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text(
               'Logout',
-              style: TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -635,15 +551,15 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
+      builder: (_) => const Center(
         child: CircularProgressIndicator(color: Color(0xFF062B72)),
       ),
     );
 
     try {
       final doctorController = ref.read(doctorControllerProvider);
-      try {
-        if (doctorController.currentDoctor != null) {
+      if (doctorController.currentDoctor != null) {
+        try {
           await FirebaseFirestore.instance
               .collection('telemedicine_doctors')
               .doc(doctorController.currentDoctor!.id)
@@ -656,42 +572,149 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                 'lastSeen': FieldValue.serverTimestamp(),
               })
               .timeout(const Duration(seconds: 3));
-        }
-      } catch (_) {}
+        } catch (_) {}
+      }
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('current_doctor');
       await doctorController.signOut();
 
-      ToastService.instance.showSuccess('Logged out successfully');
       if (mounted) {
+        Navigator.pop(context); // spinner
+        ToastService.instance.showSuccess('Logged out successfully');
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const SignInScreen()),
+          MaterialPageRoute(builder: (_) => const SignInScreen()),
           (route) => false,
         );
       }
     } catch (e) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('current_doctor');
-      ToastService.instance.showSuccess('Logged out');
       if (mounted) {
+        Navigator.pop(context); // spinner
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const SignInScreen()),
+          MaterialPageRoute(builder: (_) => const SignInScreen()),
           (route) => false,
         );
       }
     }
   }
 
+  Future<void> _deleteAccount() async {
+    final doctorController = ref.read(doctorControllerProvider);
+    final currentDoctor = doctorController.currentDoctor;
+    if (currentDoctor == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.red),
+            const SizedBox(width: 8),
+            Text(
+              'Deactivate Account',
+              style: TextStyle(
+                fontSize: context.fs(16),
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF1F2F44),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your doctor profile will be deactivated and hidden from patient search listings.',
+              style: TextStyle(
+                fontSize: context.fs(13),
+                color: const Color(0xFF657991),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Note: Completed consultations, medical prescriptions, and patient records are preserved on file in compliance with healthcare regulations.',
+              style: TextStyle(
+                fontSize: context.fs(11.5),
+                color: const Color(0xFF657991),
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: Color(0xFF657991),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text(
+              'Deactivate',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: CircularProgressIndicator(color: Color(0xFF062B72)),
+        ),
+      );
+
+      final success = await doctorController.deleteDoctorProfile(
+        currentDoctor.id,
+        performedBy: currentDoctor.id,
+        reason: 'Requested by doctor',
+      );
+
+      if (success) {
+        await doctorController.signOut();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('current_doctor');
+
+        if (mounted) {
+          Navigator.pop(context); // spinner
+          ToastService.instance.showSuccess('Doctor account deactivated');
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const SignInScreen()),
+            (route) => false,
+          );
+        }
+      } else {
+        if (mounted) {
+          Navigator.pop(context); // spinner
+          ToastService.instance.showError('Failed to deactivate account');
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final doctorController = ref.watch(doctorControllerProvider);
-    final currentDoctor = doctorController.currentDoctor;
+    final currentDoctor =
+        ref.watch(currentDoctorProvider) ?? ref.watch(userProvider);
 
     if (currentDoctor == null) {
-      // `_currentDoctor` is nulled by sign-out and by controller error paths,
-      // and this screen is a live tab of the doctor portal — an unlabelled
-      // spinner left the doctor staring at a blank screen with no way out.
       return Scaffold(
         backgroundColor: const Color(0xFFEDF2F8),
         body: Center(
@@ -704,25 +727,24 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                 color: Color(0xFF7E90A6),
               ),
               const SizedBox(height: 16),
-              Text(
-                'Session ended',
+              const Text(
+                'Session Ended',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1F2F44),
+                  color: Color(0xFF1F2F44),
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
+              const Text(
                 'Please sign in again to manage your profile.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: const Color(0xFF657991)),
+                style: TextStyle(fontSize: 13, color: Color(0xFF657991)),
               ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () => Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (context) => const SignInScreen()),
+                  MaterialPageRoute(builder: (_) => const SignInScreen()),
                   (route) => false,
                 ),
                 style: ElevatedButton.styleFrom(
@@ -736,10 +758,13 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
       );
     }
 
+    final bool canPop = Navigator.of(context).canPop();
+
     return Scaffold(
       backgroundColor: const Color(0xFFEDF2F8),
       body: Stack(
         children: [
+          // ECG Watermark - Top Right
           Positioned(
             top: 20,
             right: 0,
@@ -751,9 +776,11 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
               ),
             ),
           ),
+
           SafeArea(
             child: Column(
               children: [
+                // Top App Bar
                 Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal: context.rsp(20),
@@ -761,176 +788,261 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                   ),
                   child: Row(
                     children: [
+                      if (canPop) ...[
+                        CircularBackButton(
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        const SizedBox(width: 14),
+                      ],
                       Expanded(
                         child: Text(
-                          'Edit Profile',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          'Profile & Settings',
                           style: TextStyle(
-                            fontSize: context.fs(16),
+                            fontSize: context.fs(20),
                             fontWeight: FontWeight.w700,
                             color: const Color(0xFF1F2F44),
+                            letterSpacing: -0.3,
                           ),
                         ),
                       ),
-                      if (isSaving)
-                        const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Color(0xFF062B72),
-                          ),
-                        )
-                      else
-                        GestureDetector(
-                          onTap: _saveProfile,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF284F85),
-                                  Color(0xFF15386A),
-                                  Color(0xFF0D264E),
-                                  Color(0xFF081938),
-                                ],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: const Color(0xFF132D56),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF0B2041,
-                                  ).withValues(alpha: 0.32),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              'Save',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),
+
+                // Main Scrollable Settings Content
                 Expanded(
                   child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: context.rsp(20),
-                      vertical: 8,
+                    padding: EdgeInsets.fromLTRB(
+                      context.rsp(20),
+                      context.rsp(8),
+                      context.rsp(20),
+                      context.rsp(32),
                     ),
-                    child: CenteredContent(
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 8),
-                          _buildAvatarSection(),
-                          const SizedBox(height: 28),
-                          Text(
-                            'Doctor Information',
-                            style: TextStyle(
-                              fontSize: context.fs(20),
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF1F2F44),
-                              letterSpacing: -0.5,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: context.contentMaxWidth < 440
+                              ? context.contentMaxWidth
+                              : 440,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // 1. Profile Header
+                            OpdProfileHeader(
+                              name: currentDoctor.fullname,
+                              subtitle:
+                                  currentDoctor.highestDegree?.isNotEmpty ==
+                                      true
+                                  ? currentDoctor.highestDegree!
+                                  : (currentDoctor.phoneNumber ?? 'Doctor'),
+                              imageUrl: currentDoctor.image,
+                              roleBadge:
+                                  (currentDoctor.doctorId != null &&
+                                      currentDoctor.doctorId!.isNotEmpty)
+                                  ? 'Doctor • ID: ${currentDoctor.doctorId}'
+                                  : 'Verified Doctor',
+                              isUploading: _isUploadingPhoto,
+                              onEditPhoto: _showPhotoOptionsDialog,
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Update your professional details and profile picture.',
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF657991),
-                              height: 1.4,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 24),
-                          _buildDoctorIdCard(currentDoctor),
-                          const SizedBox(height: 24),
-                          _buildOnlineStatusCard(),
-                          const SizedBox(height: 24),
-                          Form(
-                            key: _formKey,
-                            child: Column(
-                              children: [
-                                MetallicInput(
-                                  hintText: 'Full Name',
-                                  icon: Icons.person_rounded,
-                                  controller: nameController,
-                                  showLabel: true,
-                                  labelText: 'Full Name',
-                                  validator: (value) =>
-                                      value?.trim().isEmpty ?? true
-                                      ? 'Required'
-                                      : null,
-                                ),
-                                const SizedBox(height: 16),
-                                MetallicInput(
-                                  hintText: 'Highest Degree',
-                                  icon: Icons.school_rounded,
-                                  controller: highestDegreeController,
-                                  showLabel: true,
-                                  labelText: 'Highest Degree',
-                                ),
-                                const SizedBox(height: 16),
-                                MetallicInput(
-                                  hintText: '1500',
-                                  icon: Icons.payments_outlined,
-                                  controller: priceController,
-                                  showLabel: true,
-                                  labelText: 'Price (PKR)',
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
+
+                            const SizedBox(height: 12),
+
+                            // 2. Account Section
+                            OpdSettingsGroup(
+                              title: 'Account',
+                              items: [
+                                OpdSettingsTile(
+                                  icon: Icons.person_outline_rounded,
+                                  title: 'Manage Profile',
+                                  subtitle: 'Name, photo & contact info',
+                                  onTap: () async {
+                                    final updated = await Navigator.push<bool>(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const UpdateDoctorProfileScreen(),
                                       ),
+                                    );
+                                    if (updated == true && mounted) {
+                                      ref.invalidate(userProvider);
+                                      _loadInitialData();
+                                    }
+                                  },
                                 ),
-                                const SizedBox(height: 16),
-                                MetallicInput(
-                                  hintText:
-                                      'Cardiologist with 12 years of experience',
-                                  icon: Icons.notes_outlined,
-                                  controller: descriptionController,
-                                  showLabel: true,
-                                  labelText: 'About / Description',
+
+                                OpdSettingsTile(
+                                  icon: Icons.badge_outlined,
+                                  title: 'Doctor Account Details',
+                                  subtitle: 'View credentials, fee & languages',
+                                  onTap: () {
+                                    _showDoctorAccountDetailsModal(
+                                      currentDoctor,
+                                    );
+                                  },
                                 ),
-                                const SizedBox(height: 22),
-                                _buildLanguagesSection(),
                               ],
                             ),
-                          ),
-                          if (errorText.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 16),
-                              child: Text(
-                                errorText,
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 13,
+
+                            // 3. Preferences Section
+                            OpdSettingsGroup(
+                              title: 'Preferences',
+                              items: [
+                                OpdSettingsSwitchTile(
+                                  icon: Icons.sensors_rounded,
+                                  title: 'Available for Consultations',
+                                  subtitle: _isOnline
+                                      ? 'You are online for patient calls'
+                                      : 'You appear offline to patients',
+                                  value: _isOnline,
+                                  onChanged: _toggleOnlineStatus,
+                                ),
+                                OpdSettingsSwitchTile(
+                                  icon: Icons.notifications_none_rounded,
+                                  title: 'Notifications',
+                                  subtitle:
+                                      'Patient chat & consultation alerts',
+                                  value: _notificationsEnabled,
+                                  onChanged: _toggleNotifications,
+                                ),
+                                OpdSettingsTile(
+                                  icon: Icons.translate_rounded,
+                                  title: 'Language',
+                                  subtitle: _selectedLanguage,
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _selectedLanguage,
+                                        style: TextStyle(
+                                          fontSize: context.fs(13),
+                                          fontWeight: FontWeight.w600,
+                                          color: const Color(0xFF062B72),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: Color(0xFF94A3B8),
+                                        size: 20,
+                                      ),
+                                    ],
+                                  ),
+                                  onTap: () {
+                                    OpdSupportDialogs.showLanguageSelector(
+                                      context: context,
+                                      currentLanguage: _selectedLanguage,
+                                      onSelected: _setLanguage,
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+
+                            // 4. Support Section
+                            OpdSettingsGroup(
+                              title: 'Support',
+                              items: [
+                                OpdSettingsTile(
+                                  icon: Icons.headset_mic_outlined,
+                                  title: 'Help Center',
+                                  subtitle: '24/7 Doctor support helpline',
+                                  onTap: () {
+                                    OpdSupportDialogs.showHelpCenter(context);
+                                  },
+                                ),
+                                OpdSettingsTile(
+                                  icon: Icons.policy_outlined,
+                                  title: 'Terms & Policies',
+                                  subtitle: 'Medical practitioner guidelines',
+                                  onTap: () {
+                                    OpdSupportDialogs.showTermsAndPolicies(
+                                      context,
+                                    );
+                                  },
+                                ),
+                                OpdSettingsTile(
+                                  icon: Icons.info_outline_rounded,
+                                  title: 'About Us',
+                                  subtitle: 'Version 1.0.6 (Build 6)',
+                                  onTap: () {
+                                    OpdSupportDialogs.showAboutUs(context);
+                                  },
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            // 5. Account Actions (Visually Separated)
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFFE2E8F0),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF0F233C,
+                                    ).withValues(alpha: 0.035),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Column(
+                                  children: [
+                                    OpdSettingsTile(
+                                      icon: Icons.logout_rounded,
+                                      title: 'Logout',
+                                      subtitle: 'Sign out of doctor portal',
+                                      iconBgColor: Colors.red.withValues(
+                                        alpha: 0.08,
+                                      ),
+                                      iconColor: const Color(0xFFD32F2F),
+                                      titleColor: const Color(0xFFD32F2F),
+                                      trailing: const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: Color(0xFFD32F2F),
+                                        size: 20,
+                                      ),
+                                      onTap: _logout,
+                                    ),
+                                    const Divider(
+                                      height: 1,
+                                      thickness: 1,
+                                      color: Color(0xFFF1F5F9),
+                                      indent: 54,
+                                      endIndent: 14,
+                                    ),
+                                    OpdSettingsTile(
+                                      icon: Icons.delete_outline_rounded,
+                                      title: 'Deactivate Account',
+                                      subtitle:
+                                          'Deactivate doctor account securely',
+                                      iconBgColor: const Color(0xFFF1F5F9),
+                                      iconColor: const Color(0xFF64748B),
+                                      titleColor: const Color(0xFF64748B),
+                                      trailing: const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: Color(0xFF94A3B8),
+                                        size: 20,
+                                      ),
+                                      onTap: _deleteAccount,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                          const SizedBox(height: 32),
-                          _buildActionButtons(),
-                          const SizedBox(height: 24),
-                        ],
+
+                            const SizedBox(height: 24),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -940,494 +1052,6 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildLanguagesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFDCE6F2)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0F233C).withValues(alpha: 0.06),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0F4FA),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.translate_rounded,
-                      color: Color(0xFF062B72),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Languages',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF1F2F44),
-                          ),
-                        ),
-                        Text(
-                          _selectedLanguages.isEmpty
-                              ? 'None selected yet'
-                              : '${_selectedLanguages.length} selected',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: const Color(0xFF657991),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              DoctorLanguageSelector(
-                selected: _selectedLanguages,
-                onChanged: _onLanguagesChanged,
-                helperText:
-                    'Tap to add or remove a language. Patients see these on '
-                    'your contact card in chat.',
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAvatarSection() {
-    final hasPhoto =
-        selectedImage != null ||
-        (currentImageUrl != null && currentImageUrl!.isNotEmpty);
-
-    final name = nameController.text.trim();
-    final cleanName = name
-        .replaceFirst(RegExp(r'^Dr\.?\s*', caseSensitive: false), '')
-        .trim();
-    final initial = cleanName.isNotEmpty
-        ? cleanName[0].toUpperCase()
-        : (name.isNotEmpty ? name[0].toUpperCase() : 'D');
-
-    return GestureDetector(
-      onTap: _showImageSourceDialog,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xFFE3EAF2),
-                  Color(0xFFF5F8FC),
-                  Color(0xFFE2E9F2),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFBAC7D8), width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF0F233C).withValues(alpha: 0.08),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: ClipOval(
-                child: isUploading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF062B72),
-                        ),
-                      )
-                    : selectedImage != null
-                    ? Image.file(selectedImage!, fit: BoxFit.cover)
-                    : currentImageUrl != null && currentImageUrl!.isNotEmpty
-                    ? Image.network(
-                        currentImageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Center(
-                          child: Text(
-                            initial,
-                            style: TextStyle(
-                              fontSize: 44,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF15386A),
-                            ),
-                          ),
-                        ),
-                      )
-                    : Center(
-                        child: Text(
-                          initial,
-                          style: TextStyle(
-                            fontSize: 44,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF15386A),
-                          ),
-                        ),
-                      ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF284F85),
-                    Color(0xFF15386A),
-                    Color(0xFF0D264E),
-                    Color(0xFF081938),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF132D56), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0B2041).withValues(alpha: 0.32),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.camera_alt_rounded,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-          ),
-          if (hasPhoto)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: GestureDetector(
-                onTap: _confirmRemovePhoto,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade600,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.red.withValues(alpha: 0.35),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.delete_outline_rounded,
-                    color: Colors.white,
-                    size: 14,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDoctorIdCard(UserModel doctor) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF284F85),
-            Color(0xFF15386A),
-            Color(0xFF0D264E),
-            Color(0xFF081938),
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF132D56)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0B2041).withValues(alpha: 0.32),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.badge_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Doctor ID',
-                  style: TextStyle(
-                    color: const Color(0xFF8FA4BD),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  doctor.doctorId ?? 'Not assigned',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: context.fs(15),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          GestureDetector(
-            onTap: () {
-              final doctorId = doctor.doctorId ?? '';
-              if (doctorId.isNotEmpty) {
-                Clipboard.setData(ClipboardData(text: doctorId));
-                ToastService.instance.showSuccess('Doctor ID copied!');
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              constraints: const BoxConstraints(minHeight: 40, minWidth: 40),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.copy_rounded, size: 14, color: Colors.white),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Copy',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOnlineStatusCard() {
-    return GestureDetector(
-      onTap: _toggleOnlineStatus,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFDCE6F2)),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0F233C).withValues(alpha: 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isOnline
-                    ? const Color(0xFF4CAF50).withValues(alpha: 0.1)
-                    : const Color(0xFFBDBDBD).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
-                color: isOnline
-                    ? const Color(0xFF4CAF50)
-                    : const Color(0xFFBDBDBD),
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Online Status',
-                    style: TextStyle(
-                      color: const Color(0xFF1F2F44),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    isOnline
-                        ? 'You are visible to patients'
-                        : 'You are offline',
-                    style: TextStyle(
-                      color: const Color(0xFF657991),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 48,
-              height: 28,
-              decoration: BoxDecoration(
-                color: isOnline
-                    ? const Color(0xFF4CAF50)
-                    : const Color(0xFFBDBDBD),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Stack(
-                children: [
-                  AnimatedPositioned(
-                    duration: const Duration(milliseconds: 200),
-                    left: isOpen ? 22 : 2,
-                    top: 2,
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  bool get isOpen => isOnline;
-
-  Widget _buildActionButtons() {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: _logout,
-          child: Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.red.withValues(alpha: 0.08),
-                  Colors.red.withValues(alpha: 0.04),
-                  Colors.red.withValues(alpha: 0.08),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: Colors.red.withValues(alpha: 0.3),
-                width: 1.5,
-              ),
-            ),
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white,
-                    Colors.red.withValues(alpha: 0.02),
-                    Colors.white,
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(27),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.logout_rounded, color: Colors.red[700], size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Logout',
-                    style: TextStyle(
-                      fontSize: context.fs(14),
-                      fontWeight: FontWeight.w600,
-                      color: Colors.red[700],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

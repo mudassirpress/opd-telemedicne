@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:telemedicine/features/auth/presentation/controllers/doctor_controller.dart';
 import 'package:telemedicine/features/chat/presentation/chat_list_widget.dart';
 import 'package:telemedicine/features/calls/presentation/call_history_screen.dart';
-import 'package:telemedicine/features/doctor_portal/presentation/bottom_nav/doctor_portal_tab_provider.dart';
 import 'package:telemedicine/app/theme/app_theme.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 import 'package:telemedicine/core/utils/toast_utils.dart';
@@ -20,6 +19,7 @@ class _DoctorPortalScreenState extends ConsumerState<DoctorPortalScreen> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = true;
+  bool _isUpdatingAvailability = false;
   bool isOnline = false;
 
   @override
@@ -39,80 +39,70 @@ class _DoctorPortalScreenState extends ConsumerState<DoctorPortalScreen> {
     super.dispose();
   }
 
-  Future<void> _checkAndLoadDoctorProfile() async {
-    if (!mounted) return;
+  Future<void> _toggleAvailability(bool currentStatus) async {
+    if (_isUpdatingAvailability) return;
+    setState(() => _isUpdatingAvailability = true);
 
-    setState(() {
-      _isLoading = true;
-    });
-
+    final newStatus = !currentStatus;
     try {
-      final doctorController = ref.read(doctorControllerProvider);
+      final success = await ref
+          .read(doctorControllerProvider)
+          .toggleDoctorStatus(newStatus);
 
-      if (doctorController.currentDoctor == null) {
-        await doctorController.loadDoctorFromLocalStorage();
-      }
-
-      if (doctorController.currentDoctor != null) {
+      if (success) {
         setState(() {
-          isOnline = doctorController.isDoctorOnline;
+          isOnline = newStatus;
         });
-      }
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        if (newStatus) {
+          ToastService.instance.showSuccess(
+            'You are now Online. Ready to receive voice consultations.',
+          );
+        } else {
+          ToastService.instance.showInfo(
+            'You are now Offline. Patients cannot call you.',
+          );
+        }
+      } else {
+        ToastService.instance.showError(
+          'Failed to update availability. Please try again.',
+        );
       }
     } catch (e) {
-      ToastService.instance.showError(
-        'Error loading doctor profile: ${e.toString()}',
-      );
+      ToastService.instance.showError('Unable to update status. Please try again.');
+    } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isUpdatingAvailability = false);
       }
     }
   }
 
-  void _clearSearch() {
-    _searchController.clear();
-    setState(() {
-      _searchQuery = '';
-    });
-    ToastService.instance.showInfo('Search cleared');
-  }
-
-  bool _isToggling = false;
-
-  Future<void> _toggleOnlineStatus() async {
-    if (_isToggling) return;
-    _isToggling = true;
+  Future<void> _checkAndLoadDoctorProfile() async {
+    if (!mounted) return;
 
     final doctorController = ref.read(doctorControllerProvider);
-    final targetStatus = !isOnline;
-
-    final success = await doctorController.toggleDoctorStatus(targetStatus);
-
-    if (mounted) {
+    if (doctorController.currentDoctor == null) {
       setState(() {
-        isOnline = doctorController.isDoctorOnline;
-        _isToggling = false;
+        _isLoading = true;
       });
+    }
 
-      if (success) {
-        if (targetStatus) {
-          ToastService.instance.showSuccess(
-            'You are now online and ready for calls',
-          );
-        } else {
-          ToastService.instance.showInfo('You are now offline');
-        }
-      } else {
-        ToastService.instance.showWarning(
-          'Failed to update online status. Please check your connection.',
-        );
+    try {
+      if (doctorController.currentDoctor == null) {
+        await doctorController.loadDoctorFromLocalStorage();
+      }
+
+      if (doctorController.currentDoctor != null && mounted) {
+        setState(() {
+          isOnline = doctorController.isDoctorOnline;
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ [DoctorPortalScreen] Profile load error: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -122,10 +112,8 @@ class _DoctorPortalScreenState extends ConsumerState<DoctorPortalScreen> {
     final doctorController = ref.watch(doctorControllerProvider);
     final currentDoctor = doctorController.currentDoctor;
 
-    // Keep toggle visual state bound to central controller
-    if (!_isToggling && isOnline != doctorController.isDoctorOnline) {
-      isOnline = doctorController.isDoctorOnline;
-    }
+    // Automated presence state bound directly to central controller
+    isOnline = doctorController.isDoctorOnline;
 
     if (_isLoading) {
       return Scaffold(
@@ -159,6 +147,35 @@ class _DoctorPortalScreenState extends ConsumerState<DoctorPortalScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            if (!isOnline)
+              Container(
+                width: double.infinity,
+                color: const Color(0xFFE53935),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 7,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.wifi_off_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Internet connection unstable or package expired. Calls may not connect.',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: context.fs(11),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Container(
               padding: EdgeInsets.symmetric(
                 horizontal: context.rsp(16),
@@ -197,51 +214,90 @@ class _DoctorPortalScreenState extends ConsumerState<DoctorPortalScreen> {
                           ],
                         ),
                       ),
-                      GestureDetector(
-                        onTap: _toggleOnlineStatus,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: context.rsp(12),
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isOnline
-                                ? const Color(0xFF4CAF50)
-                                : const Color(0xFFBDBDBD),
+                      Tooltip(
+                        message: isOnline
+                            ? 'You are Online. Tap to switch to Offline'
+                            : 'You are Offline. Tap to switch to Online',
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _isUpdatingAvailability
+                                ? null
+                                : () => _toggleAvailability(isOnline),
                             borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(
-                                  0xFF0F233C,
-                                ).withValues(alpha: 0.08),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: context.rsp(12),
+                                vertical: 7,
                               ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 7,
-                                height: 7,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.white,
-                                ),
+                              decoration: BoxDecoration(
+                                color: isOnline
+                                    ? const Color(0xFF1E8E5A)
+                                    : const Color(0xFF78909C),
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (isOnline
+                                            ? const Color(0xFF1E8E5A)
+                                            : const Color(0xFF78909C))
+                                        .withValues(alpha: 0.28),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 6),
-                              Text(
-                                isOnline ? 'Online' : 'Offline',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: context.fs(12),
-                                  fontWeight: FontWeight.w500,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_isUpdatingAvailability) ...[
+                                    const SizedBox(
+                                      width: 10,
+                                      height: 10,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.5,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                  ] else ...[
+                                    AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 200),
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  Text(
+                                    isOnline ? 'Online' : 'Offline',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: context.fs(12),
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    isOnline
+                                        ? Icons.check_circle_rounded
+                                        : Icons.power_settings_new_rounded,
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    size: 13,
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -298,41 +354,6 @@ class _DoctorPortalScreenState extends ConsumerState<DoctorPortalScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDoctorAvatar(dynamic currentDoctor) {
-    return GestureDetector(
-      onTap: () {
-        ref.read(doctorPortalTabProvider.notifier).state =
-            DoctorPortalTab.profile.index;
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFDCE6F2), width: 2),
-        ),
-        child: CircleAvatar(
-          radius: 20,
-          backgroundColor: const Color(0xFFF0F4FA),
-          backgroundImage:
-              (currentDoctor?.image != null && currentDoctor!.image!.isNotEmpty)
-              ? NetworkImage(currentDoctor!.image!)
-              : null,
-          child: (currentDoctor?.image == null || currentDoctor!.image!.isEmpty)
-              ? Text(
-                  (currentDoctor?.fullname ?? 'D').isNotEmpty
-                      ? (currentDoctor!.fullname ?? 'D')[0].toUpperCase()
-                      : 'D',
-                  style: TextStyle(
-                    color: AppColors.primaryRed,
-                    fontSize: context.fs(15),
-                    fontWeight: FontWeight.w600,
-                  ),
-                )
-              : null,
         ),
       ),
     );

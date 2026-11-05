@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:telemedicine/core/services/notification_service.dart';
@@ -78,39 +77,18 @@ class VerifyOtpResult {
 /// on the Firebase project.
 class PatientPasswordResetService {
   PatientPasswordResetService({
-    FirebaseFunctions? functions,
     FirebaseFirestore? firestore,
-  }) : _customFunctions = functions,
-       _customFirestore = firestore;
-
-  /// Primary region of the deployed callables (see functions/patient_password_reset.js).
-  static const String region = 'asia-south1';
-
-  /// Fallback region for environments where Cloud Functions are deployed in default US region.
-  static const String fallbackRegion = 'us-central1';
+  }) : _customFirestore = firestore;
 
   static const String _logPrefix = '[PasswordResetService]';
-
-  static const String _startFn = 'requestPatientPasswordResetOtp';
-  static const String _startFnLegacy = 'startPatientPasswordReset';
-  static const String _verifyFn = 'verifyPatientPasswordResetOtp';
-  static const String _resetFn = 'resetPatientPasswordWithOtp';
-  static const String _resetFnLegacy = 'resetPatientPassword';
 
   static const String _kOtpPepper =
       'dev_default_otp_pepper_for_testing_purposes_only_32bytes';
 
-  final FirebaseFunctions? _customFunctions;
   final FirebaseFirestore? _customFirestore;
-
-  FirebaseFunctions get _functions =>
-      _customFunctions ?? FirebaseFunctions.instanceFor(region: region);
 
   FirebaseFirestore get _firestore =>
       _customFirestore ?? FirebaseFirestore.instance;
-
-  /// Cached detection flag: false when Cloud Functions are not deployed on the project.
-  static bool? _cloudFunctionsAvailable;
 
   // ── Cryptographic and validation helpers ─────────────────────────────────
 
@@ -269,7 +247,7 @@ class PatientPasswordResetService {
     return null; // null = valid
   }
 
-  // ── Callable wrappers ─────────────────────────────────────────────────────
+  // ── Operations ────────────────────────────────────────────────────────────
 
   /// Step 1 — request an OTP for [phoneNumber] (international or Pakistani).
   Future<StartOtpResult> startOtp({
@@ -288,55 +266,11 @@ class PatientPasswordResetService {
     final masked = maskPhoneNumber(phone);
     debugPrint('$_logPrefix [startOtp] Initiating request for phone=$masked');
 
-    // If Cloud Functions are known to be undeployed/unavailable, jump directly to fallback
-    if (_cloudFunctionsAvailable == false) {
-      debugPrint(
-        '$_logPrefix Cloud Functions unavailable. Using secure Firestore fallback.',
-      );
-      return _startOtpFirestoreFallback(
-        phone,
-        countryCode: countryCode,
-        deviceFcmToken: deviceFcmToken,
-      );
-    }
-
-    try {
-      final payload = <String, dynamic>{
-        'phoneNumber': phone,
-        if (countryCode != null && countryCode.isNotEmpty)
-          'countryCode': countryCode,
-        if (deviceFcmToken != null && deviceFcmToken.isNotEmpty)
-          'deviceFcmToken': deviceFcmToken,
-      };
-
-      final result = await _callWithFallback(_startFn, _startFnLegacy, payload);
-      _cloudFunctionsAvailable = true;
-      final data = _asMap(result.data);
-      debugPrint('$_logPrefix [startOtp] Request succeeded for phone=$masked');
-      return StartOtpResult(
-        resendInSeconds: _asInt(data['resendInSeconds'], fallback: 60),
-        otpExpiresInSeconds: _asInt(data['otpExpiresInSeconds'], fallback: 300),
-        message:
-            (data['message'] as String?) ??
-            'If this number is registered, a verification code has been sent.',
-      );
-    } catch (error) {
-      debugPrint(
-        '$_logPrefix [startOtp] Request failed for phone=$masked: $error',
-      );
-      if (_isNotFoundOrUnavailable(error)) {
-        _cloudFunctionsAvailable = false;
-        debugPrint(
-          '$_logPrefix Cloud Functions not deployed (not-found). Falling back to secure Firestore OTP flow.',
-        );
-        return _startOtpFirestoreFallback(
-          phone,
-          countryCode: countryCode,
-          deviceFcmToken: deviceFcmToken,
-        );
-      }
-      throw _mapError(error);
-    }
+    return _startOtpFirestoreFallback(
+      phone,
+      countryCode: countryCode,
+      deviceFcmToken: deviceFcmToken,
+    );
   }
 
   /// Step 2 — verify the six-digit [otp]; returns a single-use reset token
@@ -364,52 +298,7 @@ class PatientPasswordResetService {
     final masked = maskPhoneNumber(phone);
     debugPrint('$_logPrefix [verifyOtp] Verifying OTP for phone=$masked');
 
-    if (_cloudFunctionsAvailable == false) {
-      debugPrint(
-        '$_logPrefix Cloud Functions unavailable. Using secure Firestore fallback.',
-      );
-      return _verifyOtpFirestoreFallback(phone, code);
-    }
-
-    try {
-      final payload = <String, dynamic>{
-        'phoneNumber': phone,
-        'otp': code,
-        if (countryCode != null && countryCode.isNotEmpty)
-          'countryCode': countryCode,
-      };
-
-      final result = await _callWithFallback(_verifyFn, null, payload);
-      _cloudFunctionsAvailable = true;
-      final data = _asMap(result.data);
-      final token = data['resetToken'] as String?;
-      if (token == null || token.isEmpty) {
-        throw const PasswordResetException(
-          PasswordResetException.internal,
-          'Something went wrong. Try again.',
-        );
-      }
-      debugPrint(
-        '$_logPrefix [verifyOtp] Verification succeeded for phone=$masked',
-      );
-      return VerifyOtpResult(
-        resetToken: token,
-        expiresIn: _asInt(data['expiresIn'], fallback: 600),
-      );
-    } catch (error) {
-      debugPrint(
-        '$_logPrefix [verifyOtp] Verification failed for phone=$masked: $error',
-      );
-      if (error is PasswordResetException) rethrow;
-      if (_isNotFoundOrUnavailable(error)) {
-        _cloudFunctionsAvailable = false;
-        debugPrint(
-          '$_logPrefix Cloud Functions not deployed (not-found). Falling back to secure Firestore OTP flow.',
-        );
-        return _verifyOtpFirestoreFallback(phone, code);
-      }
-      throw _mapError(error);
-    }
+    return _verifyOtpFirestoreFallback(phone, code);
   }
 
   /// Step 3 — consume [resetToken] and set the new password.
@@ -432,33 +321,7 @@ class PatientPasswordResetService {
     }
 
     debugPrint('$_logPrefix [resetPassword] Consuming reset token...');
-
-    if (_cloudFunctionsAvailable == false) {
-      debugPrint(
-        '$_logPrefix Cloud Functions unavailable. Using secure Firestore fallback.',
-      );
-      return _resetPasswordFirestoreFallback(resetToken, newPassword);
-    }
-
-    try {
-      await _callWithFallback(_resetFn, _resetFnLegacy, {
-        'resetToken': resetToken,
-        'newPassword': newPassword.trim(),
-      });
-      _cloudFunctionsAvailable = true;
-      debugPrint('$_logPrefix [resetPassword] Password reset complete');
-    } catch (error) {
-      debugPrint('$_logPrefix [resetPassword] Password reset failed: $error');
-      if (error is PasswordResetException) rethrow;
-      if (_isNotFoundOrUnavailable(error)) {
-        _cloudFunctionsAvailable = false;
-        debugPrint(
-          '$_logPrefix Cloud Functions not deployed (not-found). Falling back to secure Firestore OTP flow.',
-        );
-        return _resetPasswordFirestoreFallback(resetToken, newPassword);
-      }
-      throw _mapError(error);
-    }
+    return _resetPasswordFirestoreFallback(resetToken, newPassword);
   }
 
   // ── Firestore fallback implementation ─────────────────────────────────────
@@ -852,203 +715,6 @@ class PatientPasswordResetService {
 
     debugPrint(
       '$_logPrefix Password successfully reset for accountId=$accountId',
-    );
-  }
-
-  // ── Network callable execution ────────────────────────────────────────────
-
-  Future<HttpsCallableResult<dynamic>> _callWithFallback(
-    String primary,
-    String? legacy,
-    Map<String, dynamic> data,
-  ) async {
-    final primaryFunctions = _functions;
-    final fallbackFunctions = FirebaseFunctions.instanceFor(
-      region: fallbackRegion,
-    );
-
-    try {
-      return await primaryFunctions
-          .httpsCallable(primary)
-          .call<dynamic>(data)
-          .timeout(const Duration(seconds: 10));
-    } on FirebaseFunctionsException catch (e) {
-      debugPrint(
-        '$_logPrefix Primary $primary ($region) failed: ${e.code} ${e.message}',
-      );
-      if (e.code == 'not-found') {
-        // Try primary function name on fallback region
-        try {
-          debugPrint(
-            '$_logPrefix Retrying $primary on fallback region $fallbackRegion...',
-          );
-          return await fallbackFunctions
-              .httpsCallable(primary)
-              .call<dynamic>(data)
-              .timeout(const Duration(seconds: 8));
-        } on FirebaseFunctionsException catch (fallbackErr) {
-          debugPrint(
-            '$_logPrefix Fallback region $primary failed: ${fallbackErr.code}',
-          );
-          // If legacy alias is supplied, try legacy alias on primary and fallback regions
-          if (legacy != null) {
-            try {
-              debugPrint(
-                '$_logPrefix Trying legacy alias $legacy on $region...',
-              );
-              return await primaryFunctions
-                  .httpsCallable(legacy)
-                  .call<dynamic>(data)
-                  .timeout(const Duration(seconds: 8));
-            } on FirebaseFunctionsException {
-              debugPrint(
-                '$_logPrefix Trying legacy alias $legacy on $fallbackRegion...',
-              );
-              return await fallbackFunctions
-                  .httpsCallable(legacy)
-                  .call<dynamic>(data)
-                  .timeout(const Duration(seconds: 8));
-            }
-          }
-          rethrow;
-        }
-      }
-      rethrow;
-    }
-  }
-
-  // ── Error normalisation ───────────────────────────────────────────────────
-
-  Map<String, dynamic> _asMap(dynamic value) {
-    if (value is Map<String, dynamic>) return value;
-    if (value is Map) return value.cast<String, dynamic>();
-    return const <String, dynamic>{};
-  }
-
-  int _asInt(dynamic value, {required int fallback}) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value) ?? fallback;
-    return fallback;
-  }
-
-  bool _isNotFoundOrUnavailable(Object error) {
-    if (error is FirebaseFunctionsException) {
-      final code = error.code.toLowerCase();
-      final message = (error.message ?? '').toLowerCase();
-      if (_looksOffline(message)) return false;
-      return code == 'not-found' ||
-          code == 'unavailable' ||
-          (code == 'internal' &&
-              (message.contains('not found') || message.contains('not_found')));
-    }
-    final errStr = error.toString().toLowerCase();
-    if (_looksOffline(errStr)) return false;
-    return errStr.contains('not-found') ||
-        errStr.contains('not_found') ||
-        errStr.contains('404');
-  }
-
-  PasswordResetException _mapError(Object error) {
-    if (error is TimeoutException) {
-      debugPrint('$_logPrefix Request timed out');
-      return const PasswordResetException(
-        PasswordResetException.offline,
-        'Connection timed out. Check your internet and try again.',
-      );
-    }
-
-    if (error is FirebaseFunctionsException) {
-      final details = _asMap(error.details);
-      final serverCode = details['error'] as String?;
-      final serverMessage = details['message'] as String?;
-
-      debugPrint(
-        '$_logPrefix FirebaseFunctionsException: code=${error.code}, '
-        'message=${error.message}, serverCode=$serverCode, serverMessage=$serverMessage',
-      );
-
-      switch (error.code) {
-        case 'not-found':
-          return const PasswordResetException(
-            PasswordResetException.internal,
-            'Password reset service is temporarily unavailable. Please try again.',
-          );
-        case 'unauthenticated':
-        case 'permission-denied':
-          return const PasswordResetException(
-            PasswordResetException.internal,
-            'Unable to process request. Please contact support.',
-          );
-        case 'invalid-argument':
-          if (serverCode == PasswordResetException.invalidPhone) {
-            return PasswordResetException(
-              PasswordResetException.invalidPhone,
-              serverMessage ?? 'Enter a valid mobile number with country code.',
-            );
-          }
-          if (serverCode == PasswordResetException.weakPassword) {
-            return PasswordResetException(
-              PasswordResetException.weakPassword,
-              serverMessage ?? 'Choose a stronger password.',
-            );
-          }
-          return PasswordResetException(
-            PasswordResetException.invalidInput,
-            serverMessage ?? 'Invalid input. Please check and try again.',
-          );
-        case 'failed-precondition':
-          if (serverCode == PasswordResetException.resetTokenInvalid) {
-            return PasswordResetException(
-              PasswordResetException.resetTokenInvalid,
-              serverMessage ?? 'This reset session expired. Start over.',
-            );
-          }
-          return const PasswordResetException(
-            PasswordResetException.otpInvalid,
-            'Invalid or expired code. Request a new one.',
-          );
-        case 'resource-exhausted':
-          final resend = details['resendInSeconds'];
-          return PasswordResetException(
-            PasswordResetException.rateLimited,
-            serverMessage ??
-                'Too many attempts. Please wait before trying again.',
-            resendInSeconds: resend is int
-                ? resend
-                : int.tryParse('${resend ?? ''}') ?? 60,
-          );
-        case 'unavailable':
-        case 'deadline-exceeded':
-          return const PasswordResetException(
-            PasswordResetException.offline,
-            'No internet connection. Please try again.',
-          );
-        case 'internal':
-        default:
-          if (_looksOffline(error.message)) {
-            return const PasswordResetException(
-              PasswordResetException.offline,
-              'No internet connection. Please try again.',
-            );
-          }
-          return PasswordResetException(
-            PasswordResetException.internal,
-            serverMessage ?? 'Something went wrong. Please try again.',
-          );
-      }
-    }
-
-    debugPrint('$_logPrefix General error: $error');
-    if (_looksOffline(error.toString())) {
-      return const PasswordResetException(
-        PasswordResetException.offline,
-        'No internet connection. Please try again.',
-      );
-    }
-    return const PasswordResetException(
-      PasswordResetException.internal,
-      'Something went wrong. Please try again.',
     );
   }
 

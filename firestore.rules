@@ -219,7 +219,7 @@ service cloud.firestore {
     allow update, delete: if false;
   }
 
-  // Idempotency claims written by the Cloud Functions before an FCM send.
+  // Idempotency claims written before an FCM send.
   // Admin SDK only: a client that could write here could suppress another
   // user's notification by pre-creating the claim id.
   match /notification_delivery_events/{eventId} {
@@ -232,7 +232,7 @@ service cloud.firestore {
   // The app uses `chats/{chatId}` with a `participants` array and
   // `chats/{chatId}/messages/{messageId}`. A participant may read and send;
   // nobody may delete history. These rules are the future Auth-based version
-  // (see the header): the Cloud Functions independently validate membership
+  // (see the header): the server independently validates membership
   // before any push is sent, so notification authorization does not depend on
   // these rules being deployed.
   // -------------------------------------------------------------------------
@@ -301,22 +301,20 @@ service cloud.firestore {
     allow update: if isCallParticipant() &&
       request.resource.data.diff(resource.data).affectedKeys()
         .hasOnly([
-          'callStatus', 'acceptedAt', 'endedAt', 'duration',
-          'receiverJoinedAt', 'callerJoinedAt', 'endedBy',
-          'probeAckReceivedAt'
+          'callStatus', 'status', 'acceptedAt', 'connectedAt', 'endedAt', 'duration',
+          'receiverJoinedAt', 'callerJoinedAt', 'endedBy', 'endReason',
+          'missedCall', 'rejectedBy', 'probeAckReceivedAt', 'probeAckId'
         ]);
     allow delete: if false;
   }
 
   // -------------------------------------------------------------------------
   // Patient FCM-OTP password-reset working records
-  // (see functions/patient_password_reset.js)
   //
-  // DENY-ALL for every client — reads and writes. These collections contain
+  // DENY-ALL for direct client access — reads and writes. These collections contain
   // HMAC-SHA256 hashes of OTPs and reset tokens, bound account references and
-  // rate-limit counters. They are created, read, updated and deleted ONLY by
-  // the Admin SDK inside the callable Cloud Functions (which bypass security
-  // rules) and by the nightly cleanup schedule.
+  // rate-limit counters. When server-side auth is used, they are accessed ONLY by
+  // the Admin SDK (which bypasses security rules) and maintenance schedules.
   //
   // DEPLOYMENT NOTE: this file is still intentionally NOT referenced by
   // firebase.json (see the header warning at the top — wiring it today would
@@ -393,5 +391,33 @@ service cloud.firestore {
     // Only admins can update (approve/reject) payment records.
     allow update: if isAdmin();
     allow delete: if false;
+  }
+
+  // -------------------------------------------------------------------------
+  // Prescriptions Collection
+  // -------------------------------------------------------------------------
+  match /prescriptions/{prescriptionId} {
+    // Only the prescribing doctor, the prescribed patient, or an Admin can read
+    allow read: if isAdmin() || (signedIn() && (
+      resource.data.patientId == request.auth.uid ||
+      resource.data.doctorId == request.auth.uid
+    ));
+
+    // A doctor can create prescriptions for their patients
+    allow create: if signedIn() && request.resource.data.doctorId == request.auth.uid;
+
+    // Doctor can update metadata (e.g. PDF URL); patients cannot modify prescription contents
+    allow update: if signedIn() && request.resource.data.doctorId == request.auth.uid;
+
+    // Prescriptions are official medical records and must never be deleted
+    allow delete: if false;
+  }
+
+  // -------------------------------------------------------------------------
+  // User Active Sessions
+  // -------------------------------------------------------------------------
+  match /users/{userId}/sessions/{sessionId} {
+    allow read: if signedIn() && request.auth.uid == userId;
+    allow write: if signedIn() && request.auth.uid == userId;
   }
 }

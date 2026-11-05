@@ -116,6 +116,7 @@ abstract class NotificationChannels {
   static const String chat = 'chat_notifications_channel';
   static const String call = 'call_notifications_channel';
   static const String incomingCalls = 'incoming_calls';
+  static const String missedCalls = 'missed_calls';
   static const String general = 'general_notifications';
   static const String passwordReset = 'password_reset_notifications';
 
@@ -202,11 +203,17 @@ abstract class UserRoles {
 abstract class CallStatus {
   CallStatus._();
 
+  /// Call initiated by caller, dispatching to callee (pre-delivery state).
+  static const String calling = 'calling';
+
   /// Push has been received but the callee has not been told yet.
   static const String incoming = 'incoming';
 
-  /// Callee's device is ringing.
+  /// Callee's device is ringing (delivery ack received).
   static const String ringing = 'ringing';
+
+  /// Callee answered. Peering / media negotiation in progress.
+  static const String connecting = 'connecting';
 
   /// Callee answered. Both peers are now in the media room.
   static const String accepted = 'accepted';
@@ -222,6 +229,9 @@ abstract class CallStatus {
 
   /// Nobody answered before the ring timeout elapsed.
   static const String missed = 'missed';
+
+  /// Alias for call timeouts when ring timer expires without an answer.
+  static const String timeout = 'timeout';
 
   /// Call finished normally (hang-up after it connected).
   static const String ended = 'ended';
@@ -243,10 +253,10 @@ abstract class CallStatus {
   };
 
   /// States in which the call is still waiting for an answer.
-  static const Set<String> ringing_ = <String>{incoming, ringing};
+  static const Set<String> ringing_ = <String>{calling, incoming, ringing};
 
-  /// States in which the call is live on both devices.
-  static const Set<String> active = <String>{accepted, connected};
+  /// States in which the call is active or negotiating media.
+  static const Set<String> active = <String>{connecting, accepted, connected};
 
   static bool isTerminal(String? state) =>
       state != null && terminal.contains(state);
@@ -283,8 +293,20 @@ abstract class CallStatus {
 
   static const Map<String, Set<String>> _allowedTransitions =
       <String, Set<String>>{
+        calling: <String>{
+          ringing,
+          connecting,
+          accepted,
+          declined,
+          rejected,
+          missed,
+          cancelled,
+          ended,
+          busy,
+        },
         incoming: <String>{
           ringing,
+          connecting,
           accepted,
           declined,
           rejected,
@@ -294,6 +316,7 @@ abstract class CallStatus {
           busy,
         },
         ringing: <String>{
+          connecting,
           accepted,
           declined,
           rejected,
@@ -302,10 +325,9 @@ abstract class CallStatus {
           ended,
           busy,
         },
-        accepted: <String>{connected, ended, cancelled},
+        connecting: <String>{connected, ended, cancelled, declined, rejected},
+        accepted: <String>{connecting, connected, ended, cancelled},
         connected: <String>{ended},
-        // A call that reached a terminal state never moves again; the map has
-        // no entry for them and `canTransition` returns false.
       };
 }
 
@@ -897,7 +919,8 @@ abstract class FcmMessageType {
       type == appointmentNoShow ||
       type == bookingFrozen;
 
-  static bool isCall(String? type) => type == call;
+  static bool isCall(String? type) =>
+      type == call || type == 'incoming_call';
 }
 
 /// Keys of the `appointment_start` FCM `data` payload.

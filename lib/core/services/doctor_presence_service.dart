@@ -13,12 +13,16 @@ class DoctorPresenceData {
   /// Heartbeat freshness is exposed separately as [isAppConnected]; it never
   /// changes [isOnline], because the heartbeat stops when the app is
   /// backgrounded or terminated.
+  /// True when active heartbeat lease is fresh and account is eligible.
   final bool isOnline;
+
+  /// True when isOnline is true and doctor is not busy on another call.
+  final bool isAvailable;
 
   /// Effective status: 'ONLINE' | 'OFFLINE' | 'BUSY' | 'UNREACHABLE'
   final String effectiveStatus;
 
-  /// Doctor's explicit manual intent
+  /// Doctor's availability flag
   final bool manualAvailability;
 
   /// Last seen timestamp
@@ -42,11 +46,12 @@ class DoctorPresenceData {
   /// Whether the doctor satisfies administrative eligibility requirements
   final bool isEligible;
 
-  /// Internal connection/heartbeat state (does not override manual availability)
+  /// Internal connection/heartbeat state
   final bool isAppConnected;
 
   const DoctorPresenceData({
     required this.isOnline,
+    this.isAvailable = false,
     this.effectiveStatus = 'OFFLINE',
     this.manualAvailability = false,
     this.isAppConnected = true,
@@ -61,6 +66,7 @@ class DoctorPresenceData {
 
   static const empty = DoctorPresenceData(
     isOnline: false,
+    isAvailable: false,
     effectiveStatus: 'OFFLINE',
     manualAvailability: false,
     isAppConnected: false,
@@ -148,36 +154,37 @@ class DoctorPresence extends StateNotifier<Map<String, DoctorPresenceData>> {
       final lastCallAckTs = data['lastCallAckAt'] as Timestamp?;
       final activeCallId = data['activeCallId'] ?? data['currentCallId'];
 
-      // Evaluate Heartbeat Freshness
+      // Evaluate Heartbeat Freshness (active lease within TTL 60s)
       bool heartbeatFresh = false;
-      if (manualAvailability && isEligible) {
-        final reference = lastHeartbeatTs ?? lastSeenTs;
-        if (reference != null) {
-          final diff = now.difference(reference.toDate());
-          heartbeatFresh =
-              diff.inSeconds >= 0 && diff.inSeconds < heartbeatTimeoutSeconds;
-        }
+      final reference = lastHeartbeatTs ?? lastSeenTs;
+      if (reference != null) {
+        final diff = now.difference(reference.toDate());
+        heartbeatFresh =
+            diff.inSeconds >= 0 && diff.inSeconds < heartbeatTimeoutSeconds;
+      } else {
+        heartbeatFresh = data['isOnline'] == true;
       }
 
       // Compute Effective Status:
-      // Doctor's manual availability is the single source of truth.
-      // Doctor stays ONLINE as long as manualAvailability is true and account is eligible.
-      String effectiveStatus = 'OFFLINE';
-      bool isOnline = false;
+      // isOnline: doctor's manual preference && account eligibility
+      // isAvailable: isOnline && !isBusy
+      // isAppConnected: active foreground heartbeat lease
+      final isBusy = activeCallId != null && activeCallId.toString().isNotEmpty;
+      final isOnline = manualAvailability && isEligible;
+      final isAvailable = isOnline && !isBusy;
 
-      if (!isEligible || !manualAvailability) {
+      String effectiveStatus = 'OFFLINE';
+      if (!isEligible || !isOnline) {
         effectiveStatus = 'OFFLINE';
-        isOnline = false;
-      } else if (activeCallId != null && activeCallId.toString().isNotEmpty) {
+      } else if (isBusy) {
         effectiveStatus = 'BUSY';
-        isOnline = false; // Doctor is busy on another call
       } else {
         effectiveStatus = 'ONLINE';
-        isOnline = true;
       }
 
       newStatus[doc.id] = DoctorPresenceData(
         isOnline: isOnline,
+        isAvailable: isAvailable,
         effectiveStatus: effectiveStatus,
         manualAvailability: manualAvailability,
         isAppConnected: heartbeatFresh,
@@ -198,6 +205,7 @@ class DoctorPresence extends StateNotifier<Map<String, DoctorPresenceData>> {
         final existing = state[entry.key];
         if (existing == null ||
             existing.isOnline != entry.value.isOnline ||
+            existing.isAvailable != entry.value.isAvailable ||
             existing.effectiveStatus != entry.value.effectiveStatus ||
             existing.manualAvailability != entry.value.manualAvailability ||
             existing.lastSeen != entry.value.lastSeen ||
@@ -214,9 +222,14 @@ class DoctorPresence extends StateNotifier<Map<String, DoctorPresenceData>> {
     }
   }
 
-  /// Check if a specific doctor is online.
+  /// Check if a specific doctor is online (heartbeat active within TTL).
   bool isDoctorOnline(String doctorId) {
     return state[doctorId]?.isOnline ?? false;
+  }
+
+  /// Check if a specific doctor is available (online and not busy on another call).
+  bool isDoctorAvailable(String doctorId) {
+    return state[doctorId]?.isAvailable ?? false;
   }
 
   /// Get rich presence data for a doctor.

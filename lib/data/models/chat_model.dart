@@ -1,6 +1,7 @@
 // chat_model.dart - Updated with reply functionality
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:telemedicine/data/models/chat_call_event.dart';
 
 class ReplyData {
   final String messageId;
@@ -184,6 +185,18 @@ class ChatMessageModel {
   /// fetching the prescription document.
   final String? prescriptionNotePreview;
 
+  /// Original PDF download URL for prescription documents.
+  final String? pdfUrl;
+
+  /// Rendered preview image URL (PNG) of the prescription page.
+  final String? previewImageUrl;
+
+  /// Creation date of the prescription.
+  final DateTime? prescriptionDate;
+
+  /// Doctor's name for prescription cards.
+  final String? doctorName;
+
   /// True for the system message written when a doctor confirms an
   /// appointment. Pinned messages are rendered as a banner at the top of the
   /// conversation until the appointment ends.
@@ -241,6 +254,10 @@ class ChatMessageModel {
     this.deletedAt,
     this.prescriptionId,
     this.prescriptionNotePreview,
+    this.pdfUrl,
+    this.previewImageUrl,
+    this.prescriptionDate,
+    this.doctorName,
     this.isPinned = false,
     this.appointmentId,
     this.deliveryStatus = MessageDeliveryState.sent,
@@ -294,6 +311,10 @@ class ChatMessageModel {
       fileName: map['fileName'],
       prescriptionId: map['prescriptionId'],
       prescriptionNotePreview: map['prescriptionNotePreview'],
+      pdfUrl: map['pdfUrl']?.toString(),
+      previewImageUrl: (map['previewImageUrl'] ?? map['previewUrl'])?.toString(),
+      prescriptionDate: readDateTime(map['prescriptionDate']),
+      doctorName: map['doctorName']?.toString(),
       isPinned: map['isPinned'] ?? false,
       appointmentId: map['appointmentId'],
       isListened: map['isListened'] == true || map['is_listened'] == true,
@@ -342,6 +363,11 @@ class ChatMessageModel {
       if (prescriptionId != null) 'prescriptionId': prescriptionId,
       if (prescriptionNotePreview != null)
         'prescriptionNotePreview': prescriptionNotePreview,
+      if (pdfUrl != null) 'pdfUrl': pdfUrl,
+      if (previewImageUrl != null) 'previewImageUrl': previewImageUrl,
+      if (prescriptionDate != null)
+        'prescriptionDate': Timestamp.fromDate(prescriptionDate!),
+      if (doctorName != null) 'doctorName': doctorName,
       'isPinned': isPinned,
       if (appointmentId != null) 'appointmentId': appointmentId,
       'isListened': isListened,
@@ -352,6 +378,33 @@ class ChatMessageModel {
 
   /// True when this message carries a prescription card rather than plain text.
   bool get isPrescription => messageType == 'prescription';
+
+  /// True when this row is a call timeline event (audio/video call, recording).
+  bool get isCallEvent =>
+      messageType == 'audio' ||
+      messageType == 'video' ||
+      messageType == 'call_recording';
+
+  /// Normalized call event for the timeline/call card, or null for non-call
+  /// rows. The raw `callData` map remains available for forward compatibility.
+  ChatCallEvent? get callEvent {
+    if (!isCallEvent) return null;
+    return ChatCallEvent.fromMessageData(
+      messageType: messageType,
+      message: message,
+      callData: callData,
+      duration: duration,
+      timestamp: timestamp,
+    );
+  }
+
+  /// The call document id when the writer persisted one. Legacy rows may not
+  /// have it; the UI then relies on the live CallController instead.
+  String? get callId {
+    final value = callData?['callId'] ?? callData?['id'];
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? null : text;
+  }
 
   /// True when this is the system message created for a confirmed appointment.
   bool get isAppointmentMessage => messageType == 'appointment';

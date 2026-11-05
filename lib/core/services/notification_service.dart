@@ -20,6 +20,7 @@ import 'package:telemedicine/core/constants/app_constants.dart';
 import 'package:telemedicine/core/services/audio_service.dart';
 import 'package:telemedicine/core/services/call_ringtone_service.dart';
 import 'package:telemedicine/core/services/incoming_call_coordinator.dart';
+import 'package:telemedicine/core/services/callkit_service.dart';
 import 'package:telemedicine/features/doctor_portal/presentation/bottom_nav/doctor_portal_tab_provider.dart';
 import 'package:telemedicine/features/doctor_portal/presentation/bottom_nav/doctor_portal_wrapper.dart';
 import 'package:telemedicine/features/doctor_portal/presentation/shared_reports/doctor_shared_reports_screen.dart';
@@ -27,6 +28,7 @@ import 'package:telemedicine/features/patients/presentation/patient_portal_tab_p
 import 'package:telemedicine/features/patients/presentation/patient_portal_wrapper.dart';
 import 'package:telemedicine/features/calls/presentation/call_screen.dart';
 import 'package:telemedicine/features/calls/presentation/incoming_call_screen.dart';
+import 'package:telemedicine/features/calling/screens/active_call_screen.dart';
 import 'package:telemedicine/features/chat/presentation/chat_screen.dart';
 import 'package:telemedicine/features/admin/presentation/notifications/admin_complaint_detail_screen.dart';
 import 'package:telemedicine/features/admin/presentation/notifications/admin_payment_screen.dart';
@@ -76,13 +78,14 @@ class NotificationService {
   /// applies the payment lock and conversation authorization. When this is
   /// false the Smart wrapper keeps its own fallback routing.
   static bool coldStartNotificationConsumed = false;
+  static NotificationResponse? coldStartNotificationResponse;
 
   // ─────────────────────────────────────────────────────────────
   // PAYMENT NOTIFICATION DE-DUPLICATION / NAVIGATION GUARDS
   // ─────────────────────────────────────────────────────────────
 
   // One submission/decision can reach the device more than once: the app sends
-  // the push itself *and* the Cloud Function retries it, and a system-rendered
+  // the push itself and the server delivery retries it, and a system-rendered
   // notification plus a locally shown one can both deliver a tap. Both sets are
   // keyed by `notificationId` (falling back to `paymentId`) so a given payment
   // event is displayed once and navigated to once.
@@ -323,7 +326,7 @@ class NotificationService {
       debugPrint('⚠️ Notification handlers not fully wired: $e');
     }
 
-    // Keep the receiver's latest FCM token in Firestore so the Cloud Function
+    // Keep the receiver's latest FCM token in Firestore so the server
     // never pushes to a stale/rotated token.
     try {
       _registerTokenRefresh();
@@ -443,6 +446,17 @@ class NotificationService {
           enableLights: true,
         );
 
+    const AndroidNotificationChannel missedCallsChannel =
+        AndroidNotificationChannel(
+          NotificationChannels.missedCalls,
+          'Missed Calls',
+          description: 'Notifications for missed voice and video calls',
+          importance: Importance.high,
+          enableVibration: true,
+          playSound: true,
+          showBadge: true,
+        );
+
     final androidPlugin = _localNotifications
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
@@ -525,6 +539,7 @@ class NotificationService {
     await androidPlugin?.createNotificationChannel(incomingCallsAlias);
     await androidPlugin?.createNotificationChannel(generalChannel);
     await androidPlugin?.createNotificationChannel(passwordResetChannel);
+    await androidPlugin?.createNotificationChannel(missedCallsChannel);
 
     const DarwinInitializationSettings iOSSettings =
         DarwinInitializationSettings(
@@ -579,6 +594,7 @@ class NotificationService {
       // This tap is now owned by the navigation below. [SmartLaunchCoordinator]
       // must not build a second destination for it.
       coldStartNotificationConsumed = true;
+      coldStartNotificationResponse = response;
       debugPrint(
         '📲 App launched from a notification: actionId=${response.actionId}',
       );
@@ -614,7 +630,7 @@ class NotificationService {
 
   /// Keep the receiver's FCM token fresh in Firestore whenever Firebase rotates
   /// the registration token (reinstall, app update, expiry, etc.). Without this
-  /// the Cloud Function pushes to an old token and messages are silently lost.
+  /// pushes to an old token are silently lost.
   void _registerTokenRefresh() {
     _fcm.onTokenRefresh.listen((String newToken) async {
       debugPrint('🔥 FCM token refreshed');
@@ -716,6 +732,29 @@ class NotificationService {
       debugPrint('📞 [FOREGROUND] Received call_cancel for callId=$callId');
       if (callId.isNotEmpty) {
         unawaited(IncomingCallCoordinator.instance.dismissNotification(callId));
+      }
+      return;
+    }
+
+    if (data['type'] == 'missed_call' || data['type'] == 'MISSED_CALL') {
+      final callId = (data['callId'] ?? '').toString();
+      final callerName = (data['callerName'] ?? 'Doctor').toString();
+      final callType = (data['callType'] ?? 'call').toString();
+      final callerImage = data['callerImage']?.toString();
+      debugPrint(
+        '📞 [FOREGROUND] Received missed_call push for callId=$callId',
+      );
+      if (callId.isNotEmpty) {
+        unawaited(IncomingCallCoordinator.instance.dismissNotification(callId));
+        unawaited(CallKitService.instance.hide(callId));
+        unawaited(
+          showMissedCallNotification(
+            callId: callId,
+            callerName: callerName,
+            callType: callType,
+            callerImage: callerImage,
+          ),
+        );
       }
       return;
     }
@@ -916,9 +955,8 @@ class NotificationService {
     // killed-app case. Idempotent, and a headless isolate (background FCM
     // handler, Workmanager task) simply logs the missing Activity and moves on
     // — the notification's own sound still plays.
-    if (appVisible) {
-      unawaited(SystemRingtonePlayer.playDefaultRingtone());
-    }
+    // The looping in-app ringtone is managed cleanly by IncomingCallScreen / CallAudioService
+    // to avoid duplicate audio streams when the app is visible.
 
     debugPrint(
       '📞 Incoming call notification shown id=$notificationId callId=$callId '
@@ -1004,6 +1042,119 @@ class NotificationService {
   Future<void> clearCallRecord(String callId) =>
       IncomingCallCoordinator.instance.clearCallRecord(callId);
 
+  /// Displays a persistent, high-priority Missed Call notification banner in the system tray.
+  Future<void> showMissedCallNotification({
+    required String callId,
+    required String callerName,
+    required String callType,
+    String? callerImage,
+  }) async {
+    try {
+      await _initializeNotificationChannels();
+      final id = notificationIdForCall(callId);
+      final isVideo = callType.toLowerCase() == 'video';
+      final title = 'Missed ${isVideo ? 'video' : 'voice'} call';
+      final body = 'You missed a call from $callerName';
+
+      final androidDetails = AndroidNotificationDetails(
+        NotificationChannels.missedCalls,
+        'Missed Calls',
+        channelDescription: 'Notifications for missed voice and video calls',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+        autoCancel: true,
+        category: AndroidNotificationCategory.missedCall,
+        color: const Color(0xFFE53935),
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        categoryIdentifier: 'MISSED_CALL',
+      );
+
+      final details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _localNotifications.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: details,
+        payload: jsonEncode({
+          'type': 'missed_call',
+          'callId': callId,
+          'callerName': callerName,
+          'callType': callType,
+        }),
+      );
+      debugPrint('📞 Missed call notification shown for callId=$callId');
+    } catch (e, s) {
+      debugPrint('❌ Failed to show missed call notification: $e\n$s');
+    }
+  }
+
+  /// Displays a standard heads-up notification with Action buttons for non-OPD
+  /// calls or general consultations.
+  Future<void> showStandardHeadsUpCallNotification(
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      await _initializeNotificationChannels();
+      final callId = data['callId']?.toString() ?? '';
+      final id = notificationIdForCall(callId);
+      final callerName = (data['callerName'] ?? 'Caller').toString();
+      final callType = (data['callType'] ?? 'audio').toString();
+      final isVideo = callType.toLowerCase() == 'video';
+
+      const androidDetails = AndroidNotificationDetails(
+        NotificationChannels.general,
+        'General Consultations',
+        channelDescription: 'Heads-up notification for non-OPD requests',
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
+        category: AndroidNotificationCategory.call,
+        actions: <AndroidNotificationAction>[
+          AndroidNotificationAction(
+            'accept_call',
+            'Accept',
+            showsUserInterface: true,
+          ),
+          AndroidNotificationAction(
+            'decline_call',
+            'Decline',
+            cancelNotification: true,
+          ),
+        ],
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      await _localNotifications.show(
+        id: id,
+        title: 'Incoming ${isVideo ? 'Video' : 'Voice'} Call',
+        body: '$callerName is calling you',
+        notificationDetails: const NotificationDetails(
+          android: androidDetails,
+          iOS: iosDetails,
+        ),
+        payload: jsonEncode(data),
+      );
+      debugPrint('📞 Heads-up call notification shown for callId=$callId');
+    } catch (e, s) {
+      debugPrint('❌ Failed to show heads-up call notification: $e\n$s');
+    }
+  }
+
   /// Replays a call that was pushed while the app was dead.
   ///
   /// The payload is consumed exactly once; a second call returns immediately.
@@ -1061,6 +1212,8 @@ class NotificationService {
       return false;
     }
 
+    IncomingCallCoordinator.instance.markScreenOpened(payload.callId);
+
     debugPrint(
       '📞 Opening IncomingCallScreen callId=${payload.callId} '
       'caller=${payload.callerName} type=${payload.callType} '
@@ -1094,12 +1247,20 @@ class NotificationService {
     return true;
   }
 
-  /// Pushes the live Call screen. Used when the accept came straight from the
+  /// Pushes the live ActiveCallScreen. Used when the accept came straight from the
   /// notification's Accept button, so no Incoming Call screen was ever shown.
   Future<bool> _openCallScreen(
     IncomingCallPayload payload,
     String currentUserId,
   ) async {
+    // If call screen is already mounted on the stack, skip duplicate navigation
+    if (IncomingCallCoordinator.instance.isScreenOpenFor(payload.callId)) {
+      debugPrint(
+        '📞 Call screen already open for callId=${payload.callId} — skipping duplicate push',
+      );
+      return true;
+    }
+
     // Same payment gate as [_openIncomingCallScreen]: a locked patient who
     // taps the notification's Accept action must not reach the live call.
     final lockStatus = await _resolveActiveFeatureLock();
@@ -1119,24 +1280,49 @@ class NotificationService {
         await IncomingCallCoordinator.instance.enrichFromFirestore(payload) ??
         payload;
 
-    navigator.push(
-      MaterialPageRoute(
-        settings: const RouteSettings(name: '/call_screen'),
-        builder: (_) => CallScreen(
-          channelId: enriched.channelId,
-          callId: enriched.callId,
-          callType: enriched.callType,
-          otherUserName: enriched.callerName,
-          otherUserImage: enriched.callerImage,
-          currentUserId: currentUserId,
-          otherUserId: enriched.callerId,
-          otherUserType: enriched.callerType,
-          isCaller: false,
+    final currentUserName =
+        await IncomingCallCoordinator.instance.resolveCurrentUserName();
+
+    IncomingCallCoordinator.instance.markScreenOpened(enriched.callId);
+
+    // If IncomingCallScreen is currently open on navigator, replace it; otherwise push
+    if (IncomingCallScreen.isIncomingCallScreenOpen && navigator.canPop()) {
+      navigator.pushReplacement(
+        MaterialPageRoute(
+          settings: const RouteSettings(name: '/active_call_screen'),
+          builder: (_) => ActiveCallScreen(
+            callId: enriched.callId,
+            roomId: enriched.channelId,
+            otherUserId: enriched.callerId,
+            otherUserName: enriched.callerName,
+            otherUserRole: enriched.callerType,
+            otherUserImage: enriched.callerImage,
+            currentUserId: currentUserId,
+            currentUserName: currentUserName,
+            isCaller: false,
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      navigator.push(
+        MaterialPageRoute(
+          settings: const RouteSettings(name: '/active_call_screen'),
+          builder: (_) => ActiveCallScreen(
+            callId: enriched.callId,
+            roomId: enriched.channelId,
+            otherUserId: enriched.callerId,
+            otherUserName: enriched.callerName,
+            otherUserRole: enriched.callerType,
+            otherUserImage: enriched.callerImage,
+            currentUserId: currentUserId,
+            currentUserName: currentUserName,
+            isCaller: false,
+          ),
+        ),
+      );
+    }
     debugPrint(
-      '📞 Call screen opened from notification accept callId=${enriched.callId}',
+      '📞 ActiveCallScreen opened from notification accept callId=${enriched.callId}',
     );
     return true;
   }
@@ -1484,7 +1670,7 @@ class NotificationService {
 
   /// User-visible preview for a chat notification.
   ///
-  /// Mirrors `buildChatNotificationBody` in `functions/fcm_helpers.js`: media
+  /// Standardized chat preview: media
   /// messages get a fixed label instead of a raw URL/filename, and text is
   /// collapsed and bounded. The background system notification already carries
   /// this body; without the same rule here a foreground or data-only delivery

@@ -368,17 +368,6 @@ class _DoctorSharedReportsScreenState
                 color: const Color(0xFF6B7B8D),
               ),
             ),
-            if (action != null) ...[
-              const SizedBox(height: 20),
-              SizedBox(
-                height: 46,
-                child: GradientButton(
-                  text: 'Refresh',
-                  icon: Icons.refresh_rounded,
-                  onPressed: action,
-                ),
-              ),
-            ],
           ],
         ),
       ),

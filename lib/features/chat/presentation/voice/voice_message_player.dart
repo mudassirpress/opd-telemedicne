@@ -1,20 +1,23 @@
-import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
+
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 import 'package:telemedicine/data/models/chat_model.dart';
-import 'package:telemedicine/features/chat/presentation/voice/voice_manager/voice_message_manager.dart';
+import 'package:telemedicine/features/chat/presentation/chat_status/message_status_indicator.dart';
+import 'package:telemedicine/features/chat/presentation/voice/voice_manager/voice_playback_controller.dart';
 
-/// Polished WhatsApp-style voice message player bubble supporting:
-/// - Real-time waveform scrubbing
-/// - Dynamic played/unplayed color distinctions
-/// - Accurate duration & timestamp display
-/// - WhatsApp-style microphone icon indicating receiver listen status (Grey -> Blue)
-/// - WhatsApp-style outgoing message delivery receipts (Clock -> Single Grey -> Double Grey -> Double Blue)
-/// - Full multi-player mutual exclusion & graceful error handling
+/// WhatsApp-grade voice note bubble.
+///
+/// Playback is delegated to the app-wide [VoicePlaybackController]. This widget
+/// owns no [AudioPlayer], which is what guarantees single-active concurrency and
+/// prevents the historical "every rebuilt bubble starts itself" bug.
+///
+/// Rebuild scope:
+///  * the play button listens to the shared snapshot independently;
+///  * the waveform + timer listen independently;
+///  * the avatar, reply header and bubble chrome never rebuild on progress.
 class VoiceMessageBubble extends StatefulWidget {
   final String messageId;
   final String audioUrl;
@@ -27,6 +30,10 @@ class VoiceMessageBubble extends StatefulWidget {
   final bool isListened;
   final String? senderAvatarUrl;
   final VoidCallback? onListened;
+
+  /// Quoted reply preview, anchored above the player controls, inside the same
+  /// bubble. Used when a voice note replies to text/media/audio.
+  final Widget? replyHeader;
 
   const VoiceMessageBubble({
     super.key,
@@ -41,6 +48,7 @@ class VoiceMessageBubble extends StatefulWidget {
     this.isListened = false,
     this.senderAvatarUrl,
     this.onListened,
+    this.replyHeader,
   });
 
   @override
@@ -48,235 +56,52 @@ class VoiceMessageBubble extends StatefulWidget {
 }
 
 class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
-  AudioPlayer? _audioPlayer;
-  bool _isLoading = true;
-  bool _hasError = false;
-  bool _isPlaying = false;
-  Duration _currentPosition = Duration.zero;
-  Duration _totalDuration = Duration.zero;
-  StreamSubscription<PlayerState>? _playerStateSubscription;
-  StreamSubscription<Duration>? _positionSubscription;
+  final VoicePlaybackController _playback = VoicePlaybackController.instance;
 
   late bool _isListened;
   late List<double> _waveformAmplitudes;
-
-  // Actual playback tracking to ensure honest listening detection (preventing false positives from seeks)
-  int _actualPlayedMs = 0;
-  DateTime? _lastPlayStartTime;
+  double? _dragProgress;
 
   @override
   void initState() {
     super.initState();
-    _isListened = widget.isListened;
+    _isListened = widget.isListened || _playback.isPlayed(widget.messageId);
     _waveformAmplitudes = _generateWaveform(
       widget.messageId,
       widget.audioUrl,
       38,
     );
-    _initPlayer();
-    _listenToGlobalState();
+    _playback.state.addListener(_onPlaybackStateChanged);
   }
 
   @override
   void didUpdateWidget(VoiceMessageBubble oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isListened && !_isListened) {
-      setState(() {
-        _isListened = true;
-      });
+      setState(() => _isListened = true);
     }
   }
 
-  void _listenToGlobalState() {
-    VoiceMessageManager.addPlayingStateListener(_onGlobalPlayingStateChanged);
-  }
-
-  void _onGlobalPlayingStateChanged(String? playingId) {
-    if (mounted && playingId != widget.messageId && _isPlaying) {
-      _pausePlayback();
+  void _onPlaybackStateChanged() {
+    if (!mounted) return;
+    final snapshot = _playback.state.value;
+    final justPlayed = snapshot.playedIds.contains(widget.messageId);
+    if (justPlayed && !_isListened && !widget.isMe) {
+      setState(() => _isListened = true);
+      widget.onListened?.call();
     }
   }
 
-  Future<void> _initPlayer() async {
-    try {
-      _audioPlayer = AudioPlayer();
-
-      if (widget.audioUrl.startsWith('http://') ||
-          widget.audioUrl.startsWith('https://')) {
-        await _audioPlayer!.setUrl(widget.audioUrl);
-      } else {
-        final file = File(widget.audioUrl);
-        if (await file.exists()) {
-          await _audioPlayer!.setFilePath(widget.audioUrl);
-        } else {
-          throw Exception('Local voice file not found');
-        }
-      }
-
-      _totalDuration =
-          _audioPlayer!.duration ?? Duration(seconds: widget.duration);
-
-      _positionSubscription = _audioPlayer!.positionStream.listen((pos) {
-        if (!mounted) return;
-        setState(() {
-          _currentPosition = pos;
-        });
-
-        // Track active listening
-        _checkListeningProgress(pos);
-      });
-
-      _playerStateSubscription = _audioPlayer!.playerStateStream.listen((
-        state,
-      ) {
-        if (!mounted) return;
-
-        if (state.processingState == ProcessingState.completed) {
-          // Playback completed naturally
-          if (_isPlaying) {
-            _accumulatePlayedTime();
-          }
-          setState(() {
-            _isPlaying = false;
-            _currentPosition = Duration.zero;
-          });
-          _audioPlayer?.seek(Duration.zero);
-          VoiceMessageManager.unregisterPlayer(_audioPlayer);
-
-          // Natural completion triggers listen status
-          _triggerListened();
-        }
-      });
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('[VoiceMessageBubble] Error initializing audio: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-      }
-    }
-  }
-
-  void _accumulatePlayedTime() {
-    if (_lastPlayStartTime != null) {
-      _actualPlayedMs += DateTime.now()
-          .difference(_lastPlayStartTime!)
-          .inMilliseconds;
-      _lastPlayStartTime = null;
-    }
-  }
-
-  void _checkListeningProgress(Duration position) {
-    if (widget.isMe || _isListened) return;
-
-    final totalMs = _totalDuration.inMilliseconds > 0
-        ? _totalDuration.inMilliseconds
-        : widget.duration * 1000;
-
-    if (totalMs <= 0) return;
-
-    int currentSessionMs = 0;
-    if (_lastPlayStartTime != null) {
-      currentSessionMs = DateTime.now()
-          .difference(_lastPlayStartTime!)
-          .inMilliseconds;
-    }
-    final totalPlayedMs = _actualPlayedMs + currentSessionMs;
-    final progress = position.inMilliseconds / totalMs;
-
-    // Requirement:
-    // Mark as listened when playback reaches at least 90% of audio duration while playing,
-    // or when playback reaches completion naturally.
-    // Seeking alone without playing does not trigger it.
-    final hasMeaningfulPlayback =
-        totalPlayedMs >= (totalMs * 0.40).clamp(500, 10000);
-    if (_isPlaying &&
-        (progress >= 0.90 || position.inMilliseconds >= totalMs - 250) &&
-        hasMeaningfulPlayback) {
-      _triggerListened();
-    }
-  }
-
-  void _triggerListened() {
-    if (widget.isMe || _isListened) return;
-    setState(() {
-      _isListened = true;
-    });
-    widget.onListened?.call();
-  }
-
-  Future<void> _togglePlayPause() async {
-    if (_audioPlayer == null || _hasError) return;
-
-    try {
-      if (_isPlaying) {
-        await _pausePlayback();
-      } else {
-        await _startPlayback();
-      }
-    } catch (e) {
-      debugPrint('[VoiceMessageBubble] Error toggling playback: $e');
-    }
-  }
-
-  Future<void> _startPlayback() async {
-    if (_audioPlayer == null) return;
-
-    // Stop any currently playing audio in the app
-    await VoiceMessageManager.stopAllAudio();
-
-    VoiceMessageManager.registerPlayer(_audioPlayer!, widget.messageId);
-
-    _lastPlayStartTime = DateTime.now();
-    await _audioPlayer!.play();
-
-    if (mounted) {
-      setState(() {
-        _isPlaying = true;
-      });
-    }
-  }
-
-  Future<void> _pausePlayback() async {
-    _accumulatePlayedTime();
-    await _audioPlayer?.pause();
-
-    if (mounted) {
-      setState(() {
-        _isPlaying = false;
-      });
-    }
-  }
-
-  void _seekToProgress(double progressRatio) {
-    if (_audioPlayer == null || _hasError) return;
-
-    final totalMs = _totalDuration.inMilliseconds > 0
-        ? _totalDuration.inMilliseconds
-        : widget.duration * 1000;
-
-    if (totalMs <= 0) return;
-
-    final targetMs = (progressRatio * totalMs).round().clamp(0, totalMs);
-    final targetDuration = Duration(milliseconds: targetMs);
-
-    _audioPlayer?.seek(targetDuration);
-    setState(() {
-      _currentPosition = targetDuration;
-    });
+  @override
+  void dispose() {
+    _playback.state.removeListener(_onPlaybackStateChanged);
+    super.dispose();
   }
 
   String _formatDuration(Duration duration) {
-    int totalSeconds = duration.inSeconds;
-    int minutes = totalSeconds ~/ 60;
-    int seconds = totalSeconds % 60;
+    final totalSeconds = duration.inSeconds;
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
@@ -289,15 +114,12 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
     return '$hour:$minute $amPm';
   }
 
-  /// Generates a realistic voice message waveform amplitude pattern
   static List<double> _generateWaveform(String id, String url, int count) {
     final seed = (id.isNotEmpty ? id : url).hashCode;
     final rand = math.Random(seed.abs());
     final result = <double>[];
-
     double current = 0.35;
-    for (int i = 0; i < count; i++) {
-      // Create speech-like peaks and troughs
+    for (var i = 0; i < count; i++) {
       final rawTarget = 0.20 + rand.nextDouble() * 0.75;
       current = current * 0.4 + rawTarget * 0.6;
       result.add(current.clamp(0.18, 1.0));
@@ -306,27 +128,8 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
   }
 
   @override
-  void dispose() {
-    VoiceMessageManager.removePlayingStateListener(
-      _onGlobalPlayingStateChanged,
-    );
-    _positionSubscription?.cancel();
-    _playerStateSubscription?.cancel();
-
-    if (VoiceMessageManager.getCurrentPlayingId() == widget.messageId) {
-      VoiceMessageManager.unregisterPlayer(_audioPlayer);
-    }
-    _audioPlayer?.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final maxBubbleWidth = math.min(290.0, context.sw - 50);
-
-    // WhatsApp authentic theme styling
-    // Outgoing: soft light green (#E7FFDB / #D9FDD3)
-    // Incoming: pure white (#FFFFFF)
     final bubbleColor = widget.isMe ? const Color(0xFFE7FFDB) : Colors.white;
     final borderColor = widget.isMe
         ? const Color(0xFFC7EBB8)
@@ -356,29 +159,28 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
           ),
         ],
       ),
-      child: widget.isMe ? _buildOutgoingContent() : _buildIncomingContent(),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.replyHeader != null) ...[
+            widget.replyHeader!,
+            const SizedBox(height: 6),
+          ],
+          if (widget.isMe) _buildOutgoingContent() else _buildIncomingContent(),
+        ],
+      ),
     );
   }
 
-  /// Outgoing voice message (Current user sent):
-  /// - Sender profile picture on the LEFT with microphone status icon
-  /// - Play/pause button
-  /// - Waveform with played progress
-  /// - Duration below waveform on left
-  /// - Timestamp and WhatsApp delivery ticks on right
   Widget _buildOutgoingContent() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // 1. Sender profile picture with microphone status badge
         _buildAvatarWithMic(isLeft: true),
         const SizedBox(width: 8),
-
-        // 2. Play / Pause Button
         _buildPlayPauseButton(),
         const SizedBox(width: 8),
-
-        // 3. Waveform + Duration & Delivery Ticks
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,20 +196,12 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
     );
   }
 
-  /// Incoming voice message (Received from doctor or patient):
-  /// - Play button on the LEFT
-  /// - Waveform in center
-  /// - Duration below waveform
-  /// - Sender profile image on the RIGHT with microphone status icon
   Widget _buildIncomingContent() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // 1. Play / Pause Button on the left
         _buildPlayPauseButton(),
         const SizedBox(width: 8),
-
-        // 2. Waveform + Duration & Timestamp in center
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -420,91 +214,89 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
           ),
         ),
         const SizedBox(width: 8),
-
-        // 3. Sender profile image with microphone status badge on the right
         _buildAvatarWithMic(isLeft: false),
       ],
     );
   }
 
-  /// Circular play/pause button matching WhatsApp's iconic voice note style
   Widget _buildPlayPauseButton() {
-    if (_isLoading) {
-      return Container(
-        width: 36,
-        height: 36,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: Color(0xFF54656F),
-        ),
-        alignment: Alignment.center,
-        child: const SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-          ),
-        ),
-      );
-    }
+    return ValueListenableBuilder<VoicePlaybackSnapshot>(
+      valueListenable: _playback.state,
+      builder: (context, snapshot, _) {
+        final isLoading = snapshot.isLoadingId(widget.messageId);
+        final hasError =
+            snapshot.activeId == widget.messageId && snapshot.error != null;
+        final isPlaying = snapshot.isPlayingId(widget.messageId);
 
-    if (_hasError) {
-      return GestureDetector(
-        onTap: () {
-          setState(() {
-            _isLoading = true;
-            _hasError = false;
-          });
-          _initPlayer();
-        },
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.red.shade100,
-          ),
-          child: const Icon(Icons.refresh_rounded, color: Colors.red, size: 20),
-        ),
-      );
-    }
+        if (isLoading) {
+          return _circleButton(
+            child: const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+          );
+        }
 
-    return GestureDetector(
-      onTap: _togglePlayPause,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: Color(0xFF54656F),
-        ),
-        child: Icon(
-          _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-          color: Colors.white,
-          size: 22,
-        ),
-      ),
+        if (hasError) {
+          return GestureDetector(
+            onTap: () => _playback.play(widget.messageId),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.red.shade100,
+              ),
+              child: const Icon(
+                Icons.refresh_rounded,
+                color: Colors.red,
+                size: 20,
+              ),
+            ),
+          );
+        }
+
+        return GestureDetector(
+          onTap: () => _playback.toggle(widget.messageId),
+          child: _circleButton(
+            child: Icon(
+              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
+        );
+      },
     );
   }
 
-  /// Avatar with the circular microphone status badge:
-  /// - GREY: Voice message has NOT been listened to by the receiver
-  /// - BLUE: Voice message HAS been listened to (threshold reached)
+  Widget _circleButton({required Widget child}) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Color(0xFF54656F),
+      ),
+      alignment: Alignment.center,
+      child: child,
+    );
+  }
+
   Widget _buildAvatarWithMic({required bool isLeft}) {
-    // WhatsApp Listen Status:
-    // Grey when unlistened, Blue when listened.
-    final Color micColor = _isListened
+    final micColor = _isListened
         ? const Color(0xFF34B7F1)
         : const Color(0xFF94A3B8);
-
     final avatarImage = widget.senderAvatarUrl;
     final hasImage = avatarImage != null && avatarImage.isNotEmpty;
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Profile picture
         Container(
           width: 42,
           height: 42,
@@ -539,8 +331,6 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
                 : const Icon(Icons.person, size: 24, color: Color(0xFF64748B)),
           ),
         ),
-
-        // Small microphone icon badge
         Positioned(
           bottom: -2,
           left: isLeft ? null : -3,
@@ -570,62 +360,83 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
     );
   }
 
-  /// Interactive waveform scrubber with played/unplayed distinguishing and drag support
   Widget _buildWaveformInteractive() {
-    double progress = 0.0;
-    if (_totalDuration.inMilliseconds > 0) {
-      progress =
-          (_currentPosition.inMilliseconds / _totalDuration.inMilliseconds)
-              .clamp(0.0, 1.0);
-    }
+    return ValueListenableBuilder<VoicePlaybackSnapshot>(
+      valueListenable: _playback.state,
+      builder: (context, snapshot, _) {
+        final isActive = snapshot.isActive(widget.messageId);
+        final total = _totalDuration(snapshot);
+        final position = isActive
+            ? snapshot.position
+            : _playback.positionFor(widget.messageId);
+        var progress = 0.0;
+        if (total.inMilliseconds > 0) {
+          progress = (position.inMilliseconds / total.inMilliseconds).clamp(
+            0.0,
+            1.0,
+          );
+        }
+        if (_dragProgress != null) progress = _dragProgress!;
 
-    // Colors:
-    // Played portion: Blue (#34B7F1)
-    // Unplayed portion: Grey (#B0BEC5)
-    const playedColor = Color(0xFF34B7F1);
-    const unplayedColor = Color(0xFFB0BEC5);
+        const playedColor = Color(0xFF34B7F1);
+        const unplayedColor = Color(0xFFB0BEC5);
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final totalWidth = constraints.maxWidth;
-        // 2.5px bar + 1.5px space = 4.0px per bar
-        final barCount = (totalWidth / 4.0).floor().clamp(20, 48);
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final totalWidth = constraints.maxWidth;
+            final barCount = (totalWidth / 4.0).floor().clamp(20, 48);
+            final bars = _waveformAmplitudes.length == barCount
+                ? _waveformAmplitudes
+                : _resampleBars(_waveformAmplitudes, barCount);
 
-        // Subsample or interpolate waveform
-        final bars = _waveformAmplitudes.length == barCount
-            ? _waveformAmplitudes
-            : _resampleBars(_waveformAmplitudes, barCount);
+            void updateDrag(Offset localPosition) {
+              final ratio = (localPosition.dx / totalWidth).clamp(0.0, 1.0);
+              setState(() => _dragProgress = ratio);
+            }
 
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (details) {
-            final ratio = (details.localPosition.dx / totalWidth).clamp(
-              0.0,
-              1.0,
-            );
-            _seekToProgress(ratio);
-          },
-          onHorizontalDragUpdate: (details) {
-            final ratio = (details.localPosition.dx / totalWidth).clamp(
-              0.0,
-              1.0,
-            );
-            _seekToProgress(ratio);
-          },
-          child: SizedBox(
-            height: 28,
-            width: totalWidth,
-            child: CustomPaint(
-              size: Size(totalWidth, 28),
-              painter: _WhatsAppWaveformPainter(
-                amplitudes: bars,
-                progress: progress,
-                playedColor: playedColor,
-                unplayedColor: unplayedColor,
-                thumbColor: playedColor,
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (details) {
+                final ratio = (details.localPosition.dx / totalWidth).clamp(
+                  0.0,
+                  1.0,
+                );
+                _playback.seekToRatio(widget.messageId, ratio);
+              },
+              onHorizontalDragStart: (details) {
+                updateDrag(details.localPosition);
+              },
+              onHorizontalDragUpdate: (details) {
+                updateDrag(details.localPosition);
+              },
+              onHorizontalDragEnd: (_) {
+                final ratio = _dragProgress;
+                setState(() => _dragProgress = null);
+                if (ratio != null) {
+                  _playback.seekToRatio(widget.messageId, ratio);
+                }
+              },
+              onHorizontalDragCancel: () {
+                setState(() => _dragProgress = null);
+              },
+              child: SizedBox(
+                height: 28,
+                width: totalWidth,
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    size: Size(totalWidth, 28),
+                    painter: _WhatsAppWaveformPainter(
+                      amplitudes: bars,
+                      progress: progress,
+                      playedColor: playedColor,
+                      unplayedColor: unplayedColor,
+                      thumbColor: playedColor,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -634,7 +445,7 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
   List<double> _resampleBars(List<double> source, int targetCount) {
     if (source.isEmpty) return List.filled(targetCount, 0.4);
     final res = <double>[];
-    for (int i = 0; i < targetCount; i++) {
+    for (var i = 0; i < targetCount; i++) {
       final index = ((i / targetCount) * source.length).floor().clamp(
         0,
         source.length - 1,
@@ -644,92 +455,71 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
     return res;
   }
 
-  /// Duration and Status row below the waveform
+  Duration _totalDuration(VoicePlaybackSnapshot snapshot) {
+    if (snapshot.activeId == widget.messageId &&
+        snapshot.duration > Duration.zero) {
+      return snapshot.duration;
+    }
+    if (widget.duration > 0) return Duration(seconds: widget.duration);
+    return _playback.durationFor(widget.messageId);
+  }
+
   Widget _buildMetaRow({required bool isOutgoing}) {
-    final displayDuration = (_isPlaying || _currentPosition.inSeconds > 0)
-        ? _formatDuration(_currentPosition)
-        : _formatDuration(
-            _totalDuration.inSeconds > 0
-                ? _totalDuration
-                : Duration(seconds: widget.duration),
-          );
+    return ValueListenableBuilder<VoicePlaybackSnapshot>(
+      valueListenable: _playback.state,
+      builder: (context, snapshot, _) {
+        final isActive = snapshot.isActive(widget.messageId);
+        final total = _totalDuration(snapshot);
+        final completed = snapshot.completedId == widget.messageId;
+        final showPosition =
+            isActive &&
+            !completed &&
+            (snapshot.isPlaying || snapshot.position > Duration.zero);
+        final displayDuration = showPosition ? snapshot.position : total;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        // Voice message duration
-        Text(
-          displayDuration,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF667781),
-            letterSpacing: -0.2,
-          ),
-        ),
-
-        // Message timestamp & Outgoing Delivery Ticks
-        Row(
-          mainAxisSize: MainAxisSize.min,
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              _formatTimestamp(widget.timestamp),
+              _formatDuration(displayDuration),
               style: const TextStyle(
-                fontSize: 10.5,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
                 color: Color(0xFF667781),
                 letterSpacing: -0.2,
               ),
             ),
-            if (isOutgoing) ...[
-              const SizedBox(width: 3),
-              _buildDeliveryStatusTick(),
-            ],
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _formatTimestamp(widget.timestamp),
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: Color(0xFF667781),
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                if (isOutgoing) ...[
+                  const SizedBox(width: 3),
+                  MessageStatusIndicator(
+                    state: widget.deliveryStatus,
+                    color: const Color(0xFF667781),
+                    size: 14,
+                    readColor: const Color(0xFF34B7F1),
+                  ),
+                ],
+              ],
+            ),
           ],
-        ),
-      ],
+        );
+      },
     );
-  }
-
-  /// WhatsApp-style outgoing ticks:
-  /// - Pending: Clock icon
-  /// - Sent: Single grey tick
-  /// - Delivered: Double grey tick
-  /// - Listened to: Double blue tick
-  Widget _buildDeliveryStatusTick() {
-    if (widget.deliveryStatus == MessageDeliveryState.pending) {
-      return const Icon(
-        Icons.access_time_rounded,
-        size: 11,
-        color: Color(0xFF667781),
-      );
-    }
-
-    if (_isListened) {
-      // Listened: double blue ticks
-      return const Icon(
-        Icons.done_all_rounded,
-        size: 15,
-        color: Color(0xFF34B7F1),
-      );
-    }
-
-    if (widget.isDelivered ||
-        widget.deliveryStatus == MessageDeliveryState.delivered ||
-        widget.isRead) {
-      // Delivered: double grey ticks
-      return const Icon(
-        Icons.done_all_rounded,
-        size: 15,
-        color: Color(0xFF667781),
-      );
-    }
-
-    // Sent: single grey tick
-    return const Icon(Icons.done_rounded, size: 14, color: Color(0xFF667781));
   }
 }
 
-/// Custom painter for WhatsApp voice message waveform bars with smooth progress playhead
+/// Custom painter for WhatsApp voice message waveform bars with smooth progress
+/// playhead. Repaints are clipped to the waveform's own RepaintBoundary.
 class _WhatsAppWaveformPainter extends CustomPainter {
   final List<double> amplitudes;
   final double progress;
@@ -753,7 +543,6 @@ class _WhatsAppWaveformPainter extends CustomPainter {
       ..color = playedColor
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 2.4;
-
     final unplayedPaint = Paint()
       ..color = unplayedColor
       ..strokeCap = StrokeCap.round
@@ -763,20 +552,15 @@ class _WhatsAppWaveformPainter extends CustomPainter {
     final spacing = size.width / totalBars;
     final centerY = size.height / 2;
     final maxHalfHeight = size.height * 0.44;
-
     final playedWidth = size.width * progress;
 
-    for (int i = 0; i < totalBars; i++) {
+    for (var i = 0; i < totalBars; i++) {
       final x = (i * spacing) + (spacing / 2);
-      final heightFactor = amplitudes[i];
-      final halfHeight = (maxHalfHeight * heightFactor).clamp(
+      final halfHeight = (maxHalfHeight * amplitudes[i]).clamp(
         2.5,
         maxHalfHeight,
       );
-
-      final isBarPlayed = x <= playedWidth;
-      final paint = isBarPlayed ? playedPaint : unplayedPaint;
-
+      final paint = x <= playedWidth ? playedPaint : unplayedPaint;
       canvas.drawLine(
         Offset(x, centerY - halfHeight),
         Offset(x, centerY + halfHeight),
@@ -784,14 +568,10 @@ class _WhatsAppWaveformPainter extends CustomPainter {
       );
     }
 
-    // Draw the scrubber playhead thumb circle at progress position
     final thumbX = playedWidth.clamp(0.0, size.width);
     final thumbPaint = Paint()..color = thumbColor;
-    final thumbBorderPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
+    final thumbBorderPaint = Paint()..color = Colors.white;
 
-    // Small white border ring with solid thumb
     canvas.drawCircle(Offset(thumbX, centerY), 4.5, thumbBorderPaint);
     canvas.drawCircle(Offset(thumbX, centerY), 3.5, thumbPaint);
   }
@@ -801,6 +581,6 @@ class _WhatsAppWaveformPainter extends CustomPainter {
     return oldDelegate.progress != progress ||
         oldDelegate.playedColor != playedColor ||
         oldDelegate.unplayedColor != unplayedColor ||
-        oldDelegate.amplitudes != amplitudes;
+        !listEquals(oldDelegate.amplitudes, amplitudes);
   }
 }

@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:telemedicine/core/utils/phone_utils.dart';
 
@@ -67,19 +66,13 @@ class PhoneAvailabilityResult {
 
 /// Service to verify phone number availability and uniqueness.
 class PhoneVerificationService {
-  static const String region = 'asia-south1';
-  static const String fallbackRegion = 'us-central1';
-  static const String _callableName = 'checkPhoneAvailability';
   static const String registeredPhonesCollection = 'registered_phones';
 
   final FirebaseFirestore _firestore;
-  final FirebaseFunctions _functions;
 
   PhoneVerificationService({
     FirebaseFirestore? firestore,
-    FirebaseFunctions? functions,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _functions = functions ?? FirebaseFunctions.instanceFor(region: region);
+  }) : _firestore = firestore ?? FirebaseFirestore.instance;
 
   /// Checks if [rawPhone] is available or already registered in the system.
   Future<PhoneAvailabilityResult> checkPhoneAvailability(
@@ -95,39 +88,7 @@ class PhoneVerificationService {
       return PhoneAvailabilityResult.invalid(rawPhone);
     }
 
-    // 1. Try Cloud Functions callable
-    try {
-      final callable = _functions.httpsCallable(_callableName);
-      final response = await callable.call<Map<String, dynamic>>({
-        'phone': normalized,
-        'role': role,
-        'countryCode': defaultDialCode,
-      });
-
-      final data = Map<String, dynamic>.from(response.data);
-      final isRegistered = data['is_registered'] == true;
-      final isSuccess = data['success'] == true;
-
-      if (isRegistered) {
-        return PhoneAvailabilityResult.alreadyRegistered(
-          normalizedPhone: normalized,
-          role: data['role']?.toString(),
-          userId: data['user_id']?.toString(),
-          hasPatientId: data['has_patient_id'] == true,
-          customMessage: data['message']?.toString(),
-        );
-      }
-
-      if (isSuccess) {
-        return PhoneAvailabilityResult.available(normalized);
-      }
-    } catch (e) {
-      debugPrint(
-        '[PhoneVerificationService] Cloud Function failed or unavailable: $e. Falling back to direct Firestore check.',
-      );
-    }
-
-    // 2. Direct Firestore fallback (resilient offline/direct mode)
+    // Direct Firestore check
     return _checkDirectFirestore(
       normalized,
       role: role,

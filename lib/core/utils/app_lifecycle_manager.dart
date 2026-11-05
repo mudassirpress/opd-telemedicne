@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
 import 'package:telemedicine/features/auth/presentation/controllers/doctor_controller.dart';
+import 'package:telemedicine/features/calls/presentation/controllers/call_controller.dart';
 
 class AppLifecycleManager extends WidgetsBindingObserver {
   final WidgetRef ref;
@@ -26,6 +27,10 @@ class AppLifecycleManager extends WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      CallController().handleAppKilledDuringCall();
+    }
+
     // ── Doctor presence ──────────────────────────────────────────────────
     final doctorController = ref.read(doctorControllerProvider);
     final currentDoctor = doctorController.currentDoctor;
@@ -33,11 +38,8 @@ class AppLifecycleManager extends WidgetsBindingObserver {
     if (currentDoctor != null) {
       switch (state) {
         case AppLifecycleState.resumed:
-          // Resume foreground timer only if doctor is manually online.
-          // NEVER force an online status write that can clobber manual intent.
-          if (doctorController.manualAvailability) {
-            doctorController.startPresenceTracking();
-          }
+          // Resume automated foreground heartbeat timer
+          doctorController.startPresenceTracking();
           break;
         case AppLifecycleState.paused:
         case AppLifecycleState.detached:

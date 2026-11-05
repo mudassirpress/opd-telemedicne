@@ -96,6 +96,8 @@ class MetallicInput extends StatefulWidget {
   final bool readOnly;
   final Widget? suffixIcon;
   final AutovalidateMode autovalidateMode;
+  final int? maxLines;
+  final int? minLines;
 
   const MetallicInput({
     super.key,
@@ -118,6 +120,8 @@ class MetallicInput extends StatefulWidget {
     this.readOnly = false,
     this.suffixIcon,
     this.autovalidateMode = AutovalidateMode.onUserInteraction,
+    this.maxLines = 1,
+    this.minLines,
   });
 
   @override
@@ -171,6 +175,8 @@ class _MetallicInputState extends State<MetallicInput> {
             : fieldState.errorText;
         final hasError = effectiveError != null && effectiveError.isNotEmpty;
 
+        final isMultiline = (widget.maxLines ?? 1) > 1;
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -202,7 +208,7 @@ class _MetallicInputState extends State<MetallicInput> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(isMultiline ? 18 : 28),
                 border: Border.all(
                   color: hasError ? Colors.red : const Color(0xFFBAC7D8),
                   width: 1.5,
@@ -217,8 +223,16 @@ class _MetallicInputState extends State<MetallicInput> {
                 ],
               ),
               child: Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                height: isMultiline ? null : 48,
+                constraints: isMultiline
+                    ? BoxConstraints(
+                        minHeight: (widget.minLines ?? 3) * 22.0 + 24,
+                      )
+                    : null,
+                padding: EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: isMultiline ? 10 : 0,
+                ),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [
@@ -229,14 +243,20 @@ class _MetallicInputState extends State<MetallicInput> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                   ),
-                  borderRadius: BorderRadius.circular(25),
+                  borderRadius: BorderRadius.circular(isMultiline ? 15 : 25),
                 ),
                 child: Row(
+                  crossAxisAlignment: isMultiline
+                      ? CrossAxisAlignment.start
+                      : CrossAxisAlignment.center,
                   children: [
-                    Icon(
-                      widget.icon,
-                      color: hasError ? Colors.red : const Color(0xFF0E274D),
-                      size: 18,
+                    Padding(
+                      padding: EdgeInsets.only(top: isMultiline ? 2 : 0),
+                      child: Icon(
+                        widget.icon,
+                        color: hasError ? Colors.red : const Color(0xFF0E274D),
+                        size: 18,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -249,6 +269,8 @@ class _MetallicInputState extends State<MetallicInput> {
                         readOnly: widget.readOnly,
                         inputFormatters: widget.inputFormatters,
                         maxLength: widget.maxLength,
+                        maxLines: widget.maxLines,
+                        minLines: widget.minLines,
                         onChanged: (val) {
                           fieldState.didChange(val);
                           widget.onChanged?.call(val);

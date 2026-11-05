@@ -246,6 +246,69 @@ class FirebaseStorageService {
     return uploadFile(storagePath: path, file: file);
   }
 
+  // ── Prescriptions ──────────────────────────────────────────────────────────
+  Future<StorageUploadResult> uploadPrescriptionPdf({
+    required String patientId,
+    required String prescriptionId,
+    required Uint8List pdfBytes,
+    Map<String, String>? customMetadata,
+  }) async {
+    final storagePath =
+        'prescriptions/$patientId/$prescriptionId/prescription.pdf';
+    return uploadData(
+      storagePath: storagePath,
+      data: pdfBytes,
+      contentType: 'application/pdf',
+      customMetadata: customMetadata,
+    );
+  }
+
+  Future<StorageUploadResult> uploadPrescriptionPreview({
+    required String patientId,
+    required String prescriptionId,
+    required Uint8List pngBytes,
+    Map<String, String>? customMetadata,
+  }) async {
+    final storagePath =
+        'prescriptions/$patientId/$prescriptionId/preview.png';
+    return uploadData(
+      storagePath: storagePath,
+      data: pngBytes,
+      contentType: 'image/png',
+      customMetadata: customMetadata,
+    );
+  }
+
+  /// Uploads a single page image (PNG) of a prescription as the Single Source of Truth.
+  ///
+  /// Structured path: `prescriptions/{patientId}/{prescriptionId}/prescription_page_{pageNumber}.png`.
+  Future<StorageUploadResult> uploadPrescriptionPageImage({
+    required String patientId,
+    required String prescriptionId,
+    required int pageIndex,
+    required Uint8List pngBytes,
+    int? version,
+    Map<String, String>? customMetadata,
+  }) async {
+    final pageNumber = pageIndex + 1;
+    final suffix = (version != null && version > 1) ? '_v$version' : '';
+    final storagePath =
+        'prescriptions/$patientId/$prescriptionId/prescription_page_$pageNumber$suffix.png';
+    return uploadData(
+      storagePath: storagePath,
+      data: pngBytes,
+      contentType: 'image/png',
+      customMetadata: {
+        'pageNumber': '$pageNumber',
+        'pageIndex': '$pageIndex',
+        'patientId': patientId,
+        'prescriptionId': prescriptionId,
+        if (version != null) 'version': '$version',
+        ...?customMetadata,
+      },
+    );
+  }
+
   // ── Safe Deletion ──────────────────────────────────────────────────────────
   Future<bool> deleteByUrl(String downloadUrl) async {
     try {

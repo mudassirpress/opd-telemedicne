@@ -1,26 +1,23 @@
-// lib/features/doctors/presentation/screens/update_doctor_profile_screen.dart
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/cupertino.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
-import 'package:telemedicine/core/services/firebase_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:telemedicine/data/models/user_model.dart';
-import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
-import 'package:telemedicine/features/auth/presentation/controllers/doctor_controller.dart';
-import 'package:telemedicine/features/doctor_portal/presentation/bottom_nav/doctor_portal_wrapper.dart';
-
 import 'package:telemedicine/core/constants/app_constants.dart';
-import 'package:telemedicine/app/theme/app_theme.dart';
+import 'package:telemedicine/core/services/firebase_storage_service.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 import 'package:telemedicine/core/utils/toast_utils.dart';
+import 'package:telemedicine/data/models/user_model.dart';
 import 'package:telemedicine/features/appointments/presentation/appointment_controller.dart';
-import 'package:telemedicine/shared/widgets/custom_text_field.dart';
+import 'package:telemedicine/features/auth/presentation/controllers/doctor_controller.dart';
+import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
+import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
+import 'package:telemedicine/features/doctor_portal/presentation/bottom_nav/doctor_portal_wrapper.dart';
+import 'package:telemedicine/shared/widgets/auth_layout.dart';
 import 'package:telemedicine/shared/widgets/language_field.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:telemedicine/shared/widgets/opd_design_system.dart';
 
 class UpdateDoctorProfileScreen extends ConsumerStatefulWidget {
   const UpdateDoctorProfileScreen({super.key});
@@ -32,35 +29,25 @@ class UpdateDoctorProfileScreen extends ConsumerStatefulWidget {
 
 class _UpdateDoctorProfileScreenState
     extends ConsumerState<UpdateDoctorProfileScreen> {
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController degreeController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final ImagePicker _picker = ImagePicker();
 
-  /// Appointment booking fields — the fee is what the patient is charged and
-  /// the video URL is what gates the 30% discount.
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController degreeController = TextEditingController();
   final TextEditingController feeController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
   final TextEditingController videoUrlController = TextEditingController();
 
   File? selectedImage;
-  bool isUploading = false;
-  String errorText = '';
-  bool isUpdating = false; // Changed from isCreatingProfile
   String? existingImageUrl;
   bool _isImageRemoved = false;
+  String? selectedGender;
 
-  final _formKey = GlobalKey<FormState>();
-  final ImagePicker _picker = ImagePicker();
+  bool isUpdating = false;
+  String errorText = '';
 
-  /// Languages the doctor has selected on this form. Seeded from the saved
-  /// profile so re-opening the screen never shows a blank picker.
   List<String> _selectedLanguages = <String>[];
-
-  /// Price / description / video link exactly as they exist on the doctor
-  /// document right now, `null` when the document has never carried the field.
-  ///
-  /// Used to write only what actually changed: an old doctor who leaves the
-  /// Description box blank must not stamp `''` over a value saved elsewhere,
-  /// and an untouched blank stays *missing* rather than becoming empty text.
   double _savedPrice = 0;
   String? _savedDescription;
   String? _savedVideoUrl;
@@ -71,17 +58,20 @@ class _UpdateDoctorProfileScreenState
     _loadExistingDoctorData();
   }
 
-  /// Seeds the form from the doctor's Firestore document, falling back to the
-  /// cached session when the document cannot be read.
-  ///
-  /// The document is the source of truth: an old session may predate the
-  /// `price` / `description` fields, and seeding empty boxes from it would
-  /// then let a plain *Save* wipe values the doctor already entered.
-  /// Documents that never had the fields seed blank boxes, so the doctor can
-  /// add them right here.
+  @override
+  void dispose() {
+    nameController.dispose();
+    phoneController.dispose();
+    degreeController.dispose();
+    feeController.dispose();
+    descriptionController.dispose();
+    videoUrlController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadExistingDoctorData() async {
-    final doctorController = ref.read(doctorControllerProvider);
-    final currentDoctor = doctorController.currentDoctor;
+    final currentDoctor =
+        ref.read(currentDoctorProvider) ?? ref.read(userProvider);
     if (currentDoctor == null) return;
 
     Map<String, dynamic>? document;
@@ -93,8 +83,6 @@ class _UpdateDoctorProfileScreenState
             .get();
         if (snapshot.exists) document = snapshot.data();
       } catch (_) {
-        // Offline or unreadable: the cached session below still fills the
-        // form, and saving later re-checks the same document.
         document = null;
       }
     }
@@ -104,6 +92,14 @@ class _UpdateDoctorProfileScreenState
 
     final name = (data['fullname'] ?? currentDoctor.fullname).toString().trim();
     if (name.isNotEmpty) nameController.text = name;
+
+    final phone = (data['phoneNumber'] ?? currentDoctor.phoneNumber ?? '')
+        .toString()
+        .trim();
+    phoneController.text = phone;
+
+    final gender = (data['gender'] ?? currentDoctor.gender)?.toString().trim();
+    if (gender != null && gender.isNotEmpty) selectedGender = gender;
 
     final degree = (data['highestDegree'] ?? currentDoctor.highestDegree ?? '')
         .toString()
@@ -116,10 +112,6 @@ class _UpdateDoctorProfileScreenState
             .trim();
     if (image.isNotEmpty) existingImageUrl = image;
 
-    // ── Price ──
-    // `price` first, the legacy `consultationFee` second; a document with
-    // neither (created before either field existed) seeds an empty box, which
-    // the validator then makes the doctor fill in.
     _savedPrice =
         _parsePrice(data['price']) ?? _parsePrice(data['consultationFee']) ?? 0;
     if (_savedPrice <= 0 && document == null) {
@@ -129,9 +121,6 @@ class _UpdateDoctorProfileScreenState
       feeController.text = _savedPrice.toStringAsFixed(0);
     }
 
-    // ── Description / intro video ──
-    // `null` means "the document does not have the field", which is different
-    // from a value the doctor deliberately cleared.
     _savedDescription = document != null
         ? _asTrimmedStringOrNull(data['description'])
         : currentDoctor.description;
@@ -148,9 +137,6 @@ class _UpdateDoctorProfileScreenState
           )
         : List<String>.of(currentDoctor.languages);
 
-    // The seed now lands after the first frame, so rebuild — the text fields
-    // track their controllers on their own, but the language chips and the
-    // profile-picture preview read state straight from this widget.
     if (mounted) setState(() {});
   }
 
@@ -171,25 +157,6 @@ class _UpdateDoctorProfileScreenState
     return text.trim();
   }
 
-  @override
-  void dispose() {
-    nameController.dispose();
-    degreeController.dispose();
-    feeController.dispose();
-    descriptionController.dispose();
-    videoUrlController.dispose();
-    super.dispose();
-  }
-
-  /// Empty is allowed (no intro video), but anything typed must be a real
-  /// YouTube link — the same check the patient's booking screen applies.
-  String? _validateVideoUrl(String? value) {
-    final url = (value ?? '').trim();
-    if (url.isEmpty) return null;
-    if (AppointmentController.isUsableYoutubeUrl(url)) return null;
-    return 'Enter a valid YouTube link, or leave it blank';
-  }
-
   String? _validateFee(String? value) {
     final raw = (value ?? '').trim();
     if (raw.isEmpty) return 'Please enter your consultation price';
@@ -201,10 +168,6 @@ class _UpdateDoctorProfileScreenState
     return null;
   }
 
-  /// Required, like the price: this screen is where the login/app-open gate
-  /// sends doctors whose profile is missing one of the two fields, so a
-  /// blank box must not slip past the form only to fail the verification
-  /// that runs after the save.
   String? _validateDescription(String? value) {
     if ((value ?? '').trim().isEmpty) {
       return 'Please add a short description about yourself';
@@ -212,214 +175,138 @@ class _UpdateDoctorProfileScreenState
     return null;
   }
 
-  Future<String?> _uploadImage(File imageFile) async {
-    try {
-      final currentUser = ref.read(userProvider);
-      final doctorUid = currentUser?.id ?? 'temp_doctor';
-      final result = await FirebaseStorageService.instance
-          .uploadDoctorProfileImage(doctorUid: doctorUid, file: imageFile);
-
-      ToastService.instance.showSuccess('Image uploaded successfully');
-      return result.downloadUrl;
-    } catch (e) {
-      ToastService.instance.showError(
-        'Failed to upload image: ${e.toString()}',
-      );
-      setState(() {
-        errorText = 'Failed to upload image. Please try again.';
-      });
-      return null;
-    }
+  String? _validateVideoUrl(String? value) {
+    final url = (value ?? '').trim();
+    if (url.isEmpty) return null;
+    if (AppointmentController.isUsableYoutubeUrl(url)) return null;
+    return 'Enter a valid YouTube link, or leave it blank';
   }
 
   Future<void> _pickImage(ImageSource source) async {
     try {
-      setState(() {
-        isUploading = true;
-        errorText = '';
-      });
-
-      final XFile? pickedFile = await _picker.pickImage(
-        source: source,
-        imageQuality: 80,
-      );
-
-      if (pickedFile != null) {
+      final picked = await _picker.pickImage(source: source, imageQuality: 80);
+      if (picked != null) {
         setState(() {
-          selectedImage = File(pickedFile.path);
-          existingImageUrl = null; // Clear existing URL since we have new image
+          selectedImage = File(picked.path);
+          _isImageRemoved = false;
         });
-        ToastService.instance.showSuccess('Image selected successfully');
       }
-    } catch (e) {
-      setState(() {
-        errorText = 'Failed to pick image. Please try again.';
-      });
+    } catch (_) {
       ToastService.instance.showError('Failed to pick image');
-    } finally {
-      setState(() {
-        isUploading = false;
-      });
     }
   }
 
-  Future<void> _confirmRemovePhoto() async {
-    final bool? shouldRemove = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Remove Profile Picture',
-          style: TextStyle(
-            fontSize: context.fs(16),
-            fontWeight: FontWeight.w700,
-            color: Colors.grey[800],
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to remove your profile picture?',
-          style: TextStyle(fontSize: context.fs(13.5), color: Colors.grey[600]),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(
-              'Remove',
-              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (shouldRemove == true) {
-      // Bust image cache immediately so the default avatar appears instantly
-      PaintingBinding.instance.imageCache.clear();
-      PaintingBinding.instance.imageCache.clearLiveImages();
-      setState(() {
-        selectedImage = null;
-        existingImageUrl = null;
-        _isImageRemoved = true;
-      });
-      ToastService.instance.showInfo('Image removed');
-    }
-  }
-
-  void _showImageSourceDialog() {
-    final hasPhoto =
-        selectedImage != null ||
-        (existingImageUrl != null && existingImageUrl!.isNotEmpty);
-
+  void _showImageOptions() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      backgroundColor: Colors.white,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Update Profile Picture',
-                  style: TextStyle(
-                    fontSize: context.fs(15),
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildImageSourceOption(
-                      icon: Icons.camera_alt,
-                      label: 'Camera',
-                      onTap: () {
-                        Navigator.pop(context);
-                        _pickImage(ImageSource.camera);
-                      },
-                    ),
-                    _buildImageSourceOption(
-                      icon: Icons.photo_library,
-                      label: 'Gallery',
-                      onTap: () {
-                        Navigator.pop(context);
-                        _pickImage(ImageSource.gallery);
-                      },
-                    ),
-                    if (hasPhoto)
-                      _buildImageSourceOption(
-                        icon: Icons.delete_outline,
-                        label: 'Remove',
-                        iconColor: Colors.red,
-                        onTap: () {
-                          Navigator.pop(context);
-                          _confirmRemovePhoto();
-                        },
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildImageSourceOption({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    Color? iconColor,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.grey[50],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey[200]!),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Column(
-          children: [
-            Icon(icon, size: 32, color: iconColor ?? AppColors.primaryRed),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: iconColor ?? Colors.grey[700],
-                fontWeight: FontWeight.w500,
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD6E4F0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-          ],
+              Text(
+                'Change Doctor Photo',
+                style: TextStyle(
+                  fontSize: context.fs(16),
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1F2F44),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDF2F8),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_rounded,
+                    color: Color(0xFF062B72),
+                  ),
+                ),
+                title: const Text(
+                  'Take Photo',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDF2F8),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library_rounded,
+                    color: Color(0xFF062B72),
+                  ),
+                ),
+                title: const Text(
+                  'Choose from Gallery',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              if (selectedImage != null ||
+                  (existingImageUrl != null && existingImageUrl!.isNotEmpty))
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.red,
+                    ),
+                  ),
+                  title: const Text(
+                    'Remove Photo',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.red,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      selectedImage = null;
+                      existingImageUrl = null;
+                      _isImageRemoved = true;
+                    });
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // NEW METHOD: Update existing doctor profile instead of creating new one
   Future<void> _updateDoctorProfile() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -447,26 +334,17 @@ class _UpdateDoctorProfileScreenState
 
       String? imageUrl = _isImageRemoved ? null : existingImageUrl;
 
-      // Upload new image if selected
       if (selectedImage != null) {
         ToastService.instance.showInfo('Uploading image...');
-        final uploadedUrl = await _uploadImage(selectedImage!);
-        if (uploadedUrl != null) {
-          imageUrl = uploadedUrl;
-          _isImageRemoved = false;
-        } else if (mounted) {
-          setState(() {
-            errorText = 'Failed to upload image. Please try again.';
-            isUpdating = false;
-          });
-          return;
-        }
+        final uploadResult = await FirebaseStorageService.instance
+            .uploadDoctorProfileImage(
+              doctorUid: currentDoctor.id,
+              file: selectedImage!,
+            );
+        imageUrl = uploadResult.downloadUrl;
+        _isImageRemoved = false;
       }
 
-      // UPDATE — a partial update on the existing document id. Only the keys
-      // below are written, so everything else on the record (payment status,
-      // online state, timestamps, ratings, …) is preserved, and a document
-      // can never be created twice for the same doctor.
       final firestore = FirebaseFirestore.instance;
       final fee = double.parse(feeController.text.trim());
       final description = descriptionController.text.trim();
@@ -477,25 +355,17 @@ class _UpdateDoctorProfileScreenState
       final updates = <String, dynamic>{
         'fullname': nameController.text.trim(),
         'highestDegree': degreeController.text.trim(),
-        // Price is written to both spellings: `price` is the field every
-        // reader prefers now, `consultationFee` is what older builds of the
-        // app read. This is how a document created before `price` existed
-        // gains it.
+        if (selectedGender != null) 'gender': selectedGender,
         'price': fee,
         'consultationFee': fee,
         'imageUrl': imageUrl,
         'image': imageUrl,
-        'profile_image':
-            imageUrl, // Explicit null when removed, never string "null"
+        'profile_image': imageUrl,
         if (isRemovingImage) 'remove_profile_image': true,
         DoctorLanguages.field: List<String>.from(_selectedLanguages),
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // Description and the intro link are written only when the doctor
-      // actually changed them. Leaving a blank box blank must not stamp an
-      // empty value over anything — and clearing a value that was set still
-      // writes `''`, because that is an intentional edit.
       if (description != (_savedDescription ?? '').trim()) {
         updates['description'] = description;
       }
@@ -513,12 +383,10 @@ class _UpdateDoctorProfileScreenState
         PaintingBinding.instance.imageCache.clearLiveImages();
       }
 
-      // Copy rather than reconstruct: the previous field-by-field rebuild left
-      // out every field it did not enumerate, so saving here wiped them from
-      // the local session.
       final updatedDoctor = currentDoctor.copyWith(
         fullname: nameController.text.trim(),
         highestDegree: degreeController.text.trim(),
+        gender: selectedGender,
         image: imageUrl,
         clearImage: isRemovingImage,
         languages: _selectedLanguages,
@@ -529,24 +397,15 @@ class _UpdateDoctorProfileScreenState
       );
 
       _isImageRemoved = false;
-
-      // The next save must compare against what was just written, not against
-      // the values this screen was opened with.
       _savedPrice = fee;
       _savedDescription = description;
       _savedVideoUrl = videoUrl;
 
-      // Update the controller
       doctorController.updateDoctor(updatedDoctor);
-
-      // Save to local storage
       await _saveUpdatedDoctorToLocalStorage(updatedDoctor);
+      ref.invalidate(userProvider);
 
       if (mounted) {
-        // Refresh + verify before the portal is allowed to open: re-read the
-        // document and run the same predicate the login / app-open gate uses,
-        // so the doctor is only released once `price` and `description` are
-        // really back on the record.
         final stillIncomplete = await doctorController
             .requiresProfileCompletion();
 
@@ -563,22 +422,24 @@ class _UpdateDoctorProfileScreenState
           return;
         }
 
-        // Show success message
         ToastService.instance.showSuccess(
           'Doctor profile updated successfully!',
         );
 
-        // Navigate to doctor portal after a short delay
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future.delayed(const Duration(milliseconds: 400));
 
         if (mounted) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const DoctorPortalWrapper(),
-            ),
-            (route) => false,
-          );
+          if (Navigator.of(context).canPop()) {
+            Navigator.pop(context, true);
+          } else {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const DoctorPortalWrapper(),
+              ),
+              (route) => false,
+            );
+          }
         }
       }
     } catch (e) {
@@ -604,447 +465,409 @@ class _UpdateDoctorProfileScreenState
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final safeAreaPadding = MediaQuery.of(context).padding;
-    final double maxWidth = size.width > 500 ? 500 : size.width;
+    final bool canPop = Navigator.of(context).canPop();
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Container(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: Stack(
-            children: [
-              // Background Decorative Elements
-              Positioned(
-                top: -size.height * 0.10,
-                right: -size.width * 0.20,
-                child: Container(
-                  width: size.width * 0.6,
-                  height: size.width * 0.6,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.primaryRed.withOpacity(0.1),
-                        AppColors.primaryRed.withOpacity(0.05),
+    return OpdScreenShell(
+      title: canPop ? 'Manage Profile' : 'Complete Profile',
+      subtitle: canPop
+          ? 'Update your personal and professional details'
+          : 'Please complete your profile to continue',
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Avatar picker
+            Center(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF0F233C,
+                          ).withValues(alpha: 0.12),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
                       ],
-                      begin: Alignment.topRight,
-                      end: Alignment.bottomLeft,
+                    ),
+                    child: ClipOval(child: _buildAvatarImage()),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: GestureDetector(
+                      onTap: _showImageOptions,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF284F85), Color(0xFF062B72)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(
+                                0xFF062B72,
+                              ).withValues(alpha: 0.35),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
-                  child: Icon(
-                    CupertinoIcons.person_circle,
-                    size: 150,
-                    color: AppColors.primaryRed.withOpacity(0.08),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Card 1: Personal Information
+            OpdCard(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Full Name',
+                    style: TextStyle(
+                      fontSize: context.fs(13),
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1F2F44),
+                    ),
                   ),
+                  const SizedBox(height: 8),
+                  MetallicInput(
+                    hintText: 'Enter full name (e.g. Dr. John Doe)',
+                    icon: Icons.person_outline_rounded,
+                    controller: nameController,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Full name is required';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  Text(
+                    'Phone Number',
+                    style: TextStyle(
+                      fontSize: context.fs(13),
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1F2F44),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  MetallicInput(
+                    hintText: 'Phone number',
+                    icon: Icons.phone_android_rounded,
+                    controller: phoneController,
+                    enabled: false,
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  Text(
+                    'Gender',
+                    style: TextStyle(
+                      fontSize: context.fs(13),
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1F2F44),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _buildGenderChip('Male', Icons.male_rounded),
+                      const SizedBox(width: 10),
+                      _buildGenderChip('Female', Icons.female_rounded),
+                      const SizedBox(width: 10),
+                      _buildGenderChip('Other', Icons.transgender_rounded),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Card 2: Professional Information & Consultation Fee
+            OpdCard(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Highest Qualification / Degree',
+                    style: TextStyle(
+                      fontSize: context.fs(13),
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1F2F44),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  MetallicInput(
+                    hintText: 'e.g. MBBS, FCPS Cardiology, MD',
+                    icon: Icons.school_outlined,
+                    controller: degreeController,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Qualification/Degree is required';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  Text(
+                    'Consultation Fee (PKR)',
+                    style: TextStyle(
+                      fontSize: context.fs(13),
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1F2F44),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  MetallicInput(
+                    hintText: 'Enter fee in PKR (e.g. 1500)',
+                    icon: Icons.payments_outlined,
+                    controller: feeController,
+                    keyboardType: TextInputType.number,
+                    validator: _validateFee,
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  DoctorLanguageSelector(
+                    label: 'Consultation Languages',
+                    selected: _selectedLanguages,
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedLanguages = value;
+                      });
+                    },
+                    helperText: _selectedLanguages.isEmpty
+                        ? 'Select the languages you communicate in with patients.'
+                        : 'Tap a language again to remove it.',
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Card 3: Bio & Introduction Link
+            OpdCard(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Professional Summary / Bio',
+                    style: TextStyle(
+                      fontSize: context.fs(13),
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1F2F44),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  MetallicInput(
+                    hintText:
+                        'Tell patients about your medical background, clinical experience, and clinical expertise...',
+                    icon: Icons.description_outlined,
+                    controller: descriptionController,
+                    maxLines: 4,
+                    minLines: 3,
+                    validator: _validateDescription,
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  Text(
+                    'YouTube Introduction Video (Optional)',
+                    style: TextStyle(
+                      fontSize: context.fs(13),
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1F2F44),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  MetallicInput(
+                    hintText: 'https://youtube.com/watch?v=...',
+                    icon: Icons.video_library_outlined,
+                    controller: videoUrlController,
+                    validator: _validateVideoUrl,
+                  ),
+                ],
+              ),
+            ),
+
+            if (errorText.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: Colors.red,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        errorText,
+                        style: TextStyle(
+                          fontSize: context.fs(12.5),
+                          color: Colors.red[800],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+            ],
 
-              // Main Content
-              SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: CenteredContent(
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      left: context.rsp(20),
-                      right: context.rsp(20),
-                      top: safeAreaPadding.top > 0 ? safeAreaPadding.top : 20,
-                      bottom: safeAreaPadding.bottom > 0
-                          ? safeAreaPadding.bottom + 20
-                          : 20,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Back Button with Title
-                        Container(
-                          margin: const EdgeInsets.only(top: 10, bottom: 10),
-                          child: Row(
-                            children: [
-                              IconButton(
-                                onPressed: () {
-                                  // Login and app-open push this screen with an
-                                  // empty stack behind it, so a plain pop would
-                                  // leave a blank route — fall back to the
-                                  // sign-in screen while the session is kept.
-                                  if (Navigator.of(context).canPop()) {
-                                    ToastService.instance.showInfo(
-                                      'Going back',
-                                    );
-                                    Navigator.pop(context);
-                                  } else {
-                                    Navigator.of(context).pushAndRemoveUntil(
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const SignInScreen(),
-                                      ),
-                                      (route) => false,
-                                    );
-                                  }
-                                },
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                icon: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.grey[100],
-                                  ),
-                                  child: Icon(
-                                    Icons.arrow_back_rounded,
-                                    color: AppColors.primaryRed,
-                                    size: 24,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Text(
-                                  'Complete Doctor Profile',
-                                  style: TextStyle(
-                                    fontSize: context.fs(20),
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[800],
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+            const SizedBox(height: 28),
 
-                        Padding(
-                          padding: const EdgeInsets.only(left: 65, bottom: 30),
-                          child: Text(
-                            'Please complete your profile to continue',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                              height: 1.5,
-                            ),
-                          ),
-                        ),
+            GradientButton(
+              text: isUpdating ? 'Saving...' : 'Save Changes',
+              icon: isUpdating ? null : Icons.check_circle_outline_rounded,
+              onPressed: isUpdating ? null : _updateDoctorProfile,
+            ),
 
-                        // Profile Picture Section
-                        Center(
-                          child: Column(
-                            children: [
-                              if (selectedImage != null ||
-                                  existingImageUrl != null)
-                                Container(
-                                  height: 130,
-                                  width: 130,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: AppColors.primaryRed,
-                                      width: 3,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppColors.shadowMedium,
-                                        blurRadius: 15,
-                                        offset: const Offset(0, 5),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ClipOval(
-                                    child: selectedImage != null
-                                        ? Image.file(
-                                            selectedImage!,
-                                            fit: BoxFit.cover,
-                                            width: 130,
-                                            height: 130,
-                                          )
-                                        : (existingImageUrl != null &&
-                                                  existingImageUrl!.isNotEmpty
-                                              ? Image.network(
-                                                  existingImageUrl!,
-                                                  fit: BoxFit.cover,
-                                                  width: 130,
-                                                  height: 130,
-                                                  errorBuilder:
-                                                      (
-                                                        context,
-                                                        error,
-                                                        stackTrace,
-                                                      ) {
-                                                        return Icon(
-                                                          Icons.person,
-                                                          size: 50,
-                                                          color:
-                                                              Colors.grey[400],
-                                                        );
-                                                      },
-                                                )
-                                              : Container()),
-                                  ),
-                                ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: isUploading
-                                          ? null
-                                          : _showImageSourceDialog,
-                                      icon: const Icon(
-                                        Icons.camera_alt,
-                                        size: 18,
-                                      ),
-                                      label: const Text('Update Photo'),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: AppColors.primaryRed,
-                                        side: BorderSide(
-                                          color: AppColors.primaryRed,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (selectedImage != null ||
-                                      existingImageUrl != null)
-                                    const SizedBox(width: 12),
-                                  if (selectedImage != null ||
-                                      existingImageUrl != null)
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: _confirmRemovePhoto,
-                                        icon: const Icon(
-                                          Icons.delete,
-                                          size: 18,
-                                        ),
-                                        label: const Text('Remove'),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: Colors.red,
-                                          side: const BorderSide(
-                                            color: Colors.red,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
 
-                        const SizedBox(height: 30),
-
-                        // Form Fields
-                        Form(
-                          key: _formKey,
-                          child: Column(
-                            children: [
-                              CustomTextField(
-                                controller: nameController,
-                                hintText: 'Dr. John Doe',
-                                labelText: 'Full Name',
-                                prefixIcon: Icons.person_outline,
-                                fontSize: 14,
-                                keyboardType: TextInputType.name,
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Please enter your full name';
-                                  }
-                                  if (value.length < 2) {
-                                    return 'Name must be at least 2 characters';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                              CustomTextField(
-                                controller: degreeController,
-                                hintText: 'MBBS, FCPS',
-                                labelText: 'Degree / Credential',
-                                prefixIcon: Icons.school_outlined,
-                                fontSize: 14,
-                                keyboardType: TextInputType.text,
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Please enter your degree/credential';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 22),
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: const Color(0xFFDCE6F2),
-                                  ),
-                                ),
-                                child: DoctorLanguageSelector(
-                                  label: 'Languages',
-                                  selected: _selectedLanguages,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _selectedLanguages = value;
-                                    });
-                                  },
-                                  helperText: _selectedLanguages.isEmpty
-                                      ? 'Optional — no languages selected yet.'
-                                      : 'Tap a language again to remove it.',
-                                ),
-                              ),
-                              const SizedBox(height: 22),
-
-                              // ── Appointment booking fields ──
-                              Text(
-                                'Appointment Booking',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey[800],
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Patients pay this price before requesting an '
-                                'appointment. The optional YouTube introduction '
-                                'unlocks a 30% discount once they watch it.',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                  height: 1.45,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              CustomTextField(
-                                controller: feeController,
-                                hintText: '1500',
-                                labelText: 'Price / Consultation Fee (PKR) *',
-                                prefixIcon: Icons.payments_outlined,
-                                fontSize: 14,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                                validator: _validateFee,
-                              ),
-                              const SizedBox(height: 16),
-                              CustomTextField(
-                                controller: descriptionController,
-                                hintText:
-                                    'Cardiologist with 12 years of experience',
-                                labelText: 'About / Description *',
-                                prefixIcon: Icons.notes_outlined,
-                                fontSize: 14,
-                                keyboardType: TextInputType.text,
-                                validator: _validateDescription,
-                              ),
-                              const SizedBox(height: 16),
-                              CustomTextField(
-                                controller: videoUrlController,
-                                hintText: 'https://www.youtube.com/watch?v=...',
-                                labelText: 'YouTube Introduction (optional)',
-                                prefixIcon: Icons.ondemand_video_outlined,
-                                fontSize: 14,
-                                keyboardType: TextInputType.url,
-                                validator: _validateVideoUrl,
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        if (errorText.isNotEmpty)
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.red[50],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.error_outline,
-                                  color: Colors.red,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    errorText,
-                                    style: TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        // Save/Update Button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: (isUploading || isUpdating)
-                                ? null
-                                : _updateDoctorProfile,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primaryRed,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shadowColor: Colors.transparent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: (isUploading || isUpdating)
-                                ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'Save Profile',
-                                        style: TextStyle(
-                                          fontSize: context.fs(14),
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      const Icon(Icons.save_rounded, size: 20),
-                                    ],
-                                  ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 30),
-                      ],
-                    ),
-                  ),
+  Widget _buildGenderChip(String label, IconData icon) {
+    final isSelected = selectedGender?.toLowerCase() == label.toLowerCase();
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            selectedGender = label;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? const Color(0xFF062B72).withValues(alpha: 0.08)
+                : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? const Color(0xFF062B72)
+                  : const Color(0xFFDCE6F2),
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected
+                    ? const Color(0xFF062B72)
+                    : const Color(0xFF657991),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected
+                      ? const Color(0xFF062B72)
+                      : const Color(0xFF1F2F44),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatarImage() {
+    if (selectedImage != null) {
+      return Image.file(
+        selectedImage!,
+        fit: BoxFit.cover,
+        width: 96,
+        height: 96,
+      );
+    }
+    if (existingImageUrl != null && existingImageUrl!.trim().isNotEmpty) {
+      return Image.network(
+        existingImageUrl!,
+        fit: BoxFit.cover,
+        width: 96,
+        height: 96,
+        errorBuilder: (_, __, ___) => _buildFallbackInitial(),
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return const Center(
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFF062B72),
+              ),
+            ),
+          );
+        },
+      );
+    }
+    return _buildFallbackInitial();
+  }
+
+  Widget _buildFallbackInitial() {
+    final name = nameController.text.trim();
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'D';
+    return Container(
+      color: const Color(0xFFEDF2F8),
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: const TextStyle(
+          fontSize: 36,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF062B72),
         ),
       ),
     );

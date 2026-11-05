@@ -17,10 +17,12 @@
 #include <flutter_sound/flutter_sound_plugin_c_api.h>
 #include <gal/gal_plugin_c_api.h>
 #include <permission_handler_windows/permission_handler_windows_plugin.h>
+#include <printing/printing_plugin.h>
 #include <record_windows/record_windows_plugin_c_api.h>
 #include <share_plus/share_plus_windows_plugin_c_api.h>
 #include <url_launcher_windows/url_launcher_windows.h>
 #include <zego_express_engine/zego_express_engine_plugin.h>
+#include <zego_zim/zego_zim_plugin.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
   AudioplayersWindowsPluginRegisterWithRegistrar(
@@ -45,6 +47,8 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("GalPluginCApi"));
   PermissionHandlerWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("PermissionHandlerWindowsPlugin"));
+  PrintingPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("PrintingPlugin"));
   RecordWindowsPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("RecordWindowsPluginCApi"));
   SharePlusWindowsPluginCApiRegisterWithRegistrar(
@@ -53,4 +57,6 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("UrlLauncherWindows"));
   ZegoExpressEnginePluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("ZegoExpressEnginePlugin"));
+  ZegoZimPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("ZegoZimPlugin"));
 }

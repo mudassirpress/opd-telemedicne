@@ -1,35 +1,25 @@
 // notification_dispatcher.dart
 //
-// The client's ONLY way of asking for a push notification to be delivered.
+// Client notification request dispatcher for the OPD Telemedicine app.
 //
-// It deliberately cannot send anything itself. Services that push FCM need a
-// Firebase Admin credential, and there is nowhere on a user's device that such
-// a credential can be kept — it ships inside the APK, so it is public. This app
-// used to embed exactly such a key and post directly to the FCM HTTP v1 API
-// from the app; every push it sent was signed with a secret anyone could pull
-// out of the build.
+// Security Architecture Note:
+// Services that push FCM require a Firebase Admin credential (service account key).
+// In accordance with Google Cloud and Firebase security standards, private keys
+// must NEVER be bundled in the Flutter mobile application (APK/AAB/IPA).
 //
-// Instead this class queues a request into `notification_outbox` and a Cloud
-// Function (`dispatchNotification` in functions/index.js) performs the actual
-// send. The function resolves the recipient's *user id* to a token server-side
-// and only accepts an allow-listed set of notification types, so a client can
-// neither read another user's token nor forge an arbitrary message.
+// With Node.js Cloud Functions removed, requests are queued in the Firestore
+// `notification_outbox` collection. This provides an audit log and outbox queue
+// for server-side delivery by a secure, trusted backend environment (such as
+// Google Cloud Run, Cloud Tasks, or serverless event triggers).
 //
-// Some notification types are no longer sent from the client at all — they are
-// produced by Firestore-triggered functions that watch the same documents the
-// app already writes:
-//   • chat messages      → sendChatNotification
-//   • incoming calls     → sendIncomingCallNotification
-//   • password resets    → sendPasswordResetNotifications
-//   • payment proof      → sendAdminPaymentProofNotifications
-// Those are sent by exactly one sender, which also removes the duplicate
-// pushes that firing from both the client and the function used to produce.
+// In-app notifications and real-time state synchronization for active users are
+// handled directly via Firestore snapshot listeners in the Flutter client.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
 
-/// Queues one push notification for the Cloud Function to deliver.
+/// Queues one push notification request into the Firestore outbox for server delivery.
 ///
 /// [toUserId] is a user id, never a device token: the token is looked up on the
 /// server so it is never handled by, or exposed to, the client.

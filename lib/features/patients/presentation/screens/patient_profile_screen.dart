@@ -1,13 +1,18 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telemedicine/core/services/firebase_storage_service.dart';
-import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
-import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 import 'package:telemedicine/core/utils/toast_utils.dart';
+import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
+import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
+import 'package:telemedicine/features/patients/presentation/screens/edit_patient_profile_screen.dart';
+import 'package:telemedicine/features/prescriptions/presentation/patient_prescriptions_screen.dart';
 import 'package:telemedicine/shared/widgets/auth_layout.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:telemedicine/shared/widgets/opd_design_system.dart';
+import 'package:telemedicine/shared/widgets/opd_profile_components.dart';
 
 class PatientProfileScreen extends ConsumerStatefulWidget {
   const PatientProfileScreen({super.key});
@@ -19,269 +24,264 @@ class PatientProfileScreen extends ConsumerStatefulWidget {
 
 class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
     with AutomaticKeepAliveClientMixin {
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController phoneNumberController = TextEditingController();
-  final TextEditingController highestDegreeController = TextEditingController();
-
-  File? selectedImage;
-  bool isUploading = false;
-  bool isSaving = false;
-  String errorText = '';
-  String? currentImageUrl;
-  String? selectedGender;
-
-  final _formKey = GlobalKey<FormState>();
   final ImagePicker _picker = ImagePicker();
+
+  bool _isUploadingPhoto = false;
+  bool _notificationsEnabled = true;
+  String _selectedLanguage = 'English';
 
   @override
   bool get wantKeepAlive => true;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _loadUserData();
+  void initState() {
+    super.initState();
+    _loadPreferences();
   }
 
-  @override
-  void dispose() {
-    nameController.dispose();
-    phoneNumberController.dispose();
-    highestDegreeController.dispose();
-    super.dispose();
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+      _selectedLanguage = prefs.getString('app_language') ?? 'English';
+    });
   }
 
-  void _loadUserData() {
-    final currentUser = ref.read(userProvider);
-    if (currentUser != null) {
-      nameController.text = currentUser.fullname;
-      phoneNumberController.text = currentUser.phoneNumber ?? '';
-      highestDegreeController.text = currentUser.highestDegree ?? '';
-      currentImageUrl = currentUser.image;
-      selectedGender = currentUser.gender;
-    }
-  }
-
-  Future<String?> _uploadImage(File imageFile) async {
-    try {
-      final currentUser = ref.read(userProvider);
-      final uid = currentUser?.id ?? 'temp_patient';
-      final result = await FirebaseStorageService.instance
-          .uploadPatientProfileImage(patientUid: uid, file: imageFile);
-      ToastService.instance.showSuccess('Image uploaded');
-      return result.downloadUrl;
-    } catch (e) {
-      ToastService.instance.showError('Upload failed: ${e.toString()}');
-      return null;
-    }
-  }
-
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      setState(() {
-        isUploading = true;
-        errorText = '';
-      });
-      final XFile? pickedFile = await _picker.pickImage(
-        source: source,
-        imageQuality: 80,
-      );
-      if (pickedFile != null) {
-        setState(() {
-          selectedImage = File(pickedFile.path);
-        });
-      }
-    } catch (e) {
-      setState(() {
-        errorText = 'Failed to pick image';
-      });
-    } finally {
-      setState(() {
-        isUploading = false;
-      });
-    }
-  }
-
-  void _showImageSourceDialog() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (BuildContext context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD6E4F0),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    'Profile Picture',
-                    style: TextStyle(
-                      fontSize: context.fs(15),
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF1F2F44),
-                    ),
-                  ),
-                ),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEDF2F8),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt_rounded,
-                      color: Color(0xFF062B72),
-                    ),
-                  ),
-                  title: Text(
-                    'Take Photo',
-                    style: TextStyle(
-                      color: const Color(0xFF1F2F44),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.camera);
-                  },
-                ),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEDF2F8),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.photo_library_rounded,
-                      color: Color(0xFF062B72),
-                    ),
-                  ),
-                  title: Text(
-                    'Choose from Gallery',
-                    style: TextStyle(
-                      color: const Color(0xFF1F2F44),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.gallery);
-                  },
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
-        );
-      },
+  Future<void> _toggleNotifications(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notifications_enabled', value);
+    if (!mounted) return;
+    setState(() {
+      _notificationsEnabled = value;
+    });
+    ToastService.instance.showInfo(
+      value ? 'Notifications turned on' : 'Notifications turned off',
     );
   }
 
-  Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    final currentUser = ref.read(userProvider);
-    if (currentUser == null) {
-      ToastService.instance.showError('No user logged in');
-      return;
-    }
-
+  Future<void> _setLanguage(String lang) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_language', lang);
+    if (!mounted) return;
     setState(() {
-      isSaving = true;
-      errorText = '';
+      _selectedLanguage = lang;
     });
+    ToastService.instance.showSuccess('Language set to $lang');
+  }
+
+  Future<void> _pickAndUploadPhoto(ImageSource source) async {
+    final currentUser = ref.read(userProvider);
+    if (currentUser == null) return;
 
     try {
+      final picked = await _picker.pickImage(
+        source: source,
+        imageQuality: 80,
+      );
+      if (picked == null) return;
+
+      setState(() => _isUploadingPhoto = true);
+      ToastService.instance.showInfo('Uploading profile picture...');
+
+      final uploadResult = await FirebaseStorageService.instance
+          .uploadPatientProfileImage(
+            patientUid: currentUser.id,
+            file: File(picked.path),
+          );
+
       final patientController = ref.read(patientControllerProvider);
-      String? uploadedImageUrl = currentImageUrl;
-
-      if (selectedImage != null) {
-        ToastService.instance.showInfo('Uploading...');
-        final uploadedUrl = await _uploadImage(selectedImage!);
-        if (uploadedUrl != null) {
-          uploadedImageUrl = uploadedUrl;
-        }
-      }
-
       final success = await patientController.updateUserProfile(
-        image: uploadedImageUrl,
-        fullname: nameController.text.trim(),
-        gender: selectedGender,
+        fullname: currentUser.fullname,
+        image: uploadResult.downloadUrl,
       );
 
       if (success && mounted) {
-        ToastService.instance.showSuccess('Profile updated!');
+        ToastService.instance.showSuccess('Profile photo updated');
         ref.invalidate(userProvider);
-        await Future.delayed(const Duration(milliseconds: 300));
-        if (mounted) {
-          Navigator.pop(context);
-        }
       } else if (mounted) {
-        ToastService.instance.showError(patientController.errorMessage);
+        ToastService.instance.showError('Failed to update profile photo');
       }
     } catch (e) {
-      ToastService.instance.showError('Update failed');
-    } finally {
       if (mounted) {
-        setState(() {
-          isSaving = false;
-        });
+        ToastService.instance.showError('Upload failed: ${e.toString()}');
       }
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
     }
+  }
+
+  Future<void> _removePhoto() async {
+    final currentUser = ref.read(userProvider);
+    if (currentUser == null) return;
+
+    setState(() => _isUploadingPhoto = true);
+    try {
+      final patientController = ref.read(patientControllerProvider);
+      final success = await patientController.updateUserProfile(
+        fullname: currentUser.fullname,
+        image: null,
+      );
+      if (success && mounted) {
+        ToastService.instance.showInfo('Profile picture removed');
+        ref.invalidate(userProvider);
+      }
+    } catch (_) {
+      if (mounted) ToastService.instance.showError('Failed to remove photo');
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
+  void _showPhotoOptionsDialog() {
+    final currentUser = ref.read(userProvider);
+    final hasPhoto =
+        currentUser?.image != null && currentUser!.image!.isNotEmpty;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD6E4F0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(
+                'Profile Picture',
+                style: TextStyle(
+                  fontSize: context.fs(16),
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1F2F44),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDF2F8),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_rounded,
+                    color: Color(0xFF062B72),
+                  ),
+                ),
+                title: const Text(
+                  'Take Photo',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadPhoto(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDF2F8),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library_rounded,
+                    color: Color(0xFF062B72),
+                  ),
+                ),
+                title: const Text(
+                  'Choose from Gallery',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadPhoto(ImageSource.gallery);
+                },
+              ),
+              if (hasPhoto)
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.red,
+                    ),
+                  ),
+                  title: const Text(
+                    'Remove Photo',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.red,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _removePhoto();
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _logout() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: Text(
           'Logout',
           style: TextStyle(
-            fontSize: context.fs(15),
+            fontSize: context.fs(16),
             fontWeight: FontWeight.w700,
             color: const Color(0xFF1F2F44),
           ),
         ),
         content: Text(
-          'Are you sure you want to logout?',
+          'Are you sure you want to sign out of your account?',
           style: TextStyle(
-            fontSize: context.fs(13),
-            color: const Color(0xFF6B7B8D),
+            fontSize: context.fs(13.5),
+            color: const Color(0xFF657991),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(
+            child: const Text(
               'Cancel',
-              style: TextStyle(color: const Color(0xFF6B7B8D)),
+              style: TextStyle(
+                color: Color(0xFF657991),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(
+            child: const Text(
               'Logout',
-              style: TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -290,10 +290,11 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
 
     if (shouldLogout != true) return;
 
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
+      builder: (_) => const Center(
         child: CircularProgressIndicator(color: Color(0xFF062B72)),
       ),
     );
@@ -302,10 +303,10 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
       final patientController = ref.read(patientControllerProvider);
       await patientController.signOut();
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.pop(context); // Dismiss spinner
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const SignInScreen()),
+          MaterialPageRoute(builder: (_) => const SignInScreen()),
           (route) => false,
         );
       }
@@ -320,15 +321,17 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red[700]),
+            const Icon(Icons.warning_amber_rounded, color: Colors.red),
             const SizedBox(width: 8),
             Text(
               'Delete Account',
               style: TextStyle(
-                fontSize: context.fs(15),
+                fontSize: context.fs(16),
                 fontWeight: FontWeight.w700,
                 color: const Color(0xFF1F2F44),
               ),
@@ -340,27 +343,26 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Your account will be deactivated and you will no longer be able '
-              'to sign in.',
+              'Your account will be deactivated and you will no longer be able to sign in.',
               style: TextStyle(
                 fontSize: context.fs(13),
-                color: const Color(0xFF6B7B8D),
+                color: const Color(0xFF657991),
+                height: 1.4,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
-              'Your chats, prescriptions, reports, payment records and other '
-              'history are preserved on file and are not erased.',
+              'Note: In compliance with medical record regulations, your consultations, prescriptions and clinical logs remain securely archived.',
               style: TextStyle(
-                fontSize: 13,
-                color: const Color(0xFF6B7B8D),
+                fontSize: context.fs(11.5),
+                color: const Color(0xFF657991),
                 height: 1.4,
               ),
             ),
             const SizedBox(height: 16),
             MetallicInput(
-              hintText: 'Enter password',
-              icon: Icons.lock_rounded,
+              hintText: 'Enter account password',
+              icon: Icons.lock_outline_rounded,
               isPassword: true,
               controller: passwordController,
             ),
@@ -369,17 +371,20 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(
+            child: const Text(
               'Cancel',
-              style: TextStyle(color: const Color(0xFF6B7B8D)),
+              style: TextStyle(
+                color: Color(0xFF657991),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(
+            child: const Text(
               'Delete',
-              style: TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -393,7 +398,7 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
       );
       if (result && mounted) {
         ToastService.instance.showSuccess(
-          'Account deleted. Your records have been preserved.',
+          'Account deactivated. Records have been archived.',
         );
         Navigator.pushAndRemoveUntil(
           context,
@@ -424,11 +429,13 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
       return _buildGuestProfileView(context);
     }
 
+    final bool canPop = Navigator.of(context).canPop();
+
     return Scaffold(
       backgroundColor: const Color(0xFFEDF2F8),
       body: Stack(
         children: [
-          // ECG Watermark - Top Right (matching Sign In)
+          // ECG Watermark - Top Right
           Positioned(
             top: 20,
             right: 0,
@@ -441,11 +448,10 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
             ),
           ),
 
-          // Main Content
           SafeArea(
             child: Column(
               children: [
-                // Top Bar with Back Button
+                // Top App Bar
                 Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal: context.rsp(20),
@@ -453,192 +459,245 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                   ),
                   child: Row(
                     children: [
+                      if (canPop) ...[
+                        CircularBackButton(
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        const SizedBox(width: 14),
+                      ],
                       Expanded(
                         child: Text(
-                          'Edit Profile',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          'Profile & Settings',
                           style: TextStyle(
-                            fontSize: context.fs(16),
+                            fontSize: context.fs(20),
                             fontWeight: FontWeight.w700,
                             color: const Color(0xFF1F2F44),
+                            letterSpacing: -0.3,
                           ),
                         ),
                       ),
-                      if (isSaving)
-                        const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Color(0xFF062B72),
-                          ),
-                        )
-                      else
-                        GestureDetector(
-                          onTap: _saveProfile,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF284F85),
-                                  Color(0xFF15386A),
-                                  Color(0xFF0D264E),
-                                  Color(0xFF081938),
-                                ],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: const Color(0xFF132D56),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF0B2041,
-                                  ).withValues(alpha: 0.32),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              'Save',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),
 
-                // Scrollable Content
+                // Main Scrollable Settings Content
                 Expanded(
                   child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: context.rsp(20),
-                      vertical: 8,
+                    padding: EdgeInsets.fromLTRB(
+                      context.rsp(20),
+                      context.rsp(8),
+                      context.rsp(20),
+                      context.rsp(32),
                     ),
-                    child: CenteredContent(
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 8),
-
-                          // Avatar Section
-                          _buildAvatarSection(currentUser),
-                          const SizedBox(height: 28),
-
-                          // Title
-                          Text(
-                            'Personal Information',
-                            style: TextStyle(
-                              fontSize: context.fs(20),
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF1F2F44),
-                              letterSpacing: -0.5,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: context.contentMaxWidth < 440
+                              ? context.contentMaxWidth
+                              : 440,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // 1. Profile Header
+                            OpdProfileHeader(
+                              name: currentUser.fullname,
+                              subtitle: (currentUser.phoneNumber?.isNotEmpty == true
+                                      ? currentUser.phoneNumber
+                                      : 'Patient') ??
+                                  'Patient',
+                              imageUrl: currentUser.image,
+                              roleBadge: 'Patient',
+                              isUploading: _isUploadingPhoto,
+                              onEditPhoto: _showPhotoOptionsDialog,
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Update your personal details and profile picture.',
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF657991),
-                              height: 1.4,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 28),
 
-                          // Form Fields
-                          Form(
-                            key: _formKey,
-                            child: Column(
-                              children: [
-                                MetallicInput(
-                                  hintText: 'Full Name',
-                                  icon: Icons.person_rounded,
-                                  controller: nameController,
-                                  showLabel: true,
-                                  labelText: 'Full Name',
-                                  validator: (value) =>
-                                      value?.trim().isEmpty ?? true
-                                      ? 'Required'
-                                      : null,
-                                ),
-                                const SizedBox(height: 16),
-                                MetallicInput(
-                                  hintText: 'Phone Number',
-                                  icon: Icons.phone_rounded,
-                                  keyboardType: TextInputType.phone,
-                                  controller: phoneNumberController,
-                                  showLabel: true,
-                                  labelText: 'Phone Number',
-                                  enabled: false,
-                                  validator: (value) =>
-                                      value?.trim().isEmpty ?? true
-                                      ? 'Required'
-                                      : null,
-                                ),
-                                const SizedBox(height: 16),
-                                GenderDropdownField(
-                                  value: selectedGender,
-                                  showLabel: true,
-                                  labelText: 'Gender',
-                                  onChanged: (val) {
-                                    setState(() {
-                                      selectedGender = val;
-                                    });
+                            const SizedBox(height: 12),
+
+                            // 2. Account Section
+                            OpdSettingsGroup(
+                              title: 'Account',
+                              items: [
+                                OpdSettingsTile(
+                                  icon: Icons.person_outline_rounded,
+                                  title: 'Manage Profile',
+                                  subtitle: 'Personal information & photo',
+                                  onTap: () async {
+                                    final updated = await Navigator.push<bool>(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const EditPatientProfileScreen(),
+                                      ),
+                                    );
+                                    if (updated == true) {
+                                      ref.invalidate(userProvider);
+                                    }
                                   },
-                                  validator: (val) =>
-                                      (val == null || val.isEmpty)
-                                      ? 'Please select your gender'
-                                      : null,
                                 ),
-                                if (currentUser.role == 'doctor') ...[
-                                  const SizedBox(height: 16),
-                                  MetallicInput(
-                                    hintText: 'Highest Degree',
-                                    icon: Icons.school_rounded,
-                                    controller: highestDegreeController,
-                                    showLabel: true,
-                                    labelText: 'Highest Degree',
-                                  ),
-                                ],
+                                OpdSettingsTile(
+                                  icon: Icons.receipt_long_outlined,
+                                  title: 'My Prescriptions',
+                                  subtitle: 'Digital prescriptions & advice',
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const PatientPrescriptionsScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
                               ],
                             ),
-                          ),
 
-                          if (errorText.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 16),
-                              child: Text(
-                                errorText,
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 13,
+                            // 3. Preferences Section
+                            OpdSettingsGroup(
+                              title: 'Preferences',
+                              items: [
+                                OpdSettingsSwitchTile(
+                                  icon: Icons.notifications_none_rounded,
+                                  title: 'Notifications',
+                                  subtitle: 'Consultation & message alerts',
+                                  value: _notificationsEnabled,
+                                  onChanged: _toggleNotifications,
+                                ),
+                                OpdSettingsTile(
+                                  icon: Icons.translate_rounded,
+                                  title: 'Language',
+                                  subtitle: _selectedLanguage,
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _selectedLanguage,
+                                        style: TextStyle(
+                                          fontSize: context.fs(13),
+                                          fontWeight: FontWeight.w600,
+                                          color: const Color(0xFF062B72),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: Color(0xFF94A3B8),
+                                        size: 20,
+                                      ),
+                                    ],
+                                  ),
+                                  onTap: () {
+                                    OpdSupportDialogs.showLanguageSelector(
+                                      context: context,
+                                      currentLanguage: _selectedLanguage,
+                                      onSelected: _setLanguage,
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+
+                            // 4. Support Section
+                            OpdSettingsGroup(
+                              title: 'Support',
+                              items: [
+                                OpdSettingsTile(
+                                  icon: Icons.headset_mic_outlined,
+                                  title: 'Help Center',
+                                  subtitle: '24/7 Helpline & contacts',
+                                  onTap: () {
+                                    OpdSupportDialogs.showHelpCenter(context);
+                                  },
+                                ),
+                                OpdSettingsTile(
+                                  icon: Icons.policy_outlined,
+                                  title: 'Terms & Policies',
+                                  subtitle: 'Clinical & privacy guidelines',
+                                  onTap: () {
+                                    OpdSupportDialogs.showTermsAndPolicies(
+                                      context,
+                                    );
+                                  },
+                                ),
+                                OpdSettingsTile(
+                                  icon: Icons.info_outline_rounded,
+                                  title: 'About Us',
+                                  subtitle: 'Version 1.0.6 (Build 6)',
+                                  onTap: () {
+                                    OpdSupportDialogs.showAboutUs(context);
+                                  },
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            // 5. Account Actions (Visually Separated)
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFFE2E8F0),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF0F233C)
+                                        .withValues(alpha: 0.035),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Column(
+                                  children: [
+                                    OpdSettingsTile(
+                                      icon: Icons.logout_rounded,
+                                      title: 'Logout',
+                                      subtitle: 'Sign out of this session',
+                                      iconBgColor:
+                                          Colors.red.withValues(alpha: 0.08),
+                                      iconColor: const Color(0xFFD32F2F),
+                                      titleColor: const Color(0xFFD32F2F),
+                                      trailing: const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: Color(0xFFD32F2F),
+                                        size: 20,
+                                      ),
+                                      onTap: _logout,
+                                    ),
+                                    const Divider(
+                                      height: 1,
+                                      thickness: 1,
+                                      color: Color(0xFFF1F5F9),
+                                      indent: 54,
+                                      endIndent: 14,
+                                    ),
+                                    OpdSettingsTile(
+                                      icon: Icons.delete_outline_rounded,
+                                      title: 'Delete Account',
+                                      subtitle: 'Deactivate account securely',
+                                      iconBgColor: const Color(0xFFF1F5F9),
+                                      iconColor: const Color(0xFF64748B),
+                                      titleColor: const Color(0xFF64748B),
+                                      trailing: const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: Color(0xFF94A3B8),
+                                        size: 20,
+                                      ),
+                                      onTap: _deleteAccount,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
 
-                          const SizedBox(height: 32),
-
-                          // Action Buttons
-                          _buildActionButtons(),
-                          const SizedBox(height: 24),
-                        ],
+                            const SizedBox(height: 24),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -648,228 +707,6 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildAvatarSection(dynamic currentUser) {
-    return GestureDetector(
-      onTap: _showImageSourceDialog,
-      child: Stack(
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xFFE3EAF2),
-                  Color(0xFFF5F8FC),
-                  Color(0xFFE2E9F2),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFBAC7D8), width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF0F233C).withValues(alpha: 0.08),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: ClipOval(
-                child: isUploading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF062B72),
-                        ),
-                      )
-                    : selectedImage != null
-                    ? Image.file(selectedImage!, fit: BoxFit.cover)
-                    : currentImageUrl != null && currentImageUrl!.isNotEmpty
-                    ? Image.network(
-                        currentImageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          Icons.person_rounded,
-                          size: 50,
-                          color: Color(0xFF8FA4BD),
-                        ),
-                      )
-                    : const Icon(
-                        Icons.person_rounded,
-                        size: 50,
-                        color: Color(0xFF8FA4BD),
-                      ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF284F85),
-                    Color(0xFF15386A),
-                    Color(0xFF0D264E),
-                    Color(0xFF081938),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF132D56), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0B2041).withValues(alpha: 0.32),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.camera_alt_rounded,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButtons() {
-    return Column(
-      children: [
-        // Logout Button
-        GestureDetector(
-          onTap: _logout,
-          child: Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.red.withValues(alpha: 0.08),
-                  Colors.red.withValues(alpha: 0.04),
-                  Colors.red.withValues(alpha: 0.08),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: Colors.red.withValues(alpha: 0.3),
-                width: 1.5,
-              ),
-            ),
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white,
-                    Colors.red.withValues(alpha: 0.02),
-                    Colors.white,
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(27),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.logout_rounded, color: Colors.red[700], size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Logout',
-                    style: TextStyle(
-                      fontSize: context.fs(14),
-                      fontWeight: FontWeight.w600,
-                      color: Colors.red[700],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Delete Account Button
-        GestureDetector(
-          onTap: _deleteAccount,
-          child: Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.red.withValues(alpha: 0.12),
-                  Colors.red.withValues(alpha: 0.06),
-                  Colors.red.withValues(alpha: 0.12),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: Colors.red.withValues(alpha: 0.4),
-                width: 1.5,
-              ),
-            ),
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white,
-                    Colors.red.withValues(alpha: 0.03),
-                    Colors.white,
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(27),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.delete_outline_rounded,
-                    color: Colors.red[700],
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Delete Account',
-                    style: TextStyle(
-                      fontSize: context.fs(14),
-                      fontWeight: FontWeight.w600,
-                      color: Colors.red[700],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -891,43 +728,26 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
           ),
           SafeArea(
             child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 32,
-                ),
+              child: Padding(
+                padding: EdgeInsets.all(context.rsp(24)),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      width: 96,
-                      height: 96,
+                      width: 90,
+                      height: 90,
                       decoration: BoxDecoration(
+                        color: const Color(0xFFD6E4F0),
                         shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        border: Border.all(
-                          color: const Color(0xFF94A3B8),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
+                        border: Border.all(color: Colors.white, width: 3),
                       ),
                       child: const Icon(
-                        Icons.person_outline_rounded,
-                        size: 52,
-                        color: Color(0xFF475569),
+                        Icons.person_rounded,
+                        size: 48,
+                        color: Color(0xFF062B72),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     Text(
                       'Guest User',
                       style: TextStyle(
@@ -955,9 +775,9 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 16),
                     Text(
-                      'You are currently browsing as a guest. Log in to access room chat, doctor messaging, voice calling, appointment booking, and your medical profile.',
+                      'You are currently browsing as a guest. Sign in to access room chat, appointments, prescriptions, and medical history.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: context.fs(13),
@@ -965,61 +785,19 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
                         height: 1.5,
                       ),
                     ),
-                    const SizedBox(height: 32),
-                    Container(
-                      width: double.infinity,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(26),
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF001B48), Color(0xFF02457A)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(
-                              0xFF001B48,
-                            ).withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+                    const SizedBox(height: 28),
+                    GradientButton(
+                      text: 'Sign In / Register',
+                      icon: Icons.login_rounded,
+                      onPressed: () {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SignInScreen(),
                           ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(26),
-                          onTap: () {
-                            Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const SignInScreen(),
-                              ),
-                              (route) => false,
-                            );
-                          },
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.login_rounded,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                'Sign In / Register',
-                                style: TextStyle(
-                                  fontSize: context.fs(15),
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                          (route) => false,
+                        );
+                      },
                     ),
                   ],
                 ),

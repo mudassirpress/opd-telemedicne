@@ -8,6 +8,8 @@ import 'package:telemedicine/features/patients/presentation/patient_portal_tab_p
 import 'package:telemedicine/features/chat/presentation/room_chat_screen.dart';
 import 'package:telemedicine/core/providers/badge_providers.dart';
 import 'package:telemedicine/shared/widgets/badge_indicator.dart';
+import 'package:telemedicine/shared/widgets/single_device_session_guard.dart';
+import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
 
 /// Patient shell holding exactly three tabs — Chat, Appointments and Profile.
 ///
@@ -80,7 +82,9 @@ class _PatientPortalWrapperState extends ConsumerState<PatientPortalWrapper> {
     final unreadAppointments =
         ref.watch(unreadAppointmentsCountProvider).valueOrNull ?? 0;
 
-    return PopScope(
+    final patient = ref.watch(patientControllerProvider).currentUser;
+
+    final content = PopScope(
       canPop: currentTab == PatientPortalTab.chat,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) {
@@ -154,6 +158,16 @@ class _PatientPortalWrapperState extends ConsumerState<PatientPortalWrapper> {
         ),
       ),
     );
+
+    if (patient != null && patient.id.isNotEmpty) {
+      return SingleDeviceSessionGuard(
+        collectionName: 'telemedicine_patient',
+        documentId: patient.id,
+        child: content,
+      );
+    }
+
+    return content;
   }
 
   Widget _buildNavItem(

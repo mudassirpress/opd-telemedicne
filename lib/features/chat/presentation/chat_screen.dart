@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +12,9 @@ import 'package:telemedicine/features/auth/presentation/providers/user_provider.
 import 'package:telemedicine/features/auth/presentation/controllers/doctor_controller.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
 import 'package:telemedicine/data/models/appointment_model.dart';
+import 'package:telemedicine/data/models/call_model.dart';
+import 'package:telemedicine/data/models/chat_call_event.dart';
+import 'package:telemedicine/core/services/call_session_manager.dart';
 import 'package:telemedicine/features/appointments/presentation/appointment_controller.dart';
 import 'package:telemedicine/features/appointments/presentation/appointment_status_widgets.dart';
 import 'package:telemedicine/features/calls/presentation/controllers/call_controller.dart';
@@ -25,13 +27,18 @@ import 'package:telemedicine/features/chat/presentation/controllers/chat_control
 import 'package:telemedicine/features/chat/presentation/chat_menu/chat_overflow_menu.dart';
 import 'package:telemedicine/features/chat/presentation/chat_menu/forward_recipient_screen.dart';
 import 'package:telemedicine/features/chat/presentation/voice/voice_message_player.dart';
-import 'package:telemedicine/features/chat/presentation/voice/voice_manager/voice_message_manager.dart';
+import 'package:telemedicine/features/chat/presentation/voice/voice_manager/voice_playback_controller.dart';
+import 'package:telemedicine/features/chat/presentation/widgets/call_action_card.dart';
+import 'package:telemedicine/features/chat/presentation/widgets/fixed_chat_scaffold.dart';
+import 'package:telemedicine/features/chat/presentation/widgets/in_flow_typing_indicator.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:telemedicine/data/models/chat_model.dart';
+import 'package:telemedicine/features/doctor_portal/presentation/prescriptions/prescription_controller.dart';
 import 'package:telemedicine/features/doctor_portal/presentation/prescriptions/prescription_detail_screen.dart';
 import 'package:telemedicine/features/doctor_portal/presentation/ratings/doctor_rating_controller.dart';
 import 'package:telemedicine/features/doctor_portal/presentation/ratings/doctor_rating_popup.dart';
+import 'package:telemedicine/features/prescriptions/services/prescription_pdf_service.dart';
 import 'package:telemedicine/features/reports/presentation/report_history/report_history_screen.dart';
 import 'package:telemedicine/data/local/offline_chat_service.dart';
 import 'package:telemedicine/data/local/offline_converters.dart';
@@ -181,6 +188,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   /// Separate from `_searchMessageKeys` so clearing search cannot drop a
   /// key that a jump is still animating to.
   final Map<String, GlobalKey> _messageKeys = {};
+  final Map<String, GlobalKey> _visibilityKeys = {};
+  final GlobalKey _messageViewportKey = GlobalKey();
+  final Map<String, Stream<CallModel?>> _callDocStreams = {};
+  Timer? _readVisibilityTimer;
 
   /// Message ids already marked read by this screen instance.
   ///
@@ -442,24 +453,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         final chatId = _chatController.getChatId(user.id, widget.otherUserId);
         NotificationService.activeChatId = chatId;
 
-        // 1. Immediately decrement bottom navigation badge listener optimistically
-        markChatAsReadLocally(ref, chatId);
-
-        // 2. Immediately mark local Hive rows to is_read: true upon viewing
-        OfflineChatService.instance.markChatAsRead(chatId, user.id);
-        OfflineChatService.instance.setCachedChatUnreadCount(
-          userId: user.id,
-          chatId: chatId,
-          count: 0,
-        );
-        _chatController.invalidateUnreadMemo(user.id, chatId);
-
-        // 3. Trigger bulk update on mount to mark all unread messages as read
-        _chatController.markMessagesRead(
-          messageIds: null,
-          userId: user.id,
-          otherUserId: widget.otherUserId,
-        );
+        // Read state is intentionally NOT asserted here. Only messages that
+        // actually become visible in the viewport are marked read; the
+        // post-frame visibility check owns that transition.
         // This device can now vouch that anything already in its inbox reached
         // the sender, so those messages advance to the double tick.
         _acknowledgeInboundDelivery();
@@ -581,18 +577,97 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
   }
 
+  /// IDs whose widgets currently intersect the message viewport.
+  ///
+  /// Only incoming-unread rows get a visibility [GlobalKey], so this scan stays
+  /// proportional to the unread set rather than the whole conversation.
+  List<String> _visibleMessageIds(List<ChatMessageModel> messages) {
+    final viewportBox =
+        _messageViewportKey.currentContext?.findRenderObject() as RenderBox?;
+    if (viewportBox == null || !viewportBox.hasSize) return const [];
+
+    final viewportRect = Offset.zero & viewportBox.size;
+    final visible = <String>[];
+    for (final message in messages) {
+      final key = _visibilityKeys[message.id];
+      final box = key?.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) continue;
+      final offset = box.localToGlobal(Offset.zero, ancestor: viewportBox);
+      final rect = offset & box.size;
+      if (rect.overlaps(viewportRect)) {
+        visible.add(message.id);
+      }
+    }
+    return visible;
+  }
+
+  /// Debounced viewport read check. Debouncing avoids a Firestore write for
+  /// every scroll notification while still marking a message as soon as it
+  /// settles inside the visible area.
+  void _scheduleVisibleReadCheck({
+    Duration delay = const Duration(milliseconds: 120),
+  }) {
+    _readVisibilityTimer?.cancel();
+    _readVisibilityTimer = Timer(delay, () {
+      if (!mounted || !isCurrentUserChatOpen) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !isCurrentUserChatOpen) return;
+        final messages = _latestMessages;
+        if (messages.isEmpty) return;
+        _markMessagesAsSeen(messages);
+      });
+    });
+  }
+
+  /// Rebuilds the shared voice queue without touching the transport.
+  ///
+  /// Queue updates never call play, so receiving a message, scrolling,
+  /// rebuilding, or re-entering the conversation cannot auto-play a note.
+  void _syncVoiceQueue(List<ChatMessageModel> messages) {
+    final user = ref.read(userProvider);
+    if (user == null) return;
+
+    final items = <VoiceQueueItem>[];
+    for (final message in messages) {
+      final isVoice =
+          message.messageType == 'voice' ||
+          (message.messageType == 'audio' &&
+              message.mediaUrl != null &&
+              message.mediaUrl!.isNotEmpty);
+      if (!isVoice || message.id.isEmpty) continue;
+      final url = message.mediaUrl;
+      if (url == null || url.isEmpty) continue;
+      items.add(
+        VoiceQueueItem(
+          messageId: message.id,
+          audioUrl: url,
+          durationSeconds: message.duration ?? 0,
+          isMe: MessageActionRules.isOwnMessage(message, user.id),
+          alreadyListened: message.isListened,
+        ),
+      );
+    }
+    VoicePlaybackController.instance.updateQueue(items);
+  }
+
   Future<void> _markMessagesAsSeen(List<ChatMessageModel> messages) async {
     final user = ref.read(userProvider);
     if (user == null) return;
 
     // Guard on the conversation still being open: an async gap between the
     // stream emission and this write must not mark messages read after the
-    // user has navigated away (§8, quick open/close/reopen).
+    // user has navigated away (A8, quick open/close/reopen).
     if (!mounted || !isCurrentUserChatOpen) return;
+
+    // Viewport-only transition: a message that is merely loaded in the list
+    // (above the fold) must stay unread until the user actually reaches it.
+    final visibleIds = _visibleMessageIds(messages).toSet();
+    if (visibleIds.isEmpty) return;
 
     final unreadIds = messages
         .where(
           (msg) =>
+              visibleIds.contains(msg.id) &&
               msg.receiverId == user.id &&
               msg.senderId != user.id &&
               !msg.isRead,
@@ -617,13 +692,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     if (marked > 0) {
       _readMarkedIds.addAll(unreadIds);
       final chatId = _chatController.getChatId(user.id, widget.otherUserId);
-      markChatAsReadLocally(ref, chatId);
-      await OfflineChatService.instance.markChatAsRead(chatId, user.id);
-      await OfflineChatService.instance.setCachedChatUnreadCount(
-        userId: user.id,
-        chatId: chatId,
-        count: 0,
+      final remaining = OfflineChatService.instance.countUnreadIncomingMessages(
+        chatId,
+        user.id,
       );
+      if (remaining == 0) {
+        markChatAsReadLocally(ref, chatId);
+      }
+      _chatController.invalidateUnreadMemo(user.id, chatId);
+      _visibilityKeys.removeWhere((id, _) => unreadIds.contains(id));
     }
   }
 
@@ -645,12 +722,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     _searchMessageKeys.clear();
     _highlightTimer?.cancel();
     _messageKeys.clear();
+    _visibilityKeys.clear();
+    _readVisibilityTimer?.cancel();
+    _callDocStreams.clear();
     _recordingTimer?.cancel();
     _previewPosSub?.cancel();
     _previewStateSub?.cancel();
     _previewPlayer?.dispose();
     _audioRecorder?.dispose();
-    VoiceMessageManager.stopAllAudio();
+    unawaited(VoicePlaybackController.instance.stop());
     super.dispose();
   }
 
@@ -671,30 +751,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         _cancelVoiceRecording();
       }
       _stopPreview();
+      unawaited(VoicePlaybackController.instance.pause());
     }
     if (state != AppLifecycleState.resumed) return;
+    VoicePlaybackController.instance.onAppForegrounded();
     if (!isCurrentUserChatOpen) return;
 
     final messages = _latestMessages;
     if (messages.isEmpty) return;
-    final user = ref.read(userProvider);
-    if (user != null) {
-      final chatId = _chatController.getChatId(user.id, widget.otherUserId);
-      markChatAsReadLocally(ref, chatId);
-      OfflineChatService.instance.markChatAsRead(chatId, user.id);
-      OfflineChatService.instance.setCachedChatUnreadCount(
-        userId: user.id,
-        chatId: chatId,
-        count: 0,
-      );
-      _chatController.invalidateUnreadMemo(user.id, chatId);
-      _chatController.markMessagesRead(
-        userId: user.id,
-        otherUserId: widget.otherUserId,
-        messageIds: null,
-      );
-    }
-    _markMessagesAsSeen(messages);
+    _scheduleVisibleReadCheck(delay: Duration.zero);
     // Messages may have landed in the inbox while the app was backgrounded.
     _acknowledgeInboundDelivery();
   }
@@ -735,6 +800,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     } else if (!_showStickyHeader && _fadeAnimationController.isCompleted) {
       _fadeAnimationController.reverse();
     }
+
+    // Read receipts follow the viewport, not the loaded window.
+    _scheduleVisibleReadCheck();
 
     // Pagination: the live listener only covers the most recent window of
     // messages, so reaching the top of the list fetches the previous page of
@@ -1678,6 +1746,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   GlobalKey _keyForJump(String messageId) =>
       _messageKeys.putIfAbsent(messageId, GlobalKey.new);
 
+  GlobalKey _visibilityKeyFor(String messageId) =>
+      _visibilityKeys.putIfAbsent(messageId, GlobalKey.new);
+
   /// Scrolls a tapped reply preview to the message it quotes and flashes it.
   ///
   /// When the quoted message is gone (deleted for me, outside the loaded
@@ -2097,14 +2168,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       ToastService.instance.showError('Please login to make calls');
       return;
     }
-    final isDoctorOnline = ref.read(doctorOnlineProvider(widget.otherUserId));
-    if (widget.otherUserRole == 'doctor' && !isDoctorOnline) {
-      ToastService.instance.showWarning(
-        'Doctor is offline. Please try again later.',
-      );
-      _showOfflineDialog();
-      return;
-    }
+
     ToastService.instance.showInfo(
       'Initiating call to ${widget.otherUserName}...',
     );
@@ -2271,409 +2335,355 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ? ref.watch(doctorLastSeenProvider(widget.otherUserId))
         : null;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFEDF2F8),
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/download.jpeg'),
-            fit: BoxFit.contain,
-            opacity: 0.1,
-          ),
-        ),
-        child: Stack(
+    return FixedChatScaffold(
+      header: AnimatedSize(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: _isSelectionMode
+            ? _buildSelectionHeader(currentUserId: user.id)
+            : _isSearching
+            ? _buildSearchHeader()
+            : _buildNormalHeader(
+                isDoctorOnline: isDoctorOnline,
+                otherUserLastSeen: otherUserLastSeen,
+                currentUserId: user.id,
+              ),
+      ),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Column(
           children: [
-            SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  // Custom Chat Header — swapped for the in-chat search header
-                  // while searching, without touching the message list.
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment.topCenter,
-                    child: _isSelectionMode
-                        ? _buildSelectionHeader(currentUserId: user.id)
-                        : _isSearching
-                        ? _buildSearchHeader()
-                        : _buildNormalHeader(
-                            isDoctorOnline: isDoctorOnline,
-                            otherUserLastSeen: otherUserLastSeen,
-                            currentUserId: user.id,
-                          ),
-                  ),
-                  // Chat messages + input
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => FocusScope.of(context).unfocus(),
+            Expanded(
+              child: StreamBuilder<List<ChatMessageModel>>(
+                stream: _messagesStream,
+                initialData: OfflineChatService.instance
+                    .getMessagesForChat(
+                      _chatController.getChatId(user.id, widget.otherUserId),
+                    )
+                    .map((m) => OfflineConverters.toDomain(m))
+                    .toList(),
+                builder: (context, snapshot) {
+                  final messages = snapshot.data ?? _latestMessages;
+                  // Offline-first stream: cached messages are still the
+                  // right thing to show on a live-read failure, so only an
+                  // error with nothing cached replaces the conversation.
+                  // The old branch dumped the raw exception string (e.g.
+                  // the full `[cloud_firestore/permission-denied]` text)
+                  // over the whole chat, even though initialData was
+                  // seeded from OfflineChatService.
+                  if (snapshot.hasError && messages.isEmpty) {
+                    return Center(
                       child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Expanded(
-                            child: StreamBuilder<List<ChatMessageModel>>(
-                              stream: _messagesStream,
-                              initialData: OfflineChatService.instance
-                                  .getMessagesForChat(
-                                    _chatController.getChatId(
+                          const Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: Colors.red,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Could not load messages.\nCheck your connection.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () => setState(() {
+                              final user = ref.read(userProvider);
+                              if (user != null) {
+                                _messagesStream = _chatController
+                                    .getMessagesOfflineFirst(
                                       user.id,
                                       widget.otherUserId,
-                                    ),
-                                  )
-                                  .map((m) => OfflineConverters.toDomain(m))
-                                  .toList(),
-                              builder: (context, snapshot) {
-                                final messages =
-                                    snapshot.data ?? _latestMessages;
-                                // Offline-first stream: cached messages are still the
-                                // right thing to show on a live-read failure, so only an
-                                // error with nothing cached replaces the conversation.
-                                // The old branch dumped the raw exception string (e.g.
-                                // the full `[cloud_firestore/permission-denied]` text)
-                                // over the whole chat, even though initialData was
-                                // seeded from OfflineChatService.
-                                if (snapshot.hasError && messages.isEmpty) {
-                                  return Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(
-                                          Icons.error_outline,
-                                          size: 48,
-                                          color: Colors.red,
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Text(
-                                          'Could not load messages.\nCheck your connection.',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        ElevatedButton(
-                                          onPressed: () => setState(() {
-                                            final user = ref.read(userProvider);
-                                            if (user != null) {
-                                              _messagesStream = _chatController
-                                                  .getMessagesOfflineFirst(
-                                                    user.id,
-                                                    widget.otherUserId,
-                                                  );
-                                              _olderMessagesExhausted = false;
-                                            }
-                                          }),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(
-                                              0xFF062B72,
-                                            ),
-                                          ),
-                                          child: const Text('Retry'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }
-                                // Keep an in-memory copy for the header overflow menu so
-                                // Search / Media screens can reuse it without refetching.
-                                _latestMessages = messages;
-                                // Realtime arrivals stay searchable without a reload.
-                                _syncSearchWithStream();
-                                WidgetsBinding.instance.addPostFrameCallback((
-                                  _,
-                                ) {
-                                  _markMessagesAsSeen(messages);
-                                  // A message that just arrived is already on this
-                                  // device, so the sender's tick advances to delivered.
-                                  _acknowledgeInboundDelivery();
-                                });
-                                if (messages.length != _lastMessageCount) {
-                                  final wasEmpty = _lastMessageCount == 0;
-                                  final grew =
-                                      messages.length > _lastMessageCount;
-                                  _lastMessageCount = messages.length;
-                                  // Only auto-scroll for a newly appended message, and
-                                  // only when the user is already near the bottom — never
-                                  // yank the viewport away from history they are reading.
-                                  // A just-sent message always scrolls, whatever the
-                                  // user was looking at before they pressed send.
-                                  if (grew &&
-                                      !wasEmpty &&
-                                      mounted &&
-                                      !_isSearching &&
-                                      (_isNearBottom ||
-                                          _nearBottomNow ||
-                                          _pendingScrollToBottom)) {
-                                    _pendingScrollToBottom = false;
-                                    _scrollToBottom();
-                                  }
-                                }
-                                if (_isFirstLoad &&
-                                    messages.isNotEmpty &&
-                                    mounted) {
-                                  _isFirstLoad = false;
-                                  WidgetsBinding.instance.addPostFrameCallback((
-                                    _,
-                                  ) {
-                                    _scrollToBottomImmediately();
-                                  });
-                                }
-                                if (messages.isEmpty) {
-                                  return _buildEmptyState();
-                                }
-                                final groupedItems = _groupMessagesWithHeaders(
-                                  messages,
-                                );
-                                final currentHeader =
-                                    _getHeaderForScrollPosition(messages);
-                                if (_currentDateHeader != currentHeader) {
-                                  WidgetsBinding.instance.addPostFrameCallback((
-                                    _,
-                                  ) {
-                                    if (mounted) {
-                                      setState(() {
-                                        _currentDateHeader = currentHeader;
-                                        _lastDateHeader = currentHeader;
-                                      });
-                                    }
-                                  });
-                                }
-                                final pinnedAppointment = messages
-                                    .where(
-                                      (m) =>
-                                          m.isPinned && m.isAppointmentMessage,
-                                    )
-                                    .toList();
-                                return Column(
-                                  children: [
-                                    if (pinnedAppointment.isNotEmpty)
-                                      _buildPinnedAppointmentBanner(
-                                        pinnedAppointment.last,
-                                      ),
-                                    Expanded(
-                                      child: Stack(
-                                        children: [
-                                          ListView.builder(
-                                            controller: _scrollController,
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: context.rsp(16),
-                                              vertical: 16,
-                                            ),
-                                            itemCount: groupedItems.length,
-                                            itemBuilder: (context, index) {
-                                              final item = groupedItems[index];
-                                              if (item['type'] == 'header') {
-                                                return Column(
-                                                  children: [
-                                                    const SizedBox(height: 8),
-                                                    _buildDateSeparator(
-                                                      item['dateSeparator'],
-                                                    ),
-                                                    const SizedBox(height: 8),
-                                                  ],
-                                                );
-                                              } else {
-                                                final message =
-                                                    item['message']
-                                                        as ChatMessageModel;
-                                                // Ownership is decided only by comparing the
-                                                // authenticated user's id with the senderId
-                                                // stored on the message — never by colour,
-                                                // position or a patient/doctor assumption —
-                                                // so it is identical for patient→doctor and
-                                                // doctor→patient chats, and identical for
-                                                // messages decoded from Firestore and from the
-                                                // offline Hive cache.
-                                                final isMe =
-                                                    MessageActionRules.isOwnMessage(
-                                                      message,
-                                                      user.id,
-                                                    );
-                                                var bubble =
-                                                    _buildMessageBubble(
-                                                      message,
-                                                      isMe,
-                                                    );
-                                                // Swipe-to-reply, tap-to-select and the flash
-                                                // overlay. The appointment card returns early
-                                                // from _buildMessageBubble and stays plain.
-                                                if (!message
-                                                    .isAppointmentMessage) {
-                                                  bubble =
-                                                      _wrapBubbleForInteraction(
-                                                        message: message,
-                                                        isMe: isMe,
-                                                        child: bubble,
-                                                      );
-                                                }
-                                                // Place the row on its side explicitly.
-                                                // _buildMessageBubble only signals the side
-                                                // through CrossAxisAlignment.end/start, which
-                                                // works solely while the row keeps the full
-                                                // width the ListView hands out. The interaction
-                                                // layers above lay the bubble out inside a
-                                                // Stack, and a Stack passes its child *loose*
-                                                // constraints — the Column then shrink-wraps
-                                                // and every message, sender or not, falls back
-                                                // to the left edge. An Align pins the side
-                                                // independently of any wrapper above it.
-                                                bubble = Align(
-                                                  alignment:
-                                                      chatMessageRowAlignment(
-                                                        message,
-                                                        user.id,
-                                                      ),
-                                                  child: bubble,
-                                                );
-                                                // Matched / jumped-to messages get a key, so
-                                                // stepping through results (or tapping a reply
-                                                // preview) can scroll straight to them.
-                                                final isMatch =
-                                                    _isSearching &&
-                                                    _searchMatches.any(
-                                                      (m) =>
-                                                          m.messageId ==
-                                                          message.id,
-                                                    );
-                                                final needsJump =
-                                                    _pendingJumpMessageId ==
-                                                        message.id ||
-                                                    _highlightedMessageId ==
-                                                        message.id;
-                                                if (!isMatch && !needsJump)
-                                                  return bubble;
-                                                return KeyedSubtree(
-                                                  key: isMatch
-                                                      ? _keyForMessage(
-                                                          message.id,
-                                                        )
-                                                      : _keyForJump(message.id),
-                                                  child: bubble,
-                                                );
-                                              }
-                                            },
-                                          ),
-                                          if (_showStickyHeader &&
-                                              _currentDateHeader.isNotEmpty)
-                                            Positioned(
-                                              top: 0,
-                                              left: 0,
-                                              right: 0,
-                                              child: FadeTransition(
-                                                opacity: _fadeAnimation,
-                                                child: Container(
-                                                  color: const Color(
-                                                    0xFFEDF2F8,
-                                                  ).withOpacity(0.95),
-                                                  child: Center(
-                                                    child: AnimatedContainer(
-                                                      duration: const Duration(
-                                                        milliseconds: 200,
-                                                      ),
-                                                      margin:
-                                                          EdgeInsets.symmetric(
-                                                            vertical: 12,
-                                                            horizontal:
-                                                                _scrollOffset >
-                                                                    100
-                                                                ? 0
-                                                                : 16,
-                                                          ),
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            horizontal: 16,
-                                                            vertical: 6,
-                                                          ),
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(
-                                                          0xFFD6E4F0,
-                                                        ).withOpacity(0.9),
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              20,
-                                                            ),
-                                                        boxShadow: [
-                                                          BoxShadow(
-                                                            color: const Color(
-                                                              0xFF12263F,
-                                                            ).withOpacity(0.06),
-                                                            blurRadius: 4,
-                                                            offset:
-                                                                const Offset(
-                                                                  0,
-                                                                  1,
-                                                                ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                      child: Text(
-                                                        _currentDateHeader,
-                                                        style: TextStyle(
-                                                          fontSize: context.fs(
-                                                            12,
-                                                          ),
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color: const Color(
-                                                            0xFF1F2F44,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          if (_isLoadingOlder)
-                                            Positioned(
-                                              top: 8,
-                                              left: 0,
-                                              right: 0,
-                                              child: Center(
-                                                child: Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 14,
-                                                        vertical: 8,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(
-                                                      0xFF12263F,
-                                                    ).withOpacity(0.7),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          20,
-                                                        ),
-                                                  ),
-                                                  child: const SizedBox(
-                                                    width: 14,
-                                                    height: 14,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                          strokeWidth: 2,
-                                                          color: Colors.white,
-                                                        ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
+                                    );
+                                _olderMessagesExhausted = false;
+                              }
+                            }),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF062B72),
                             ),
+                            child: const Text('Retry'),
                           ),
-                          _buildMessageInput(),
                         ],
                       ),
-                    ),
-                  ),
-                ],
+                    );
+                  }
+                  // Keep an in-memory copy for the header overflow menu so
+                  // Search / Media screens can reuse it without refetching.
+                  _latestMessages = messages;
+                  // Realtime arrivals stay searchable without a reload.
+                  _syncSearchWithStream();
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _syncVoiceQueue(messages);
+                    _scheduleVisibleReadCheck();
+                    // A message that just arrived is already on this
+                    // device, so the sender's tick advances to delivered.
+                    _acknowledgeInboundDelivery();
+                  });
+                  if (messages.length != _lastMessageCount) {
+                    final wasEmpty = _lastMessageCount == 0;
+                    final grew = messages.length > _lastMessageCount;
+                    _lastMessageCount = messages.length;
+                    // Only auto-scroll for a newly appended message, and
+                    // only when the user is already near the bottom — never
+                    // yank the viewport away from history they are reading.
+                    // A just-sent message always scrolls, whatever the
+                    // user was looking at before they pressed send.
+                    if (grew &&
+                        !wasEmpty &&
+                        mounted &&
+                        !_isSearching &&
+                        (_isNearBottom ||
+                            _nearBottomNow ||
+                            _pendingScrollToBottom)) {
+                      _pendingScrollToBottom = false;
+                      _scrollToBottom();
+                    }
+                  }
+                  if (_isFirstLoad && messages.isNotEmpty && mounted) {
+                    _isFirstLoad = false;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _scrollToBottomImmediately();
+                    });
+                  }
+                  if (messages.isEmpty) {
+                    return _buildEmptyState();
+                  }
+                  final groupedItems = _groupMessagesWithHeaders(messages);
+                  final currentHeader = _getHeaderForScrollPosition(messages);
+                  if (_currentDateHeader != currentHeader) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() {
+                          _currentDateHeader = currentHeader;
+                          _lastDateHeader = currentHeader;
+                        });
+                      }
+                    });
+                  }
+                  final pinnedAppointment = messages
+                      .where((m) => m.isPinned && m.isAppointmentMessage)
+                      .toList();
+                  return Column(
+                    children: [
+                      if (pinnedAppointment.isNotEmpty)
+                        _buildPinnedAppointmentBanner(pinnedAppointment.last),
+                      _buildActiveCallBanner(user.id),
+                      Expanded(
+                        child: Stack(
+                          key: _messageViewportKey,
+                          children: [
+                            ListView.builder(
+                              controller: _scrollController,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: context.rsp(16),
+                                vertical: 16,
+                              ),
+                              itemCount: groupedItems.length,
+                              itemBuilder: (context, index) {
+                                final item = groupedItems[index];
+                                if (item['type'] == 'header') {
+                                  return Column(
+                                    children: [
+                                      const SizedBox(height: 8),
+                                      _buildDateSeparator(
+                                        item['dateSeparator'],
+                                      ),
+                                      const SizedBox(height: 8),
+                                    ],
+                                  );
+                                } else {
+                                  final message =
+                                      item['message'] as ChatMessageModel;
+                                  // Ownership is decided only by comparing the
+                                  // authenticated user's id with the senderId
+                                  // stored on the message — never by colour,
+                                  // position or a patient/doctor assumption —
+                                  // so it is identical for patient→doctor and
+                                  // doctor→patient chats, and identical for
+                                  // messages decoded from Firestore and from the
+                                  // offline Hive cache.
+                                  final isMe = MessageActionRules.isOwnMessage(
+                                    message,
+                                    user.id,
+                                  );
+                                  var bubble = _buildMessageBubble(
+                                    message,
+                                    isMe,
+                                  );
+                                  // Swipe-to-reply, tap-to-select and the flash
+                                  // overlay. The appointment card returns early
+                                  // from _buildMessageBubble and stays plain.
+                                  if (!message.isAppointmentMessage) {
+                                    bubble = _wrapBubbleForInteraction(
+                                      message: message,
+                                      isMe: isMe,
+                                      child: bubble,
+                                    );
+                                  }
+                                  // Place the row on its side explicitly.
+                                  // _buildMessageBubble only signals the side
+                                  // through CrossAxisAlignment.end/start, which
+                                  // works solely while the row keeps the full
+                                  // width the ListView hands out. The interaction
+                                  // layers above lay the bubble out inside a
+                                  // Stack, and a Stack passes its child *loose*
+                                  // constraints — the Column then shrink-wraps
+                                  // and every message, sender or not, falls back
+                                  // to the left edge. An Align pins the side
+                                  // independently of any wrapper above it.
+                                  bubble = Align(
+                                    alignment: chatMessageRowAlignment(
+                                      message,
+                                      user.id,
+                                    ),
+                                    child: bubble,
+                                  );
+                                  // Only unread incoming rows need a
+                                  // visibility key: the read
+                                  // transition is driven by what is
+                                  // actually on screen.
+                                  if (!isMe &&
+                                      message.receiverId == user.id &&
+                                      !message.isRead) {
+                                    bubble = KeyedSubtree(
+                                      key: _visibilityKeyFor(message.id),
+                                      child: bubble,
+                                    );
+                                  }
+                                  // Matched / jumped-to messages get a key, so
+                                  // stepping through results (or tapping a reply
+                                  // preview) can scroll straight to them.
+                                  final isMatch =
+                                      _isSearching &&
+                                      _searchMatches.any(
+                                        (m) => m.messageId == message.id,
+                                      );
+                                  final needsJump =
+                                      _pendingJumpMessageId == message.id ||
+                                      _highlightedMessageId == message.id;
+                                  if (!isMatch && !needsJump) return bubble;
+                                  return KeyedSubtree(
+                                    key: isMatch
+                                        ? _keyForMessage(message.id)
+                                        : _keyForJump(message.id),
+                                    child: bubble,
+                                  );
+                                }
+                              },
+                            ),
+                            if (_showStickyHeader &&
+                                _currentDateHeader.isNotEmpty)
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                child: FadeTransition(
+                                  opacity: _fadeAnimation,
+                                  child: Container(
+                                    color: const Color(
+                                      0xFFEDF2F8,
+                                    ).withOpacity(0.95),
+                                    child: Center(
+                                      child: AnimatedContainer(
+                                        duration: const Duration(
+                                          milliseconds: 200,
+                                        ),
+                                        margin: EdgeInsets.symmetric(
+                                          vertical: 12,
+                                          horizontal: _scrollOffset > 100
+                                              ? 0
+                                              : 16,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(
+                                            0xFFD6E4F0,
+                                          ).withOpacity(0.9),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(
+                                                0xFF12263F,
+                                              ).withOpacity(0.06),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 1),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Text(
+                                          _currentDateHeader,
+                                          style: TextStyle(
+                                            fontSize: context.fs(12),
+                                            fontWeight: FontWeight.w600,
+                                            color: const Color(0xFF1F2F44),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (_isLoadingOlder)
+                              Positioned(
+                                top: 8,
+                                left: 0,
+                                right: 0,
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(
+                                        0xFF12263F,
+                                      ).withOpacity(0.7),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
+            ),
+            StreamBuilder<Map<String, dynamic>>(
+              stream: _chatMetadataStreamFor(user.id),
+              builder: (context, snapshot) {
+                final chatMeta = snapshot.data ?? const <String, dynamic>{};
+                final isOtherTyping =
+                    chatMeta['typing_${widget.otherUserId}'] == true;
+                return RemoteTypingIndicator(
+                  active: isOtherTyping,
+                  signal: chatMeta['lastTypingUpdate'],
+                  label: '${widget.otherUserName} is typing',
+                );
+              },
             ),
           ],
         ),
       ),
+      composer: _buildMessageInput(),
     );
   }
 
@@ -3097,8 +3107,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   builder: (context, snapshot) {
                     final chatMetadata =
                         snapshot.data ?? const <String, dynamic>{};
-                    final isOtherUserTyping =
-                        chatMetadata['typing_${widget.otherUserId}'] == true;
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3140,17 +3148,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                             ],
                           ],
                         ),
-                        if (isOtherUserTyping)
-                          Text(
-                            'typing...',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: context.fs(11),
-                            ),
-                          )
-                        else if (isDoctorOnline)
+                        if (isDoctorOnline)
                           Text(
                             'Online',
                             maxLines: 1,
@@ -3419,6 +3417,163 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
   }
 
+  /// WhatsApp-style active call banner pinned at the top of the chat history.
+  /// When a call with this counterpart is in progress, clicking it immediately
+  /// returns to / re-joins the live CallScreen without dropping audio/video session.
+  Widget _buildActiveCallBanner(String currentUserId) {
+    return StreamBuilder<String>(
+      stream: _callController.callStatus,
+      initialData: _callController.activeCallStatus ?? '',
+      builder: (context, snapshot) {
+        final status = snapshot.data ?? _callController.activeCallStatus ?? '';
+        final activeCallId =
+            _callController.activeCallId ?? CallSessionManager.instance.currentCallId;
+
+        final isConnectedOrAccepted =
+            status == CallStatus.connected ||
+            status == CallStatus.accepted ||
+            status == CallStatus.calling;
+
+        final hasActiveCall = activeCallId != null &&
+            _callController.isCallActive &&
+            (CallSessionManager.instance.isCallActive || CallSessionManager.instance.isMinimized) &&
+            isConnectedOrAccepted;
+
+        if (!hasActiveCall) return const SizedBox.shrink();
+
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection(FirestoreCollections.calls)
+              .doc(activeCallId)
+              .snapshots(),
+          builder: (context, docSnap) {
+            if (docSnap.hasData && docSnap.data!.exists) {
+              final remoteStatus = docSnap.data!.data()?['callStatus'] as String?;
+              if (remoteStatus != null && CallStatus.isTerminal(remoteStatus)) {
+                // Remote call reached terminal state (ended/rejected/missed).
+                // Auto-cleanup local ghost state and hide the banner immediately.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _callController.terminateAndCleanupCall(
+                    callId: activeCallId,
+                    reason: 'ghost_banner_auto_dismiss',
+                  );
+                });
+                return const SizedBox.shrink();
+              }
+            }
+
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF00A884), Color(0xFF008069)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00A884).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _rejoinActiveCall(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: Colors.white24,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.videocam_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'Consultation Call In Progress',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              Text(
+                                'Tap to return to active call screen',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Re-joins the active call room without reloading or dropping state.
+  void _rejoinActiveCall({
+    String? channelId,
+    String? callId,
+    String? callType,
+  }) {
+    final user = ref.read(userProvider);
+    if (user == null) return;
+    final effectiveCallId =
+        callId ?? _callController.activeCallId ?? 'call_${widget.otherUserId}';
+    final effectiveChannelId = channelId ?? effectiveCallId;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CallScreen(
+          channelId: effectiveChannelId,
+          callId: effectiveCallId,
+          callType: callType ?? 'video',
+          otherUserName: widget.otherUserName,
+          otherUserImage: widget.otherUserImage,
+          currentUserId: user.id,
+          otherUserId: widget.otherUserId,
+          otherUserType: widget.otherUserType ?? 'doctor',
+          isCaller: false,
+        ),
+      ),
+    );
+  }
+
   /// Marks this side as joined, then says so once — the counterpart is told
   /// by the controller's push, the timeline by its event.
   Future<void> _joinFromBanner(AppointmentModel appointment) async {
@@ -3649,7 +3804,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           children: [
             if (message.isForwarded && !message.isDeleted)
               _buildForwardedLabel(isMe),
-            if (message.replyTo != null)
+            if (message.replyTo != null && !isVoiceMessage)
               _buildReplyPreview(message, message.replyTo!, isMe),
             ConstrainedBox(
               constraints: BoxConstraints(
@@ -3737,6 +3892,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       deliveryStatus: message.deliveryStatus,
       isListened: message.isListened,
       senderAvatarUrl: senderAvatarUrl,
+      replyHeader: message.replyTo == null
+          ? null
+          : _buildReplyPreview(message, message.replyTo!, isMe),
       onListened: () {
         if (!isMe && currentUser != null) {
           _chatController.markVoiceMessageAsListened(
@@ -3780,110 +3938,495 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   /// Prescription card shown in place of a text message. Tapping it opens the
   /// dedicated Prescription Detail page for the linked document.
   Widget _buildPrescriptionBubble(ChatMessageModel message, bool isMe) {
-    return OpdCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Accent header
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: context.rsp(8),
-            ),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF284F85), Color(0xFF15386A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(17),
-                topRight: Radius.circular(17),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.medical_information_rounded,
-                  color: Colors.white,
-                  size: 18,
+    final user = ref.read(userProvider);
+    final prescriptionId = message.prescriptionId ?? '';
+    final doctorName = (message.doctorName != null &&
+            message.doctorName!.trim().isNotEmpty)
+        ? (message.doctorName!.startsWith('Dr.')
+            ? message.doctorName!
+            : 'Dr. ${message.doctorName}')
+        : (isMe ? 'You' : 'Dr. ${widget.otherUserName}');
+    final prescriptionDate = message.prescriptionDate ?? message.timestamp;
+    final formattedDate = DateFormat('dd MMM yyyy').format(prescriptionDate);
+    final previewUrl = message.previewImageUrl ?? message.mediaUrl;
+    final cardWidth = math.min(context.sw * 0.76, 280.0);
+    final previewHeight = cardWidth * 1.35;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: cardWidth),
+      child: OpdCard(
+        padding: EdgeInsets.zero,
+        radius: 16,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Accent Header with small Prescription document label
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF0F3572), Color(0xFF062351)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Prescription',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: context.fs(14),
-                      fontWeight: FontWeight.w700,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(15),
+                  topRight: Radius.circular(15),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.medical_services_rounded,
+                          color: Colors.white,
+                          size: 13,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Prescription',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: context.fs(11),
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _formatTime(message.timestamp),
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: context.fs(10),
-                      ),
+                  const Spacer(),
+                  Text(
+                    _formatTime(message.timestamp),
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: context.fs(10),
                     ),
-                    if (isMe) ...[
-                      const SizedBox(width: 4),
-                      MessageStatusIndicator.forOutgoing(
-                        message,
-                        color: Colors.white70,
-                        readColor: _readTickOnDark,
+                  ),
+                  if (isMe) ...[
+                    const SizedBox(width: 4),
+                    MessageStatusIndicator.forOutgoing(
+                      message,
+                      color: Colors.white70,
+                      readColor: _readTickOnDark,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            // Doctor Name and Date Row
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          doctorName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: context.fs(13.5),
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF062B72),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.calendar_today_rounded,
+                              size: 11,
+                              color: Color(0xFF6B7280),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              formattedDate,
+                              style: TextStyle(
+                                fontSize: context.fs(11),
+                                color: const Color(0xFF6B7280),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Actual Prescription Preview Image (Tappable to open full screen viewer)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              child: InkWell(
+                onTap: () {
+                  if (user != null && prescriptionId.isNotEmpty) {
+                    _openPrescriptionDetail(
+                      prescriptionId: prescriptionId,
+                      viewerId: user.id,
+                      doctorId: isMe ? user.id : null,
+                      patientId: isMe ? null : user.id,
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  height: previewHeight,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF7F9FC),
+                    borderRadius: BorderRadius.circular(10),
+                    border:
+                        Border.all(color: const Color(0xFFD6E2EF), width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
                       ),
                     ],
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (previewUrl != null && previewUrl.isNotEmpty)
+                        Image.network(
+                          previewUrl,
+                          fit: BoxFit.cover,
+                          alignment: Alignment.topCenter,
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return Container(
+                              color: const Color(0xFFF2F6FA),
+                              child: const Center(
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildPrescriptionPreviewFallback(
+                              doctorName: doctorName,
+                              date: formattedDate,
+                            );
+                          },
+                        )
+                      else
+                        _buildPrescriptionPreviewFallback(
+                          doctorName: doctorName,
+                          date: formattedDate,
+                        ),
+
+                      // Overlay "Tap to view full prescription" pill at bottom of image
+                      Positioned(
+                        bottom: 8,
+                        left: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.68),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.zoom_in_rounded,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Tap to open full document',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Document Info & Direct Download Option Bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5FA),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2EBF4)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF062B72).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.description_rounded,
+                        color: Color(0xFF062B72),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'OPD_Prescription.png',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: context.fs(12),
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1E293B),
+                            ),
+                          ),
+                          Text(
+                            'Official Medical Document (PNG)',
+                            style: TextStyle(
+                              fontSize: context.fs(10),
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.download_rounded, size: 20),
+                      color: const Color(0xFF062B72),
+                      tooltip: 'Download Original Image',
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      onPressed: () =>
+                          _downloadPrescriptionFromChat(message),
+                    ),
                   ],
                 ),
-              ],
+              ),
             ),
+
+            // Prescription Actions & Rating
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: _buildPrescriptionActions(message, isMe),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Fallback graphic shown if preview image is offline or loading.
+  Widget _buildPrescriptionPreviewFallback({
+    required String doctorName,
+    required String date,
+  }) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF062B72),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.local_hospital_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'OPD Telemedicine',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF062B72),
+                      ),
+                    ),
+                    Text(
+                      doctorName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 11, 14, 0),
+          const SizedBox(height: 8),
+          const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Prescription Document',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              Text(
+                date,
+                style: const TextStyle(
+                  fontSize: 9.5,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Center(
             child: Text(
-              isMe ? 'You' : 'Dr. ${widget.otherUserName}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              'Rx',
               style: TextStyle(
-                fontSize: context.fs(13.5),
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF062B72),
+                fontSize: 36,
+                fontFamily: 'serif',
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF062B72).withOpacity(0.18),
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-            child: Text(
-              (message.prescriptionNotePreview ?? '').trim().isEmpty
-                  ? message.getDisplayMessage()
-                  : message.prescriptionNotePreview!.trim(),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Text(
+              'Official A4 Medical Prescription',
               style: TextStyle(
-                fontSize: context.fs(12.5),
-                height: 1.45,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF1F2F44),
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF062B72),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-            child: _buildPrescriptionActions(message, isMe),
           ),
         ],
       ),
     );
+  }
+
+  /// Downloads original prescription image directly from chat bubble.
+  Future<void> _downloadPrescriptionFromChat(ChatMessageModel message) async {
+    final imgUrl = message.previewImageUrl ?? message.mediaUrl;
+    if (imgUrl != null && imgUrl.isNotEmpty) {
+      await _downloadAndOpenFile(
+        imgUrl,
+        'Prescription_${message.prescriptionId ?? "opd"}.png',
+      );
+      return;
+    }
+    final pdfUrl = message.pdfUrl;
+    if (pdfUrl != null && pdfUrl.isNotEmpty) {
+      await _downloadAndOpenFile(
+        pdfUrl,
+        'Prescription_${message.prescriptionId ?? "opd"}.pdf',
+      );
+      return;
+    }
+    final prescriptionId = message.prescriptionId;
+    if (prescriptionId != null && prescriptionId.isNotEmpty) {
+      ToastService.instance.showInfo('Preparing prescription document...');
+      try {
+        final p = await ref
+            .read(prescriptionControllerProvider)
+            .fetchById(prescriptionId);
+        if (p != null) {
+          final urls = p.pageImageUrls.isNotEmpty
+              ? p.pageImageUrls
+              : (p.primaryImageUrl.isNotEmpty
+                  ? [p.primaryImageUrl]
+                  : <String>[]);
+          if (urls.isNotEmpty) {
+            final bytes =
+                await PrescriptionPdfService.instance.loadImagesFromUrls(urls);
+            if (bytes.isNotEmpty) {
+              final files = await PrescriptionPdfService.instance
+                  .savePrescriptionImages(
+                imageBytesList: bytes,
+                reference: p.reference,
+                patientName: p.patientName,
+              );
+              if (mounted && files.isNotEmpty) {
+                ToastService.instance.showSuccess('Prescription saved to device');
+                await OpenFile.open(files.first.path);
+                return;
+              }
+            }
+          }
+          final file = await PrescriptionPdfService.instance.savePdfFile(p);
+          if (mounted) {
+            ToastService.instance.showSuccess('Prescription saved to device');
+            await OpenFile.open(file.path);
+          }
+          return;
+        }
+      } catch (e) {
+        debugPrint('Prescription download error: $e');
+      }
+    }
+    if (mounted) {
+      ToastService.instance.showError('Prescription file unavailable');
+    }
   }
 
   /// "View Prescription" + the rate / your-rating row for a prescription card.
@@ -4048,200 +4591,123 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
   }
 
-  // Add these methods to handle call message interactions
-  // 1. Update the _buildCallOrRecordingBubble method to make it clickable
   Widget _buildCallOrRecordingBubble(ChatMessageModel message, bool isMe) {
-    final isRecording = message.messageType == 'call_recording';
-    final callInfo = _getCallStatusInfo(message.message, isMe);
-    // Parse call duration and time from message if available
-    final callData = _parseCallMessageData(message.message);
-    return GestureDetector(
-      onTap: () async {
-        if (isRecording && message.mediaUrl != null) {
-          // Open call recording
-          _openCallRecording(message);
-        } else if (message.id != null && message.id!.isNotEmpty) {
-          // Show call details or redial
-          _showCallDetailsDialog(message, isMe);
-        } else {
-          // Initiate new call if it's a missed call or call initiation message
-          _initiateCallFromMessage(message);
+    final baseEvent = message.callEvent;
+    if (baseEvent == null) return const SizedBox.shrink();
+
+    final callId = message.callId;
+    if (callId == null || callId.isEmpty) {
+      return _callCardFor(
+        message: message,
+        isMe: isMe,
+        event: baseEvent,
+        isLiveCall: false,
+        callId: null,
+      );
+    }
+
+    final stream = _callDocStreams.putIfAbsent(
+      callId,
+      () => _callController.watchCall(callId).asBroadcastStream(),
+    );
+    return StreamBuilder<CallModel?>(
+      stream: stream,
+      builder: (context, snapshot) {
+        final call = snapshot.data;
+        var event = baseEvent;
+        if (call != null) {
+          event = baseEvent.copyWith(
+            callType: call.callType,
+            status: ChatCallStatus.parse(call.callStatus),
+            durationSeconds: call.duration ?? baseEvent.durationSeconds,
+            startedAt: call.startTime,
+            endedAt: call.endedAt,
+          );
         }
+        return _callCardFor(
+          message: message,
+          isMe: isMe,
+          event: event,
+          isLiveCall: _isCallLive(callId, event),
+          callId: callId,
+        );
       },
-      onLongPress: () {
-        // Show message actions even for call messages
-        if (!message.isDeleted) {
-          _showMessageActions(message, Offset.zero);
-        }
+    );
+  }
+
+  /// True only when the live media session belongs to this exact call.
+  ///
+  /// A legacy timeline row with no `callId` therefore never renders as live:
+  /// its stale "in progress" body is normalized to an ended card instead.
+  bool _isCallLive(String callId, ChatCallEvent event) {
+    if (!event.status.isLive) return false;
+
+    final activeId =
+        _callController.activeCallId ?? CallSessionManager.instance.currentCallId;
+    if (activeId == null || activeId != callId) return false;
+
+    if (!_callController.isCallActive && !CallSessionManager.instance.isCallActive) {
+      return false;
+    }
+
+    final status = _callController.activeCallStatus;
+    if (status == null || CallStatus.isTerminal(status)) return false;
+
+    return status == CallStatus.connected ||
+        status == CallStatus.accepted ||
+        status == CallStatus.connecting ||
+        status == CallStatus.calling ||
+        status == CallStatus.ringing;
+  }
+
+  Widget _callCardFor({
+    required ChatMessageModel message,
+    required bool isMe,
+    required ChatCallEvent event,
+    required bool isLiveCall,
+    required String? callId,
+  }) {
+    final sessionDuration =
+        isLiveCall &&
+            callId != null &&
+            CallSessionManager.instance.currentCallId == callId
+        ? CallSessionManager.instance.callDuration
+        : event.durationSeconds;
+
+    return StreamBuilder<int>(
+      stream: isLiveCall
+          ? CallSessionManager.instance.durationStream
+          : const Stream<int>.empty(),
+      initialData: sessionDuration,
+      builder: (context, snapshot) {
+        return ChatCallActionCard(
+          event: event,
+          isMe: isMe,
+          timestamp: message.timestamp,
+          isLiveCall: isLiveCall,
+          liveDurationSeconds: snapshot.data ?? sessionDuration,
+          trailing: isMe
+              ? MessageStatusIndicator.forOutgoing(
+                  message,
+                  size: 12,
+                  color: _tickOnLightBubble,
+                  readColor: const Color(0xFF1D74C9),
+                )
+              : null,
+          onLongPress: message.isDeleted
+              ? null
+              : () => _showMessageActions(message, Offset.zero),
+          onTap: () {
+            if (event.isRecording || message.messageType == 'call_recording') {
+              _openCallRecording(message);
+            } else if (isLiveCall && callId != null) {
+              _rejoinActiveCall(callId: callId, callType: event.callType);
+            } else {
+              _showCallDetailsDialog(message, isMe);
+            }
+          },
+        );
       },
-      child: Container(
-        width: math.min(context.sw * 0.72, 250),
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0F233C).withValues(alpha: 0.06),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: isMe
-                ? const Color(0xFF062B72).withOpacity(0.2)
-                : Colors.grey[200],
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isRecording
-                      ? const Color(0xFF062B72).withOpacity(0.1)
-                      : (callInfo['color'] as Color).withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isRecording
-                      ? Icons.fiber_manual_record
-                      : (callInfo['icon'] as IconData),
-                  size: 30,
-                  color: isRecording
-                      ? const Color(0xFF062B72)
-                      : (callInfo['color'] as Color),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            isRecording
-                                ? '📞 Call Recording'
-                                : (callInfo['text'] as String),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: context.fs(13.5),
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                        if (callData['duration'] != null && !isRecording)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              callData['duration']!,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    if (isRecording && message.duration != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        _formatDuration(message.duration!),
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                      ),
-                    ],
-                    const SizedBox(height: 2),
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      runSpacing: 2,
-                      children: [
-                        Text(
-                          _formatTime(message.timestamp),
-                          style: TextStyle(
-                            fontSize: context.fs(10),
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        if (callData['startTime'] != null) ...[
-                          const SizedBox(width: 6),
-                          Icon(
-                            Icons.access_time,
-                            size: 10,
-                            color: Colors.grey[500],
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            callData['startTime']!,
-                            style: TextStyle(
-                              fontSize: context.fs(10),
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                        if (message.isEdited && !isRecording) ...[
-                          const SizedBox(width: 6),
-                          Text(
-                            'edited',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Colors.grey[500],
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
-                        if (isMe) ...[
-                          const SizedBox(width: 4),
-                          MessageStatusIndicator.forOutgoing(
-                            message,
-                            size: 12,
-                            // This bubble has a light background, so the
-                            // muted grey tick and a darker "read" blue are
-                            // both needed for contrast.
-                            color: _tickOnLightBubble,
-                            readColor: const Color(0xFF1D74C9),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              // Add a call back icon for missed calls
-              if (!isRecording && callInfo['text'] == 'Missed call')
-                Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF062B72),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      CupertinoIcons.phone_solid,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -4561,6 +5027,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   // 8. Update _getCallStatusInfo method to include duration parsing
   Map<String, dynamic> _getCallStatusInfo(String message, bool isMe) {
     final lowerMessage = message.toLowerCase();
+    // Check for ongoing / in-progress call
+    if (lowerMessage.contains('ongoing') ||
+        lowerMessage.contains('in-progress') ||
+        lowerMessage.contains('in progress') ||
+        lowerMessage.contains('active call')) {
+      return {
+        'icon': Icons.videocam_rounded,
+        'color': const Color(0xFF00A884),
+        'text': 'Call in progress • Tap to rejoin',
+        'status': 'ongoing',
+      };
+    }
     // Check for different call statuses
     if (lowerMessage.contains('missed') || lowerMessage.contains('no answer')) {
       // Extract duration if available
@@ -4614,15 +5092,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       };
     }
     return {'icon': Icons.call, 'color': Colors.green, 'text': message};
-  }
-
-  String _formatDuration(int seconds) {
-    final minutes = seconds ~/ 60;
-    final remainingSeconds = seconds % 60;
-    if (minutes > 0) {
-      return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
-    }
-    return '0:$remainingSeconds'.padLeft(4, '0');
   }
 
   Widget _buildImageBubble(ChatMessageModel message, bool isMe) {

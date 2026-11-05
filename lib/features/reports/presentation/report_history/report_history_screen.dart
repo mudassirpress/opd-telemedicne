@@ -9,6 +9,7 @@ import 'package:telemedicine/features/reports/presentation/patient_shared_report
 import 'package:telemedicine/data/models/prescription_model.dart';
 import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
 import 'package:telemedicine/features/doctor_portal/presentation/prescriptions/prescription_detail_screen.dart';
+import 'package:telemedicine/features/prescriptions/services/prescription_pdf_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 import 'package:telemedicine/core/utils/toast_utils.dart';
@@ -534,11 +535,116 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
           size: 20,
           color: Color(0xFF062B72),
         ),
-        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
         onPressed: () => _viewPrescription(prescription),
         tooltip: 'View Prescription',
       ),
+      IconButton(
+        icon: const Icon(
+          Icons.download_rounded,
+          size: 20,
+          color: Color(0xFF062B72),
+        ),
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        onPressed: () => _downloadPrescriptionPdf(prescription),
+        tooltip: 'Download PDF',
+      ),
+      IconButton(
+        icon: const Icon(
+          Icons.share_rounded,
+          size: 20,
+          color: Color(0xFF062B72),
+        ),
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        onPressed: () => _sharePrescriptionPdf(prescription),
+        tooltip: 'Share Prescription',
+      ),
     ];
+  }
+
+  Future<void> _downloadPrescriptionPdf(PrescriptionModel prescription) async {
+    try {
+      final urls = prescription.pageImageUrls.isNotEmpty
+          ? prescription.pageImageUrls
+          : (prescription.primaryImageUrl.isNotEmpty
+              ? [prescription.primaryImageUrl]
+              : <String>[]);
+      if (urls.isNotEmpty) {
+        final bytes =
+            await PrescriptionPdfService.instance.loadImagesFromUrls(urls);
+        if (bytes.isNotEmpty) {
+          final files =
+              await PrescriptionPdfService.instance.savePrescriptionImages(
+            imageBytesList: bytes,
+            reference: prescription.reference,
+            patientName: prescription.patientName,
+          );
+          if (!mounted) return;
+          ToastService.instance.showSuccess('Prescription image saved');
+          if (files.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Saved: ${files.first.uri.pathSegments.last}'),
+                action: SnackBarAction(
+                  label: 'Open',
+                  textColor: Colors.white,
+                  onPressed: () => OpenFile.open(files.first.path),
+                ),
+                duration: const Duration(seconds: 5),
+              ),
+            );
+            return;
+          }
+        }
+      }
+      final file =
+          await PrescriptionPdfService.instance.savePdfFile(prescription);
+      if (!mounted) return;
+      ToastService.instance.showSuccess('Prescription saved');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Saved: ${file.uri.pathSegments.last}'),
+          action: SnackBarAction(
+            label: 'Open',
+            textColor: Colors.white,
+            onPressed: () => OpenFile.open(file.path),
+          ),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ToastService.instance.showError('Could not save prescription: $e');
+      }
+    }
+  }
+
+  Future<void> _sharePrescriptionPdf(PrescriptionModel prescription) async {
+    try {
+      final urls = prescription.pageImageUrls.isNotEmpty
+          ? prescription.pageImageUrls
+          : (prescription.primaryImageUrl.isNotEmpty
+              ? [prescription.primaryImageUrl]
+              : <String>[]);
+      if (urls.isNotEmpty) {
+        final bytes =
+            await PrescriptionPdfService.instance.loadImagesFromUrls(urls);
+        if (bytes.isNotEmpty) {
+          await PrescriptionPdfService.instance.sharePrescriptionImages(
+            imageBytesList: bytes,
+            reference: prescription.reference,
+            patientName: prescription.patientName,
+            doctorName: prescription.doctorName,
+          );
+          return;
+        }
+      }
+      await PrescriptionPdfService.instance.sharePdf(prescription);
+    } catch (e) {
+      if (mounted) {
+        ToastService.instance.showError('Could not share prescription: $e');
+      }
+    }
   }
 
   void _viewPrescription(PrescriptionModel prescription) {

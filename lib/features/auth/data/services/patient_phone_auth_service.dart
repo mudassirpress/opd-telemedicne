@@ -410,23 +410,23 @@ class PatientPhoneAuthService {
 
   /// Maps Firebase phone authentication send errors into user-friendly diagnostic messages.
   String _mapFirebaseSendError(FirebaseAuthException e) {
+    debugPrint('⚠️ [PatientPhoneAuthService] Raw error code: ${e.code}, message: ${e.message}');
     switch (e.code) {
       case 'operation-not-allowed':
-        return 'Phone authentication is not enabled or Pakistan (+92) is not permitted in your Firebase SMS Region Policy. Please check Firebase Console > Authentication > Settings.';
+        return 'Phone verification is currently unavailable. Please contact support.';
       case 'missing-client-identifier':
       case 'app-not-authorized':
-        return 'Android app verification failed (Play Integrity / SHA fingerprint mismatch). Please verify that your debug and release SHA-1/SHA-256 fingerprints are added to the Firebase Console.';
+        return 'Security verification could not be completed on this device. Please ensure Google Play Services is updated and try again.';
       case 'too-many-requests':
-        return 'Too many SMS requests sent from this device or number. Firebase has temporarily restricted requests. Please wait a few minutes before trying again.';
+        return 'Too many SMS requests sent from this device or number. Please wait a few minutes before trying again.';
       case 'invalid-phone-number':
-        return 'The phone number format is invalid. Please verify your number and country code.';
+        return 'The phone number format is invalid. Please verify your number.';
       case 'quota-exceeded':
-        return 'SMS quota exceeded for this Firebase project. Please try again later or contact support.';
+        return 'SMS service is temporarily unavailable. Please try again later or contact support.';
       case 'network-request-failed':
         return 'Network connection error. Please check your internet connection and try again.';
       default:
-        return e.message ??
-            'Failed to send SMS verification code. Please try again.';
+        return 'Failed to send SMS verification code. Please try again.';
     }
   }
 

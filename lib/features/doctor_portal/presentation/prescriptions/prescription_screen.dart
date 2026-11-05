@@ -12,10 +12,6 @@ import 'package:telemedicine/shared/widgets/auth_layout.dart';
 import 'package:telemedicine/shared/widgets/opd_design_system.dart';
 
 /// Doctor-side prescriptions for the current chat / patient.
-///
-/// A prescription is a document plus a `prescription` chat message that links
-/// back to it, so both live in one place: the list here, and the card in the
-/// chat itself.
 class PrescriptionScreen extends ConsumerStatefulWidget {
   final String chatId;
   final String patientId;
@@ -44,11 +40,15 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   void _subscribe() {
     if (!mounted) return;
     if (ref.read(userProvider) == null) return;
-    setState(() {
-      _stream = ref
-          .read(prescriptionControllerProvider)
-          .streamForChat(widget.chatId);
-    });
+    try {
+      setState(() {
+        _stream = ref
+            .read(prescriptionControllerProvider)
+            .streamForChat(widget.chatId);
+      });
+    } catch (e) {
+      debugPrint('[PrescriptionScreen] Subscription error: $e');
+    }
   }
 
   Future<void> _openForm() async {
@@ -63,7 +63,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       ),
     );
     if (created == true && mounted) {
-      ToastService.instance.showSuccess('Prescription sent');
+      ToastService.instance.showSuccess('Prescription created and sent');
     }
   }
 
@@ -87,7 +87,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   Widget build(BuildContext context) {
     return OpdScreenShell(
       title: 'Prescriptions',
-      subtitle: 'Medication prescribed to ${widget.patientName}.',
+      subtitle: 'Official prescriptions issued to ${widget.patientName}.',
       bottom: GradientButton(
         text: 'New Prescription',
         icon: Icons.add_rounded,
@@ -121,7 +121,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
             icon: Icons.medical_information_rounded,
             title: 'No prescriptions yet',
             subtitle:
-                'Tap "New Prescription" below to write one and send it to the patient.',
+                'Tap "New Prescription" below to write an official branded prescription.',
           );
         }
 
@@ -145,14 +145,16 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     );
   }
 
-  /// Friendly, non-fatal error panel with a retry that re-issues the query.
   Widget _buildErrorState(Object error) {
-    final (icon, title, message) = _describeError(error);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        OpdEmptyState(icon: icon, title: title, subtitle: message),
+        const OpdEmptyState(
+          icon: Icons.error_outline_rounded,
+          title: 'Could not load prescriptions',
+          subtitle:
+              'Something went wrong while loading. Tap Retry to try again.',
+        ),
         const SizedBox(height: 20),
         GradientButton(
           text: 'Retry',
@@ -162,61 +164,39 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       ],
     );
   }
+}
 
-  /// Turns a Firestore failure into something the doctor can act on.
-  ///
-  /// The "index is still building" state is ONLY shown for a genuine missing
-  /// composite index - it is never used as a catch-all, so a real problem
-  /// (permissions, network) is reported honestly instead of being mislabelled.
-  ///
-  /// [PrescriptionController.streamForChat] no longer needs a composite index,
-  /// so in practice this branch should not appear at all. It is kept so that a
-  /// project still holding an ordered query reports the truth.
-  (IconData, String, String) _describeError(Object error) {
-    final text = error.toString();
+/// Helper model for reactive medicine entry fields in the prescription form.
+class _MedicineInputGroup {
+  final TextEditingController name = TextEditingController();
+  final TextEditingController strength = TextEditingController();
+  final TextEditingController dosage = TextEditingController();
+  final TextEditingController frequency = TextEditingController();
+  final TextEditingController duration = TextEditingController();
+  final TextEditingController instructions = TextEditingController();
 
-    final missingIndex =
-        text.contains('FAILED_PRECONDITION') &&
-        (text.contains('missing-indexes') || text.contains('no index'));
-    if (missingIndex) {
-      return (
-        Icons.hourglass_empty_rounded,
-        'Preparing prescriptions',
-        'A Firestore index for this query is still being built. '
-            'This usually finishes within a few minutes - try again shortly.',
-      );
-    }
-    if (text.contains('PERMISSION_DENIED') ||
-        text.contains('permission-denied')) {
-      return (
-        Icons.lock_outline_rounded,
-        'Access restricted',
-        'You do not have permission to view prescriptions for this patient.',
-      );
-    }
-    if (text.contains('UNAVAILABLE') || text.contains('unavailable')) {
-      return (
-        Icons.wifi_off_rounded,
-        'Connection problem',
-        'Could not reach Firestore. Check your connection and try again.',
-      );
-    }
-    return (
-      Icons.error_outline_rounded,
-      'Could not load prescriptions',
-      'Something went wrong while loading. Tap Retry to try again.',
+  void dispose() {
+    name.dispose();
+    strength.dispose();
+    dosage.dispose();
+    frequency.dispose();
+    duration.dispose();
+    instructions.dispose();
+  }
+
+  PrescriptionMedicine toMedicine() {
+    return PrescriptionMedicine(
+      name: name.text.trim(),
+      strength: strength.text.trim(),
+      dosage: dosage.text.trim(),
+      frequency: frequency.text.trim(),
+      duration: duration.text.trim(),
+      instructions: instructions.text.trim(),
     );
   }
 }
 
-/// Composes a prescription: a single multiline note, then **Save & Send**.
-///
-/// Save & Send (in order):
-///   1. stores the prescription document,
-///   2. posts a `prescription` message into the existing doctor↔patient chat,
-///      which lands in Hive first and then Firestore, so the chat updates
-///      live without any reload,
-///   3. triggers the FCM notification (tapping it opens that same chat).
+/// Official OPD Prescription Composition Screen.
 class PrescriptionFormScreen extends ConsumerStatefulWidget {
   final String chatId;
   final String patientId;
@@ -236,22 +216,72 @@ class PrescriptionFormScreen extends ConsumerStatefulWidget {
 
 class _PrescriptionFormScreenState
     extends ConsumerState<PrescriptionFormScreen> {
+  final List<_MedicineInputGroup> _medicines = [];
   final TextEditingController _noteController = TextEditingController();
+  final TextEditingController _adviceController = TextEditingController();
+  final TextEditingController _followUpController = TextEditingController();
+
   final FocusNode _noteFocus = FocusNode();
   bool _sending = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Start with 1 medicine input row by default
+    _addMedicineRow();
+  }
+
+  void _addMedicineRow() {
+    setState(() {
+      _medicines.add(_MedicineInputGroup());
+    });
+  }
+
+  void _removeMedicineRow(int index) {
+    if (_medicines.length <= 1) {
+      // Clear instead of removing last row
+      _medicines.first.name.clear();
+      _medicines.first.strength.clear();
+      _medicines.first.dosage.clear();
+      _medicines.first.frequency.clear();
+      _medicines.first.duration.clear();
+      _medicines.first.instructions.clear();
+      setState(() {});
+      return;
+    }
+    setState(() {
+      final removed = _medicines.removeAt(index);
+      removed.dispose();
+    });
+  }
+
+  @override
   void dispose() {
+    for (final med in _medicines) {
+      med.dispose();
+    }
     _noteController.dispose();
+    _adviceController.dispose();
+    _followUpController.dispose();
     _noteFocus.dispose();
     super.dispose();
   }
 
   Future<void> _saveAndSend() async {
     final note = _noteController.text.trim();
-    if (note.isEmpty) {
-      ToastService.instance.showWarning('Please write the prescription note');
-      _noteFocus.requestFocus();
+    final advice = _adviceController.text.trim();
+    final followUp = _followUpController.text.trim();
+
+    final validMedicines = _medicines
+        .map((m) => m.toMedicine())
+        .where((m) => m.isNotEmpty)
+        .toList();
+
+    // Must have at least one medicine OR a written general prescription note
+    if (validMedicines.isEmpty && note.isEmpty) {
+      ToastService.instance.showWarning(
+        'Please add at least one medicine or write a prescription note',
+      );
       return;
     }
 
@@ -262,33 +292,57 @@ class _PrescriptionFormScreenState
     try {
       final controller = ref.read(prescriptionControllerProvider);
 
-      // Snapshot the patient's age onto the prescription.
-      final patientAge = await controller.fetchPatientAge(widget.patientId);
+      // Snapshot patient demographic info (age & gender)
+      final patientInfo = await controller.fetchPatientInfo(widget.patientId);
+      final patientAge = patientInfo['age'] ?? '';
+      final patientGender = patientInfo['gender'] ?? '';
 
-      // 1) Save the prescription document.
+      // Snapshot doctor qualifications and specialty
+      final doctorInfo = await controller.fetchDoctorInfo(user.id);
+      final doctorDegree = (user.highestDegree ?? doctorInfo['degree'] ?? '')
+          .trim();
+      final doctorSpecialty = (doctorInfo['specialty'] ?? '').trim();
+
+      // 1) Save official prescription document & generate branded PDF
       final prescription = await controller.create(
         chatId: widget.chatId,
         doctorId: user.id,
         doctorName: user.fullname,
+        doctorQualification: doctorDegree,
+        doctorSpecialty: doctorSpecialty,
         patientId: widget.patientId,
         patientName: widget.patientName,
         patientAge: patientAge,
+        patientGender: patientGender,
         note: note,
+        medicines: validMedicines,
+        advice: advice,
+        followUp: followUp,
       );
 
-      // 2) Post the linked message into the existing chat. `sendMessage`
-      //    writes to Hive first (instant local state) and then Firestore, and
-      //    sends the FCM push — the chat listener picks it up live, so the
-      //    conversation is never refetched.
+      // Preview text for chat card
+      String previewText;
+      if (validMedicines.isNotEmpty) {
+        final firstMed = validMedicines.first;
+        previewText =
+            'Rx: ${firstMed.displayLine}${validMedicines.length > 1 ? ' (+${validMedicines.length - 1} more)' : ''}';
+      } else {
+        previewText = _buildNotePreview(note);
+      }
+
+      // 2) Post prescription message into chat with preview image and PDF URL
       await ChatController().sendMessage(
         senderId: user.id,
         receiverId: widget.patientId,
-        message: 'Prescription available — Tap to view',
+        message: 'Official Prescription — Tap to view',
         messageType: 'prescription',
+        mediaUrl: prescription.previewImageUrl ?? prescription.pdfUrl,
         prescriptionId: prescription.prescriptionId,
-        // Stored on the message so the card renders the preview instantly and
-        // keeps working from the local Hive cache when offline.
-        prescriptionNotePreview: _buildNotePreview(note),
+        prescriptionNotePreview: previewText,
+        pdfUrl: prescription.pdfUrl,
+        previewImageUrl: prescription.previewImageUrl,
+        prescriptionDate: prescription.createdAt,
+        doctorName: user.fullname,
         receiverRole: 'patient',
       );
 
@@ -296,7 +350,7 @@ class _PrescriptionFormScreenState
     } catch (e) {
       if (mounted) {
         setState(() => _sending = false);
-        ToastService.instance.showError('Could not send prescription');
+        ToastService.instance.showError('Could not save prescription: $e');
       }
     }
   }
@@ -305,10 +359,10 @@ class _PrescriptionFormScreenState
   Widget build(BuildContext context) {
     return OpdScreenShell(
       title: 'New Prescription',
-      subtitle: 'Write the prescription for ${widget.patientName}.',
+      subtitle: 'Prescribing for ${widget.patientName}.',
       bottom: GradientButton(
-        text: 'Save & Send',
-        icon: Icons.send_rounded,
+        text: 'Save Prescription',
+        icon: Icons.check_circle_rounded,
         isLoading: _sending,
         onPressed: _sending ? null : _saveAndSend,
       ),
@@ -317,91 +371,301 @@ class _PrescriptionFormScreenState
         children: [
           OpdInfoPanel(
             icon: Icons.person_rounded,
-            title: 'Patient',
-            description: '${widget.patientName} • ID ${widget.patientId}',
+            title: 'Patient Information',
+            description: '${widget.patientName} • ID: ${widget.patientId}',
           ),
-          const SizedBox(height: 22),
-          const OpdSectionLabel('Note'),
-          _buildNoteField(),
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
+
+          // ── SECTION: STRUCTURED MEDICINES ──
+          OpdSectionLabel(
+            'Medicines (Rx)',
+            trailing: TextButton.icon(
+              onPressed: _addMedicineRow,
+              icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+              label: const Text('Add Medicine'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF062B72),
+                textStyle: TextStyle(
+                  fontSize: context.fs(12.5),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          for (var i = 0; i < _medicines.length; i++) ...[
+            _buildMedicineCard(i, _medicines[i]),
+            const SizedBox(height: 12),
+          ],
+
+          const SizedBox(height: 16),
+
+          // ── SECTION: GENERAL PRESCRIPTION / WRITTEN NOTES ──
+          const OpdSectionLabel('General Prescription / Written Notes'),
+          const SizedBox(height: 6),
+          _buildTextCard(
+            controller: _noteController,
+            focusNode: _noteFocus,
+            hintText:
+                'Doctor\'s written directions or general prescription instructions...',
+            minLines: 4,
+            maxLines: 7,
+          ),
+          const SizedBox(height: 16),
+
+          // ── SECTION: ADDITIONAL ADVICE ──
+          const OpdSectionLabel('Additional Medical Advice'),
+          const SizedBox(height: 6),
+          _buildTextCard(
+            controller: _adviceController,
+            hintText: 'e.g. Drink plenty of warm fluids, rest for 3 days...',
+            minLines: 2,
+            maxLines: 4,
+          ),
+          const SizedBox(height: 16),
+
+          // ── SECTION: FOLLOW-UP ──
+          const OpdSectionLabel('Follow-up Instructions'),
+          const SizedBox(height: 6),
+          _buildTextCard(
+            controller: _followUpController,
+            hintText: 'e.g. Review after 7 days, or SOS if symptoms persist',
+            minLines: 1,
+            maxLines: 2,
+          ),
+          const SizedBox(height: 20),
+
           const OpdInfoPanel(
-            icon: Icons.info_outline_rounded,
-            title: 'Sent instantly',
+            icon: Icons.verified_rounded,
+            title: 'Official Document Generation',
             description:
-                'Saving posts the prescription to this chat and notifies the patient. '
-                'They can open the full prescription by tapping the card.',
+                'Saving generates an official branded A4 prescription PDF and attaches it directly to the patient record.',
           ),
         ],
       ),
     );
   }
 
-  /// Collapses a multiline note into a short single-line preview for the card.
+  /// Interactive card for adding a single medicine.
+  Widget _buildMedicineCard(int index, _MedicineInputGroup med) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD6E2EF), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F233C).withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header Row with Medicine Number and Delete
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF062B72),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '${index + 1}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Medicine #${index + 1}',
+                style: TextStyle(
+                  fontSize: context.fs(13),
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1F2F44),
+                ),
+              ),
+              const Spacer(),
+              if (_medicines.length > 1)
+                IconButton(
+                  onPressed: () => _removeMedicineRow(index),
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Colors.redAccent,
+                    size: 20,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Remove Medicine',
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Row 1: Name and Strength
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: _buildInputField(
+                  controller: med.name,
+                  label: 'Medicine Name *',
+                  hint: 'e.g. Paracetamol / Augmentin',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: _buildInputField(
+                  controller: med.strength,
+                  label: 'Strength',
+                  hint: 'e.g. 500mg, 10ml',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Row 2: Dosage, Frequency & Duration
+          Row(
+            children: [
+              Expanded(
+                child: _buildInputField(
+                  controller: med.dosage,
+                  label: 'Dosage',
+                  hint: 'e.g. 1 Tab',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildInputField(
+                  controller: med.frequency,
+                  label: 'Frequency',
+                  hint: 'e.g. 1-0-1',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildInputField(
+                  controller: med.duration,
+                  label: 'Duration',
+                  hint: 'e.g. 5 Days',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Row 3: Instructions (Food instructions)
+          _buildInputField(
+            controller: med.instructions,
+            label: 'Instructions / Food Directions',
+            hint: 'e.g. After meal / Before breakfast / At bedtime',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: context.fs(11),
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF5E7188),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF7FAFD),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFD6E2EF)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: TextField(
+            controller: controller,
+            style: TextStyle(
+              fontSize: context.fs(12.5),
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF1F2F44),
+            ),
+            decoration: InputDecoration(
+              isDense: true,
+              border: InputBorder.none,
+              hintText: hint,
+              hintStyle: TextStyle(
+                fontSize: context.fs(11.5),
+                color: const Color(0xFF96A5B8),
+              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextCard({
+    required TextEditingController controller,
+    FocusNode? focusNode,
+    required String hintText,
+    int minLines = 3,
+    int maxLines = 6,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FAFD),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFBAC7D8)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: TextField(
+        controller: controller,
+        focusNode: focusNode,
+        minLines: minLines,
+        maxLines: maxLines,
+        textCapitalization: TextCapitalization.sentences,
+        style: TextStyle(
+          fontSize: context.fs(13.5),
+          height: 1.5,
+          color: const Color(0xFF1E2F44),
+        ),
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          isDense: true,
+          hintText: hintText,
+          hintStyle: TextStyle(
+            fontSize: context.fs(12.5),
+            color: const Color(0xFF7E90A6),
+          ),
+        ),
+      ),
+    );
+  }
+
   static String _buildNotePreview(String note, {int maxLength = 110}) {
     final flat = note.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (flat.isEmpty) return '';
     if (flat.length <= maxLength) return flat;
     return '${flat.substring(0, maxLength).trimRight()}...';
-  }
-
-  /// Multiline note field using the same metallic treatment as the Sign In
-  /// inputs, just taller to allow a full prescription.
-  Widget _buildNoteField() {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE3EAF2), Color(0xFFF5F8FC), Color(0xFFE2E9F2)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFBAC7D8), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F233C).withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Container(
-        padding: EdgeInsets.fromLTRB(context.rsp(16), 6, context.rsp(16), 12),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-          borderRadius: BorderRadius.circular(21),
-        ),
-        child: TextField(
-          controller: _noteController,
-          focusNode: _noteFocus,
-          maxLines: 10,
-          minLines: 8,
-          textCapitalization: TextCapitalization.sentences,
-          style: TextStyle(
-            fontSize: context.fs(14),
-            fontWeight: FontWeight.w500,
-            height: 1.6,
-            color: const Color(0xFF1E2F44),
-          ),
-          decoration: InputDecoration(
-            border: InputBorder.none,
-            isDense: true,
-            contentPadding: const EdgeInsets.only(top: 12),
-            hintText:
-                'Take medicine after breakfast...\nFollow-up after 7 days...',
-            hintStyle: TextStyle(
-              fontSize: context.fs(13.5),
-              height: 1.6,
-              color: const Color(0xFF7E90A6),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -413,7 +677,9 @@ class _PrescriptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasMeds = prescription.hasMedicines;
     final note = prescription.note.trim();
+
     return OpdCard(
       onTap: onTap,
       child: Column(
@@ -422,79 +688,72 @@ class _PrescriptionCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 42,
+                height: 54,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF062B72).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(13),
+                  color: const Color(0xFF062B72).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFD6E2EF)),
                 ),
-                child: const Icon(
-                  Icons.medical_information_rounded,
-                  size: 20,
-                  color: Color(0xFF062B72),
-                ),
+                clipBehavior: Clip.antiAlias,
+                child: prescription.primaryImageUrl.isNotEmpty
+                    ? Image.network(
+                        prescription.primaryImageUrl,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(
+                            Icons.description_rounded,
+                            size: 20,
+                            color: Color(0xFF062B72),
+                          ),
+                        ),
+                      )
+                    : const Center(
+                        child: Icon(
+                          Icons.description_rounded,
+                          size: 20,
+                          color: Color(0xFF062B72),
+                        ),
+                      ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  'Dr. ${prescription.doctorName}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: context.fs(14.5),
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1F2F44),
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${prescription.doctorName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: context.fs(14.5),
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1F2F44),
+                      ),
+                    ),
+                    if (prescription.doctorQualification.isNotEmpty)
+                      Text(
+                        prescription.doctorQualification,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: context.fs(11),
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF163B6E),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  DateFormat('dd MMM yyyy').format(prescription.createdAt),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF7E90A6),
-                  ),
+              Text(
+                DateFormat('dd MMM yyyy').format(prescription.createdAt),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF7E90A6),
                 ),
-              ),
-            ],
-          ),
-          if (note.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              note,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: context.fs(13.5),
-                height: 1.5,
-                color: const Color(0xFF657991),
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Flexible(
-                child: Text(
-                  prescription.reference,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF163B6E),
-                  ),
-                ),
-              ),
-              const Spacer(),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: Color(0xFFBAC6D5),
               ),
             ],
           ),

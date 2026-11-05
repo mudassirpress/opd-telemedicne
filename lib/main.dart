@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,11 +12,15 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
 import 'package:telemedicine/core/services/fcm_token_service.dart';
+import 'package:telemedicine/core/services/callkit_service.dart';
+import 'package:telemedicine/core/services/call_service.dart';
 import 'package:telemedicine/core/services/incoming_call_coordinator.dart';
 import 'package:telemedicine/core/services/notification_service.dart';
 import 'package:telemedicine/app/theme/app_theme.dart';
 import 'package:telemedicine/features/appointments/presentation/appointment_lifecycle_service.dart';
 import 'package:telemedicine/core/services/smart_launch_coordinator.dart';
+import 'package:telemedicine/core/services/single_device_session_service.dart';
+import 'package:telemedicine/core/services/timezone_service.dart';
 import 'package:workmanager/workmanager.dart';
 import 'firebase_options.dart';
 import 'package:telemedicine/features/calls/presentation/controllers/call_controller.dart';
@@ -35,6 +40,7 @@ void _logError(String message, Object error, StackTrace? stack) {
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
+    WidgetsFlutterBinding.ensureInitialized();
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
@@ -82,21 +88,135 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       debugPrint('📞 [BACKGROUND] Received call_cancel for callId=$callId');
       if (callId.isNotEmpty) {
         await NotificationService().initializeForBackground();
+        await CallKitService.instance.hide(callId);
         await IncomingCallCoordinator.instance.dismissNotification(callId);
       }
       return;
     }
 
-    if (_isCallPayload(data)) {
-      // Headless isolate: only the local-notification plugin (channel + plugin
-      // callbacks) and the coordinator's `present` hook are needed.
-      await NotificationService().initializeForBackground();
-
-      await IncomingCallCoordinator.instance.registerIncomingCall(
-        data,
-        origin: IncomingCallOrigin.backgroundPush,
+    // Handle Missed Call push notifications
+    if (data['type'] == 'missed_call' || data['type'] == 'MISSED_CALL') {
+      final callId = (data['callId'] ?? '').toString();
+      final callerName = (data['callerName'] ?? 'Doctor').toString();
+      final callType = (data['callType'] ?? 'call').toString();
+      final callerImage = data['callerImage']?.toString();
+      debugPrint(
+        '📞 [BACKGROUND] Received missed_call push for callId=$callId caller=$callerName',
       );
+      if (callId.isNotEmpty) {
+        await CallKitService.instance.hide(callId);
+        await NotificationService().initializeForBackground();
+        await NotificationService().dismissCallNotification(callId);
+        await NotificationService().showMissedCallNotification(
+          callId: callId,
+          callerName: callerName,
+          callType: callType,
+          callerImage: callerImage,
+        );
+      }
       return;
+    }
+
+    if (_isCallPayload(data)) {
+      final callId = (data['callId'] ?? '').toString();
+      final timestampStr = data['timestamp']?.toString();
+      final expiresAtStr = data['expiresAt']?.toString();
+      final now = DateTime.now().millisecondsSinceEpoch;
+
+      // 1. Conflict Prevention: Local age/expiration check to prevent stale calls from ringing
+      bool isStale = false;
+      if (expiresAtStr != null && int.tryParse(expiresAtStr) != null) {
+        final expiresAt = int.parse(expiresAtStr);
+        if (now >= expiresAt) isStale = true;
+      } else if (timestampStr != null && int.tryParse(timestampStr) != null) {
+        final timestamp = int.parse(timestampStr);
+        // If ringing push was dispatched more than 40s ago, it is stale
+        if (now - timestamp > 40000) isStale = true;
+      }
+
+      if (isStale) {
+        debugPrint(
+          '⚠️ [BACKGROUND] Stale incoming call push for callId=$callId. Showing missed call instead.',
+        );
+        if (callId.isNotEmpty) {
+          await NotificationService().initializeForBackground();
+          await NotificationService().showMissedCallNotification(
+            callId: callId,
+            callerName: data['callerName']?.toString() ?? 'Doctor',
+            callType: data['callType']?.toString() ?? 'call',
+            callerImage: data['callerImage']?.toString(),
+          );
+        }
+        return;
+      }
+
+      // 2. Authoritative check against Firestore to ensure call is still ringing
+      if (callId.isNotEmpty) {
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection(FirestoreCollections.calls)
+              .doc(callId)
+              .get();
+          if (doc.exists) {
+            final status =
+                doc.data()?['callStatus']?.toString() ??
+                doc.data()?['status']?.toString();
+            if (status != null && !CallStatus.isRinging(status)) {
+              debugPrint(
+                '⚠️ [BACKGROUND] Call $callId is already $status. Aborting ring.',
+              );
+              if (status == CallStatus.missed) {
+                await NotificationService().initializeForBackground();
+                await NotificationService().showMissedCallNotification(
+                  callId: callId,
+                  callerName: data['callerName']?.toString() ?? 'Doctor',
+                  callType: data['callType']?.toString() ?? 'call',
+                  callerImage: data['callerImage']?.toString(),
+                );
+              }
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint(
+            '⚠️ [BACKGROUND] Error checking call status in Firestore: $e',
+          );
+        }
+      }
+
+      // Route based on targetModule:
+      // - 'opd_telemedicine': Native full-screen CallKit UI with accept/reject.
+      // - Other/general: Standard heads-up notification with action pills.
+      final targetModule =
+          data['targetModule']?.toString().toLowerCase() ?? 'opd_telemedicine';
+      final isOpdTelemedicine =
+          targetModule == 'opd_telemedicine' || targetModule.isEmpty;
+
+      if (isOpdTelemedicine) {
+        // Headless isolate: prefer the native CallKit/full-screen surface. If the
+        // plugin cannot present (for example on a platform where it is not
+        // registered), fall back to the existing local-notification presenter.
+        final payload = IncomingCallPayload.tryParse(data);
+        if (payload != null && !payload.isExpired) {
+          final shown = await CallKitService.instance.showIncomingCall(payload);
+          if (shown) {
+            await CallKitService.instance.acknowledgeDelivery(payload);
+            return;
+          }
+        }
+
+        await NotificationService().initializeForBackground();
+        await IncomingCallCoordinator.instance.registerIncomingCall(
+          data,
+          origin: IncomingCallOrigin.backgroundPush,
+        );
+        return;
+      } else {
+        // Non-OPD module or general consultation request: standard heads-up alert
+        await NotificationService().initializeForBackground();
+        await NotificationService().showStandardHeadsUpCallNotification(data);
+        return;
+      }
     }
 
     if (data['type'] == 'password_reset_otp') {
@@ -232,9 +352,14 @@ void callbackDispatcher() {
 }
 
 bool _isCallPayload(Map<String, dynamic> data) {
-  final type = data[CallPayloadKeys.type];
-  return (type is String && FcmMessageType.isCall(type)) ||
-      data.containsKey(CallPayloadKeys.callId);
+  final rawType = data[CallPayloadKeys.type]?.toString().toLowerCase();
+  if (rawType == 'missed_call' ||
+      rawType == 'call_cancel' ||
+      rawType == 'call_probe') {
+    return false;
+  }
+  return (rawType != null && FcmMessageType.isCall(rawType)) ||
+      (data.containsKey(CallPayloadKeys.callId) && rawType != 'chat_message');
 }
 
 /// Installs the three global error hooks *before* anything else can throw.
@@ -297,6 +422,20 @@ Future<void> main() async {
         options: DefaultFirebaseOptions.currentPlatform,
       );
 
+      // Pass all uncaught "fatal" errors from the framework to Crashlytics
+      FlutterError.onError = (details) {
+        FlutterError.presentError(details);
+        _logError('Flutter framework error', details.exception, details.stack);
+        FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+      };
+
+      // Pass all uncaught asynchronous errors that escape a zone to Crashlytics
+      ui.PlatformDispatcher.instance.onError = (error, stack) {
+        _logError('Uncaught platform error', error, stack);
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+        return true;
+      };
+
       // Initialize the local offline database (Hive) for chat & call history.
       await HiveDBService.initialize();
 
@@ -316,6 +455,10 @@ Future<void> main() async {
       // taps and the coordinator hooks).
       await NotificationService().initialize();
 
+      // Bind CallKit/full-screen call events. This must run after the
+      // coordinator hooks above, because accept navigates into the app.
+      await CallKitService.instance.configure();
+
       // Determine startup target before rendering Flutter UI so notification launches
       // (chat, incoming calls, etc.) bypass the splash screen.
       final launchTarget = await SmartLaunchCoordinator.determineLaunchTarget();
@@ -324,6 +467,7 @@ Future<void> main() async {
     },
     (Object error, StackTrace stack) {
       _logError('Uncaught error in root zone', error, stack);
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     },
   );
 }
@@ -338,10 +482,8 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
-  final FcmTokenService _fcmService = FcmTokenService();
+  final FCMServiceV2 _fcmService = FCMServiceV2();
   final NotificationService _notificationService = NotificationService();
-
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _activeCallsSub;
 
   /// Throttle for the resume-time token refresh: a merge-write per resume is
   /// cheap, but a foreground⇄background flip-flop loop should not hammer
@@ -378,8 +520,59 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       unawaited(_refreshFcmTokenForCurrentUser());
     }
 
+    unawaited(_validateActiveSessionOnResume());
+    unawaited(_syncTimezoneForCurrentUser());
     unawaited(ChatController().syncPendingMessages());
     unawaited(ChatController().recoverChatListIfNeeded());
+  }
+
+  /// Verifies that this device still holds the active session when resumed from background.
+  Future<void> _validateActiveSessionOnResume() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? userId;
+      String? role;
+
+      final doctorJson = prefs.getString('current_doctor');
+      if (doctorJson != null && doctorJson.isNotEmpty) {
+        try {
+          final map = jsonDecode(doctorJson) as Map<String, dynamic>;
+          userId = map['id']?.toString();
+          role = 'doctor';
+        } catch (_) {}
+      }
+
+      if (userId == null || userId.isEmpty) {
+        final userJson = prefs.getString('current_user');
+        if (userJson != null && userJson.isNotEmpty) {
+          try {
+            final map = jsonDecode(userJson) as Map<String, dynamic>;
+            userId = map['id']?.toString();
+            role = map['role']?.toString() ?? 'patient';
+          } catch (_) {}
+        }
+      }
+
+      if (userId == null || userId.isEmpty) return;
+
+      final collection = role == 'doctor'
+          ? 'telemedicine_doctors'
+          : 'telemedicine_patient';
+
+      final isValid = await SingleDeviceSessionService.validateCurrentSession(
+        collectionName: collection,
+        documentId: userId,
+      );
+
+      if (!isValid) {
+        debugPrint(
+          '🔒 [Lifecycle] Session invalidated remotely while app was suspended. Forcing logout.',
+        );
+        await SingleDeviceSessionService.handleForcedLogout(null);
+      }
+    } catch (e) {
+      debugPrint('⚠️ [Lifecycle] Error validating session on resume: $e');
+    }
   }
 
   /// Re-reads the persisted session and merge-writes this device's current
@@ -424,8 +617,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     try {
       await _requestPermissions();
 
-      // Notifications are sent by Cloud Functions only. The client just keeps
-      // its FCM registration token current (see `FcmTokenService.updateToken`).
+      // FCM registration and device token management:
+      // The client keeps its device registration token current (see `FcmTokenService.updateToken`).
 
       // Offline-first sync: set up connectivity listener so pending messages are
       // pushed to the server the moment the device is back online.
@@ -452,8 +645,48 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       // pass, and Firestore cannot start one on its own. The scheduled Cloud
       // Function covers the terminated case; this covers the open app.
       unawaited(AppointmentLifecycleService.instance.start());
+
+      // Sync canonical device timezone with server profile
+      unawaited(_syncTimezoneForCurrentUser());
     } catch (e, s) {
       _logError('App initialization failed', e, s);
+    }
+  }
+
+  /// Syncs canonical IANA timezone for the authenticated user/doctor document.
+  Future<void> _syncTimezoneForCurrentUser() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? userId;
+      String? collectionName;
+
+      final doctorJson = prefs.getString('current_doctor');
+      if (doctorJson != null && doctorJson.isNotEmpty) {
+        try {
+          final map = jsonDecode(doctorJson) as Map<String, dynamic>;
+          userId = map['id']?.toString();
+          collectionName = 'telemedicine_doctors';
+        } catch (_) {}
+      }
+
+      if (userId == null || userId.isEmpty) {
+        final userJson = prefs.getString('current_user');
+        if (userJson != null && userJson.isNotEmpty) {
+          try {
+            final map = jsonDecode(userJson) as Map<String, dynamic>;
+            userId = map['id']?.toString();
+            collectionName = 'telemedicine_patient';
+          } catch (_) {}
+        }
+      }
+
+      if (userId == null || userId.isEmpty || collectionName == null) return;
+      await TimezoneService.syncUserTimezone(
+        collectionName: collectionName,
+        documentId: userId,
+      );
+    } catch (e) {
+      debugPrint('⚠️ Timezone sync error: $e');
     }
   }
 
@@ -461,9 +694,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   /// of them through the coordinator, which decides — by app state, not by
   /// who called it — whether a notification, a screen, or both go up.
   ///
-  /// All call producers (FCM foreground, FCM background, notification tap,
-  /// this watcher) funnel through there, so a second producer arriving with
-  /// the same `callId` is a no-op rather than a second screen.
+  /// [CallService] filters `calling`/`incoming`/`ringing` client-side instead
+  /// of querying only `ringing`: the caller's first write is `calling`, so the
+  /// old query missed every call that had not been acknowledged yet.
   Future<void> _listenForActiveCalls() async {
     // The signed-in session is written a moment after the splash resolves, so
     // give it a few attempts instead of silently never watching.
@@ -480,73 +713,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       return;
     }
 
-    // Query requires composite index on 'calls':
-    //   - callStatus (Ascending)
-    //   - receiverId (Ascending)
-    //   - startTime (Descending)
-    void startCallListener({bool useOrderBy = true}) {
-      _activeCallsSub?.cancel();
-
-      Query<Map<String, dynamic>> query = FirebaseFirestore.instance
-          .collection(FirestoreCollections.calls)
-          .where('callStatus', isEqualTo: CallStatus.ringing)
-          .where('receiverId', isEqualTo: userId);
-
-      if (useOrderBy) {
-        query = query.orderBy('startTime', descending: true);
-      }
-
-      _activeCallsSub = query.snapshots().listen(
-        (snapshot) {
-          final now = DateTime.now();
-          for (final doc in snapshot.docs) {
-            final data = doc.data();
-            final rawStart = data['startTime'];
-            DateTime? started;
-            if (rawStart is Timestamp) {
-              started = rawStart.toDate();
-            } else if (rawStart is String) {
-              started = DateTime.tryParse(rawStart);
-            }
-            if (started != null && now.difference(started).inSeconds > 90) {
-              debugPrint(
-                '⏭️ Skipping stale ringing call ${doc.id} '
-                '(started $started)',
-              );
-              continue;
-            }
-            final payload = <String, dynamic>{
-              ...data,
-              CallPayloadKeys.callId: doc.id,
-            };
-            unawaited(
-              IncomingCallCoordinator.instance.registerIncomingCall(
-                payload,
-                origin: IncomingCallOrigin.firestoreWatcher,
-              ),
-            );
-          }
-        },
-        onError: (Object e) {
-          final isIndexError =
-              e is FirebaseException &&
-              (e.code == 'failed-precondition' ||
-                  (e.message?.toLowerCase().contains('index') ?? false));
-
-          if (isIndexError && useOrderBy) {
-            debugPrint(
-              '⚠️ [CALL_WATCHER] Composite index on calls (callStatus ASC, receiverId ASC, startTime DESC) '
-              'is building or missing. Falling back to un-ordered query while building: ${e.message}',
-            );
-            startCallListener(useOrderBy: false);
-          } else {
-            _logError('Call watcher error', e, StackTrace.current);
-          }
-        },
-      );
-    }
-
-    startCallListener(useOrderBy: true);
+    await CallService.instance.watchIncomingCalls(userId);
   }
 
   Future<void> _requestPermissions() async {
@@ -569,7 +736,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _activeCallsSub?.cancel();
+    unawaited(CallService.instance.stopWatchingIncomingCalls());
     AppointmentLifecycleService.instance.dispose();
     super.dispose();
   }

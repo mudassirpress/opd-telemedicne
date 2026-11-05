@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +24,10 @@ import 'package:telemedicine/features/patients/presentation/patient_portal_wrapp
 import 'package:telemedicine/features/splash/presentation/splash_screen.dart';
 import 'package:telemedicine/features/calls/presentation/call_screen.dart';
 import 'package:telemedicine/features/calls/presentation/incoming_call_screen.dart';
+import 'package:telemedicine/features/calling/screens/active_call_screen.dart';
+import 'package:telemedicine/features/calling/controllers/call_controller.dart';
+import 'package:telemedicine/features/calling/services/call_audio_service.dart';
+import 'package:telemedicine/core/services/audio_service.dart';
 import 'package:telemedicine/features/chat/presentation/chat_screen.dart';
 
 /// The kind of destination target determined at startup.
@@ -92,7 +97,47 @@ class SmartLaunchCoordinator {
     }
 
     try {
-      // 1. Check local notifications launch details (notification body tap, action button, fullScreenIntent)
+      // 0. Check NotificationService cached response if NotificationService.initialize() was called first
+      final coldStartResponse = NotificationService.coldStartNotificationResponse;
+      if (coldStartResponse != null &&
+          coldStartResponse.payload != null &&
+          coldStartResponse.payload!.isNotEmpty) {
+        final data = _parsePayload(coldStartResponse.payload!);
+        final target = _resolveTargetFromData(
+          data,
+          actionId: coldStartResponse.actionId,
+        );
+        if (target != null) {
+          debugPrint(
+            '🚀 [SMART_LAUNCH] Launched from cached coldStartNotificationResponse: $target',
+          );
+          _cachedLaunchTarget = target;
+          _hasDetermined = true;
+          return target;
+        }
+      }
+
+      // 1. Check native CallKit accepted call from terminated/background state
+      try {
+        final activeCalls = await FlutterCallkitIncoming.activeCalls();
+        for (final call in activeCalls) {
+          if (call.isAccepted && call.id != null && call.id!.isNotEmpty) {
+            final data = Map<String, dynamic>.from(call.extra ?? {});
+            data['callId'] = call.id;
+            final target = _resolveTargetFromData(data, actionId: CallActionIds.accept);
+            if (target != null) {
+              debugPrint('🚀 [SMART_LAUNCH] Launched from CallKit activeCall accept: $target');
+              _cachedLaunchTarget = target;
+              _hasDetermined = true;
+              return target;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ [SMART_LAUNCH] Error inspecting CallKit activeCalls: $e');
+      }
+
+      // 2. Check local notifications launch details (notification body tap, action button, fullScreenIntent)
       final localNotifications = FlutterLocalNotificationsPlugin();
       final localDetails = await localNotifications
           .getNotificationAppLaunchDetails();
@@ -180,14 +225,18 @@ class SmartLaunchCoordinator {
         type == 'call' || type == 'incoming_call' || data.containsKey('callId');
 
     if (isCall) {
-      if (actionId == CallActionIds.accept) {
+      if (actionId == CallActionIds.accept ||
+          actionId == 'accept' ||
+          actionId == 'accept_call') {
         return LaunchTarget(
           type: LaunchTargetType.activeCall,
           data: data,
           actionId: actionId,
         );
       }
-      if (actionId == CallActionIds.decline) {
+      if (actionId == CallActionIds.decline ||
+          actionId == 'decline' ||
+          actionId == 'decline_call') {
         return LaunchTarget(
           type: LaunchTargetType.declineCall,
           data: data,
@@ -391,17 +440,73 @@ class _SmartDirectLaunchWrapperState
               ? const AdminPortalWrapper()
               : const PatientPortalWrapper());
 
-    // A notification tap that cold-started the app was already dispatched by
-    // `NotificationService.initialize()` before `runApp`. That service owns the
-    // destination (it applies the payment lock and chat authorization and
-    // de-duplicates calls), so rendering a second one here is what used to put
-    // two chat screens / two incoming-call screens on the stack. Rendering the
-    // portal and marking the app ready lets the pending navigation land on it.
-    if (NotificationService.coldStartNotificationConsumed) {
-      debugPrint(
-        '🚀 [SMART_LAUNCH] Cold-start notification handled by '
-        'NotificationService -> base portal',
-      );
+    // 1. Handle Active Call (notification 'Accept' action button tap or native accept)
+    // Checked BEFORE coldStartNotificationConsumed so direct call acceptance bypasses all portals and splash!
+    if (widget.target.isActiveCall) {
+      final data = widget.target.data;
+      var payload = IncomingCallPayload.tryParse(data);
+
+      if (payload != null) {
+        final enriched =
+            await IncomingCallCoordinator.instance.enrichFromFirestore(payload) ??
+                payload;
+        payload = enriched;
+
+        final currentUserId =
+            await IncomingCallCoordinator.instance.resolveCurrentUserId();
+        final currentUserName =
+            await IncomingCallCoordinator.instance.resolveCurrentUserName();
+
+        // Mark screen as open right away so background listeners do not push duplicate routes
+        IncomingCallCoordinator.instance.markScreenOpened(payload.callId);
+
+        // Accept the call and connect to Zego room
+        final accepted = await CallController.instance.acceptCall(
+          payload.callId,
+          userId: currentUserId,
+          userName: currentUserName,
+        );
+
+        // Cancel notification and stop ringtones
+        await IncomingCallCoordinator.instance.dismissNotification(payload.callId);
+        await CallAudioService.instance.stopRingtone();
+        await SystemRingtonePlayer.stopDefaultRingtone();
+
+        // Start call duration timer
+        CallController.instance.startCallDurationTimer(reset: true);
+
+        // Release any app-ready waiters
+        NotificationService.markAppReady();
+
+        if (accepted && currentUserId.isNotEmpty) {
+          debugPrint(
+            '📞 [SMART_LAUNCH] Direct immediate mount to ActiveCallScreen callId=${payload.callId}',
+          );
+          if (mounted) {
+            setState(() {
+              _destination = _StackWithBasePortal(
+                basePortal: basePortal,
+                child: ActiveCallScreen(
+                  callId: payload!.callId,
+                  roomId: payload.channelId,
+                  otherUserId: payload.callerId,
+                  otherUserName: payload.callerName,
+                  otherUserRole: payload.callerType,
+                  otherUserImage: payload.callerImage,
+                  currentUserId: currentUserId,
+                  currentUserName: currentUserName,
+                  isCaller: false,
+                ),
+              );
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+      }
+
+      // If call failed or expired, clean up and fall back to base portal
+      IncomingCallCoordinator.instance.markScreenClosed(payload?.callId ?? '');
       NotificationService.markAppReady();
       if (mounted) {
         setState(() {
@@ -430,7 +535,100 @@ class _SmartDirectLaunchWrapperState
       return;
     }
 
-    // 3. Route directly based on the launch target
+    // 3. Handle incoming call notification body tap (or heads-up ringing UI)
+    if (widget.target.isIncomingCall) {
+      final data = widget.target.data;
+      var payload = IncomingCallPayload.tryParse(data);
+
+      if (payload == null) {
+        debugPrint(
+          '⚠️ [SMART_LAUNCH] Malformed call payload -> fallback to base portal',
+        );
+        NotificationService.markAppReady();
+        if (mounted) {
+          setState(() {
+            _destination = basePortal;
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      final enriched =
+          await IncomingCallCoordinator.instance.enrichFromFirestore(payload) ??
+              payload;
+      payload = enriched;
+
+      // Check whether call is still ringing
+      final validated = await IncomingCallCoordinator.instance
+          .registerIncomingCall(
+            payload.toMap(),
+            origin: IncomingCallOrigin.notificationTap,
+          );
+
+      NotificationService.markAppReady();
+
+      if (validated == null) {
+        debugPrint(
+          '⚠️ [SMART_LAUNCH] Tapped call no longer ringing -> safe home screen',
+        );
+        ToastService.instance.showInfo('This call has ended or expired.');
+        if (mounted) {
+          setState(() {
+            _destination = basePortal;
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      IncomingCallCoordinator.instance.markScreenOpened(payload.callId);
+
+      debugPrint(
+        '📞 [SMART_LAUNCH] Direct deep link to IncomingCallScreen callId=${payload.callId}',
+      );
+      if (mounted) {
+        setState(() {
+          _destination = _StackWithBasePortal(
+            basePortal: basePortal,
+            child: IncomingCallScreen(
+              callId: payload!.callId,
+              callerName: payload.callerName,
+              callerImage: payload.callerImage,
+              channelId: payload.channelId,
+              callerId: payload.callerId,
+              callType: payload.callType,
+              callerType: payload.callerType,
+              autoAccept: false,
+            ),
+          );
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    // A notification tap that cold-started the app was already dispatched by
+    // `NotificationService.initialize()` before `runApp`. That service owns the
+    // destination for chat/admin/payments, so rendering a second one here is
+    // what used to put two chat screens on the stack. Rendering the portal and
+    // marking the app ready lets the pending navigation land on it.
+    if (NotificationService.coldStartNotificationConsumed) {
+      debugPrint(
+        '🚀 [SMART_LAUNCH] Cold-start notification handled by '
+        'NotificationService -> base portal',
+      );
+      NotificationService.markAppReady();
+      if (mounted) {
+        setState(() {
+          _destination = basePortal;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    // 4. Route directly based on the launch target
     if (widget.target.isChat) {
       final data = widget.target.data;
       final otherUserId = (data['senderId'] ?? data['otherUserId'] ?? '')
@@ -476,116 +674,6 @@ class _SmartDirectLaunchWrapperState
       return;
     }
 
-    if (widget.target.isIncomingCall) {
-      final data = widget.target.data;
-      final payload = IncomingCallPayload.tryParse(data);
-
-      if (payload == null) {
-        debugPrint(
-          '⚠️ [SMART_LAUNCH] Malformed call payload -> fallback to base portal',
-        );
-        NotificationService.markAppReady();
-        if (mounted) {
-          setState(() {
-            _destination = basePortal;
-            _isLoading = false;
-          });
-        }
-        return;
-      }
-
-      // Check whether call is still ringing
-      final validated = await IncomingCallCoordinator.instance
-          .registerIncomingCall(
-            payload.toMap(),
-            origin: IncomingCallOrigin.notificationTap,
-          );
-
-      NotificationService.markAppReady();
-
-      if (validated == null) {
-        debugPrint(
-          '⚠️ [SMART_LAUNCH] Tapped call no longer ringing -> safe home screen',
-        );
-        ToastService.instance.showInfo('This call has ended or expired.');
-        if (mounted) {
-          setState(() {
-            _destination = basePortal;
-            _isLoading = false;
-          });
-        }
-        return;
-      }
-
-      debugPrint(
-        '📞 [SMART_LAUNCH] Direct deep link to IncomingCallScreen callId=${payload.callId}',
-      );
-      if (mounted) {
-        setState(() {
-          _destination = IncomingCallScreen(
-            callId: payload.callId,
-            callerName: payload.callerName,
-            callerImage: payload.callerImage,
-            channelId: payload.channelId,
-            callerId: payload.callerId,
-            callType: payload.callType,
-            callerType: payload.callerType,
-            autoAccept: false,
-          );
-          _isLoading = false;
-        });
-      }
-      return;
-    }
-
-    if (widget.target.isActiveCall) {
-      final data = widget.target.data;
-      final payload = IncomingCallPayload.tryParse(data);
-
-      if (payload != null) {
-        final currentUserId = await IncomingCallCoordinator.instance
-            .resolveCurrentUserId();
-
-        final accepted = await IncomingCallCoordinator.instance.accept(
-          payload.callId,
-        );
-
-        NotificationService.markAppReady();
-
-        if (accepted.handled && currentUserId.isNotEmpty) {
-          debugPrint(
-            '📞 [SMART_LAUNCH] Direct deep link to CallScreen callId=${payload.callId}',
-          );
-          if (mounted) {
-            setState(() {
-              _destination = CallScreen(
-                channelId: payload.channelId,
-                callId: payload.callId,
-                callType: payload.callType,
-                otherUserName: payload.callerName,
-                otherUserImage: payload.callerImage,
-                currentUserId: currentUserId,
-                otherUserId: payload.callerId,
-                otherUserType: payload.callerType,
-                isCaller: false,
-              );
-              _isLoading = false;
-            });
-          }
-          return;
-        }
-      }
-
-      NotificationService.markAppReady();
-      if (mounted) {
-        setState(() {
-          _destination = basePortal;
-          _isLoading = false;
-        });
-      }
-      return;
-    }
-
     // Default fallback
     NotificationService.markAppReady();
     if (mounted) {
@@ -611,6 +699,9 @@ class _SmartDirectLaunchWrapperState
 
 /// Helper that mounts the destination screen with the portal in the backstack,
 /// so pressing the Android back button smoothly returns the user to the portal.
+///
+/// Uses [onGenerateInitialRoutes] to synchronously render [child] on the FIRST FRAME
+/// without any intermediate flash or delay showing [basePortal].
 class _StackWithBasePortal extends StatelessWidget {
   final Widget basePortal;
   final Widget child;
@@ -620,21 +711,20 @@ class _StackWithBasePortal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Navigator(
-      onGenerateRoute: (settings) {
-        return MaterialPageRoute<void>(
-          builder: (context) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  settings: RouteSettings(name: child.runtimeType.toString()),
-                  builder: (_) => child,
-                ),
-              );
-            });
-            return basePortal;
-          },
-        );
-      },
+      onGenerateInitialRoutes: (navigator, initialRoute) => [
+        MaterialPageRoute<void>(
+          settings: const RouteSettings(name: '/home'),
+          builder: (_) => basePortal,
+        ),
+        MaterialPageRoute<void>(
+          settings: RouteSettings(name: child.runtimeType.toString()),
+          builder: (_) => child,
+        ),
+      ],
+      onGenerateRoute: (settings) => MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => child,
+      ),
     );
   }
 }

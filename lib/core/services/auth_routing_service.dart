@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telemedicine/features/admin/presentation/admin_bottom_nav/admin_portal_wrapper.dart';
 import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
 import 'package:telemedicine/features/auth/presentation/screens/expired_patient_screen.dart';
@@ -114,6 +116,51 @@ class AuthRoutingService {
       Navigator.of(
         context,
       ).pushReplacement(MaterialPageRoute(builder: (_) => targetScreen));
+    }
+  }
+
+  /// Safely routes the user to their appropriate base portal
+  /// (DoctorPortalWrapper, AdminPortalWrapper, PatientPortalWrapper, or SignInScreen)
+  /// based on their persistent session in SharedPreferences.
+  /// Used for cold-start call termination or deep-link fallback when the navigator stack has no history.
+  static Future<void> routeToAppropriatePortal(BuildContext context) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final doctorJson = prefs.getString('current_doctor');
+      final userJson = prefs.getString('current_user');
+
+      Widget portal = const SignInScreen();
+
+      if (doctorJson != null && doctorJson.isNotEmpty) {
+        portal = const DoctorPortalWrapper();
+      } else if (userJson != null && userJson.isNotEmpty) {
+        try {
+          final userMap = json.decode(userJson) as Map<String, dynamic>;
+          final role = (userMap['role'] ?? 'patient').toString().toLowerCase();
+          if (role == 'admin') {
+            portal = const AdminPortalWrapper();
+          } else {
+            portal = const PatientPortalWrapper();
+          }
+        } catch (_) {
+          portal = const PatientPortalWrapper();
+        }
+      }
+
+      if (!context.mounted) return;
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => portal),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      debugPrint('⚠️ [AuthRoutingService] routeToAppropriatePortal error: $e');
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const SignInScreen()),
+          (Route<dynamic> route) => false,
+        );
+      }
     }
   }
 }

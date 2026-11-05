@@ -10,6 +10,7 @@ import 'package:telemedicine/features/doctor_portal/presentation/doctor_portal_s
 import 'package:telemedicine/features/doctor_portal/presentation/shared_reports/doctor_shared_reports_screen.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 import 'package:telemedicine/shared/widgets/app_states.dart';
+import 'package:telemedicine/shared/widgets/single_device_session_guard.dart';
 import 'package:telemedicine/core/providers/badge_providers.dart';
 import 'package:telemedicine/shared/widgets/badge_indicator.dart';
 
@@ -118,7 +119,9 @@ class _DoctorPortalWrapperState extends ConsumerState<DoctorPortalWrapper> {
     final unreadReports =
         ref.watch(unreadReportsCountProvider).valueOrNull ?? 0;
 
-    return PopScope(
+    final doctor = ref.watch(doctorControllerProvider).currentDoctor;
+
+    final content = PopScope(
       canPop: currentIndex == DoctorPortalTab.chat.index,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) {
@@ -205,6 +208,16 @@ class _DoctorPortalWrapperState extends ConsumerState<DoctorPortalWrapper> {
         ),
       ),
     );
+
+    if (doctor != null && doctor.id.isNotEmpty) {
+      return SingleDeviceSessionGuard(
+        collectionName: 'telemedicine_doctors',
+        documentId: doctor.id,
+        child: content,
+      );
+    }
+
+    return content;
   }
 
   Widget _buildNavItem(

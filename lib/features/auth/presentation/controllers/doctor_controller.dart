@@ -12,9 +12,13 @@ import 'package:telemedicine/data/models/user_model.dart';
 import 'package:telemedicine/core/services/notification_service.dart';
 import 'package:telemedicine/core/services/session_service.dart';
 import 'package:telemedicine/core/services/soft_delete_service.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:telemedicine/core/services/single_device_session_service.dart';
+import 'package:telemedicine/core/services/timezone_service.dart';
+import 'package:telemedicine/core/services/device_service.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
 import 'package:telemedicine/core/network/network_health_checker.dart';
+import 'package:telemedicine/core/services/callkit_service.dart';
+import 'package:telemedicine/core/services/incoming_call_coordinator.dart';
 import 'package:telemedicine/features/chat/presentation/controllers/chat_controller.dart';
 
 class DoctorController extends ChangeNotifier {
@@ -33,8 +37,6 @@ class DoctorController extends ChangeNotifier {
   bool _isOnline = false;
   bool _manualAvailability = false;
   final NetworkHealthChecker _networkHealthChecker = NetworkHealthChecker();
-  FirebaseFunctions get _functions =>
-      FirebaseFunctions.instanceFor(region: 'asia-south1');
   Map<String, bool> _doctorsStatusCache = {};
 
   // Doctor list stream: self-refreshing via periodic timer
@@ -48,6 +50,27 @@ class DoctorController extends ChangeNotifier {
   // Connectivity listener for immediate offline detection
   StreamSubscription<ConnectivityResult>? _connectivitySub;
   bool _connectivityListenerSetup = false;
+
+  // Single-device active session subscription
+  StreamSubscription? _sessionSubscription;
+
+  void _listenToDoctorSession(String doctorId) {
+    _sessionSubscription?.cancel();
+    DeviceService.getDeviceId().then((currentDeviceId) {
+      _sessionSubscription = SingleDeviceSessionService.listenForSessionChanges(
+        collectionName: 'telemedicine_doctors',
+        documentId: doctorId,
+        currentDeviceId: currentDeviceId,
+        onSessionInvalidated: () async {
+          debugPrint(
+            '🔒 [DoctorController] Remote device claimed session. Dislodging this doctor.',
+          );
+          await signOut();
+          SingleDeviceSessionService.handleForcedLogout(null);
+        },
+      );
+    });
+  }
 
   // Getters
   UserModel? get currentDoctor => _currentDoctor;
@@ -108,7 +131,8 @@ class DoctorController extends ChangeNotifier {
   }
 
   /// Listen for connectivity changes.
-  /// Connectivity changes MUST NOT flip the doctor's manual availability.
+  /// When connectivity is lost, marks doctor offline in Firebase immediately.
+  /// When connectivity is restored, restores doctor's manual availability preference.
   void _setupConnectivityListener() {
     if (_connectivityListenerSetup) return;
     _connectivityListenerSetup = true;
@@ -116,10 +140,37 @@ class DoctorController extends ChangeNotifier {
     _connectivitySub = Connectivity().onConnectivityChanged.listen((
       result,
     ) async {
-      if (_currentDoctor == null) return;
-      // Interface restored - resume foreground presence tracking only if doctor's manual intent is ON
-      if (result != ConnectivityResult.none && _manualAvailability) {
-        startPresenceTracking();
+      if (_currentDoctor == null || _currentDoctor!.id.isEmpty) return;
+      final doctorId = _currentDoctor!.id;
+
+      if (result == ConnectivityResult.none) {
+        // Device lost internet connection
+        stopPresenceTracking();
+        try {
+          await _firestore.collection('telemedicine_doctors').doc(doctorId).update({
+            'isAvailable': false,
+            'effectiveStatus': 'OFFLINE',
+            'deviceReachable': false,
+            'presenceStale': true,
+            'lastStatusUpdate': FieldValue.serverTimestamp(),
+          });
+        } catch (_) {}
+      } else {
+        // Interface restored - resume tracking and restore status if manual preference was ON
+        if (_manualAvailability) {
+          try {
+            await _firestore.collection('telemedicine_doctors').doc(doctorId).update({
+              'isOnline': true,
+              'isAvailable': true,
+              'effectiveStatus': 'ONLINE',
+              'deviceReachable': true,
+              'presenceStale': false,
+              'lastStatusUpdate': FieldValue.serverTimestamp(),
+              'lastSeen': FieldValue.serverTimestamp(),
+            });
+          } catch (_) {}
+          startPresenceTracking();
+        }
       }
     });
   }
@@ -165,6 +216,9 @@ class DoctorController extends ChangeNotifier {
       } else {
         stopPresenceTracking();
         unawaited(_historyService.endAllActiveSessions(doctorId: doctorId));
+        // Gracefully tear down any incoming ringing states and native CallKit UI
+        unawaited(IncomingCallCoordinator.instance.dismissAllActiveRinging());
+        unawaited(CallKitService.instance.endAll());
       }
       return true;
     } catch (e) {
@@ -179,60 +233,57 @@ class DoctorController extends ChangeNotifier {
     return toggleDoctorStatus(isOnline);
   }
 
-  /// Heartbeat loop: sends ping every 20 seconds while app is in foreground and manualAvailability is true.
+  /// Heartbeat loop: sends ping every 25 seconds while doctor app is in foreground.
+  /// Automates online lease renewal without requiring manual duty switches.
   void startPresenceTracking() {
     _presenceTimer?.cancel();
+    if (_currentDoctor == null || _currentDoctor!.id.isEmpty) return;
 
-    _presenceTimer = Timer.periodic(const Duration(seconds: 20), (timer) async {
-      if (_currentDoctor == null || !_manualAvailability) {
+    unawaited(_sendDoctorHeartbeatPing());
+
+    _presenceTimer = Timer.periodic(const Duration(seconds: 25), (timer) async {
+      if (_currentDoctor == null || _currentDoctor!.id.isEmpty) {
         stopPresenceTracking();
         return;
       }
-
-      // Check internet reachability before heartbeat
-      final hasData = await _networkHealthChecker.hasActiveInternet();
-      if (!hasData) {
-        debugPrint('Doctor heartbeat skipped: data package unreachable');
-        return;
-      }
-
-      try {
-        final callable = _functions.httpsCallable('sendDoctorHeartbeat');
-        final response = await callable
-            .call<Map<String, dynamic>>({
-              'doctorId': _currentDoctor!.id,
-              'networkType': 'active',
-            })
-            .timeout(const Duration(seconds: 6));
-
-        final resData = response.data;
-        if (resData['success'] == true) {
-          if (!_isOnline) {
-            _isOnline = true;
-            notifyListeners();
-          }
-        }
-
-        if (_currentSessionId != null) {
-          unawaited(SessionService.heartbeatSession(_currentSessionId!));
-        }
-      } catch (e) {
-        // Fallback to direct Firestore update
-        try {
-          await _firestore
-              .collection('telemedicine_doctors')
-              .doc(_currentDoctor!.id)
-              .update({
-                'lastHeartbeat': FieldValue.serverTimestamp(),
-                'lastHeartbeatAt': FieldValue.serverTimestamp(),
-                'lastSeen': FieldValue.serverTimestamp(),
-                'isAppConnected': true,
-              });
-        } catch (err) {
-          debugPrint('Heartbeat update fallback failed: $err');
-        }
-      }
+      await _sendDoctorHeartbeatPing();
     });
+  }
+
+  Future<void> _sendDoctorHeartbeatPing() async {
+    if (_currentDoctor == null || _currentDoctor!.id.isEmpty) return;
+
+    // Check internet reachability before heartbeat
+    final hasData = await _networkHealthChecker.hasActiveInternet();
+    if (!hasData) {
+      debugPrint('Doctor heartbeat skipped: data package unreachable');
+      return;
+    }
+
+    try {
+      await _firestore
+          .collection('telemedicine_doctors')
+          .doc(_currentDoctor!.id)
+          .update({
+            'isOnline': true,
+            'isAvailable': true,
+            'manualAvailability': true,
+            'lastHeartbeat': FieldValue.serverTimestamp(),
+            'lastHeartbeatAt': FieldValue.serverTimestamp(),
+            'lastSeen': FieldValue.serverTimestamp(),
+            'isAppConnected': true,
+          });
+      if (!_isOnline) {
+        _isOnline = true;
+        notifyListeners();
+      }
+
+      if (_currentSessionId != null) {
+        unawaited(SessionService.heartbeatSession(_currentSessionId!));
+      }
+    } catch (err) {
+      debugPrint('Doctor heartbeat update error: $err');
+    }
   }
 
   // Stop presence tracking
@@ -508,16 +559,19 @@ class DoctorController extends ChangeNotifier {
         return false;
       }
 
-      final hasOtherSession =
-          await SessionService.hasActiveSessionOnOtherDevice(doctorDoc.id);
-      if (hasOtherSession) {
-        print('❌ Active session exists on another device – login blocked');
+      final claimResult = await SingleDeviceSessionService.claimActiveSession(
+        collectionName: 'telemedicine_doctors',
+        documentId: doctorDoc.id,
+        role: 'doctor',
+      );
+      if (!claimResult.allowed) {
         _errorMessage =
-            'Your account is already logged in on another device. '
-            'Please log out from that device first.';
+            claimResult.errorMessage ??
+            'Unable to establish secure doctor session.';
         _setLoading(false);
         return false;
       }
+      _currentSessionId = claimResult.sessionId;
 
       print('Found doctor: ${doctorData['fullname']}');
 
@@ -543,11 +597,7 @@ class DoctorController extends ChangeNotifier {
       });
 
       await _saveDoctorToLocalStorage(_currentDoctor!);
-
-      _currentSessionId = await SessionService.createSession(
-        userId: _currentDoctor!.id,
-        role: 'doctor',
-      );
+      _listenToDoctorSession(doctorDoc.id);
 
       // Set doctor as online
       await updateDoctorPresence(true);
@@ -1090,9 +1140,12 @@ class DoctorController extends ChangeNotifier {
           doctorId: _currentDoctor!.id,
         );
 
-        await SessionService.endSession(
-          userId: _currentDoctor!.id,
-          sessionId: _currentSessionId,
+        _sessionSubscription?.cancel();
+        _sessionSubscription = null;
+
+        await SingleDeviceSessionService.releaseSession(
+          collectionName: 'telemedicine_doctors',
+          documentId: _currentDoctor!.id,
         );
         _currentSessionId = null;
 
@@ -1162,6 +1215,12 @@ class DoctorController extends ChangeNotifier {
     // this account and fetch it if it was never confirmed. A no-op when the
     // cache is already complete.
     unawaited(ChatController().recoverChatListIfNeeded());
+    unawaited(
+      TimezoneService.syncUserTimezone(
+        collectionName: 'telemedicine_doctors',
+        documentId: doctor.id,
+      ),
+    );
   }
 
   Future<void> _clearDoctorFromLocalStorage() async {
@@ -1224,12 +1283,12 @@ class DoctorController extends ChangeNotifier {
           return;
         }
 
-        // Get manual availability and online status from Firestore
+        // Get manual availability preference from Firestore
         final firestoreData = doctorDoc.data();
         final manualAvailability =
+            firestoreData?['manualAvailability'] as bool? ??
             firestoreData?['isOnline'] as bool? ??
             firestoreData?['isAvailable'] as bool? ??
-            firestoreData?['manualAvailability'] as bool? ??
             false;
         _manualAvailability = manualAvailability;
         _isOnline = manualAvailability;
@@ -1246,6 +1305,9 @@ class DoctorController extends ChangeNotifier {
 
         print('✅ Doctor loaded from storage: ${_currentDoctor?.fullname}');
         print('✅ Online status: $_isOnline');
+        if (_currentDoctor != null && _currentDoctor!.id.isNotEmpty) {
+          _listenToDoctorSession(_currentDoctor!.id);
+        }
         notifyListeners();
       } else {
         _currentDoctor = null;

@@ -6,10 +6,10 @@ import 'package:telemedicine/core/services/notification_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('FcmTokenService & Channel Alignment', () {
-    test('FcmTokenService singleton returns identical instance', () {
-      final instance1 = FcmTokenService();
-      final instance2 = FcmTokenService();
+  group('FCMServiceV2 & Channel Alignment', () {
+    test('FCMServiceV2 singleton returns identical instance', () {
+      final instance1 = FCMServiceV2();
+      final instance2 = FCMServiceV2();
       expect(identical(instance1, instance2), isTrue);
     });
 

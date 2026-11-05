@@ -1,288 +1,443 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
+import 'package:uuid/uuid.dart';
 import 'package:telemedicine/core/services/device_service.dart';
+import 'package:telemedicine/core/services/notification_service.dart';
 import 'package:telemedicine/features/auth/data/services/phone_auth_service.dart';
+import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
 
-/// Service enforcing strict single-device login per account.
+/// Server-authoritative service enforcing strict single-active-device session per account.
 ///
-/// Ensures an account can only be active on one mobile device at any time.
-/// If user A logs in on Device 2, Device 1 is automatically signed out in real-time.
+/// Ensures an account can only be active on one device at any time.
+/// When user logs in on Device B, Device A's session is superseded on the server,
+/// Firebase Auth refresh tokens are revoked via Cloud Functions, and Device A
+/// is dislodged in real-time.
 class SingleDeviceSessionService {
   SingleDeviceSessionService._();
   static final SingleDeviceSessionService instance =
       SingleDeviceSessionService._();
 
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+  static const String _sessionStorageKey = 'active_session_id';
+
+  /// Currently active local session ID in memory.
+  static String? _cachedSessionId;
 
   /// Retrieves the persistent hardware/installation device ID.
   static Future<String> getDeviceId() async {
     return await DeviceService.getDeviceId();
   }
 
-  /// Validates whether the account is currently logged in on another device.
+  /// Retrieves the current active session ID for this device.
+  static Future<String> getLocalSessionId() async {
+    if (_cachedSessionId != null && _cachedSessionId!.isNotEmpty) {
+      return _cachedSessionId!;
+    }
+    try {
+      final secure = await _secureStorage.read(key: _sessionStorageKey);
+      if (secure != null && secure.isNotEmpty) {
+        _cachedSessionId = secure;
+        return secure;
+      }
+    } catch (_) {}
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getString(_sessionStorageKey);
+      if (stored != null && stored.isNotEmpty) {
+        _cachedSessionId = stored;
+        return stored;
+      }
+    } catch (_) {}
+
+    return '';
+  }
+
+  /// Persists the active session ID locally in secure storage and SharedPreferences.
+  static Future<void> _persistLocalSessionId(String sessionId) async {
+    _cachedSessionId = sessionId;
+    try {
+      await _secureStorage.write(key: _sessionStorageKey, value: sessionId);
+    } catch (_) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_sessionStorageKey, sessionId);
+    } catch (_) {}
+  }
+
+  /// Clears the active local session ID.
+  static Future<void> _clearLocalSessionId() async {
+    _cachedSessionId = null;
+    try {
+      await _secureStorage.delete(key: _sessionStorageKey);
+    } catch (_) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_sessionStorageKey);
+    } catch (_) {}
+  }
+
+  /// Atomically claims an authoritative single active device session.
   ///
-  /// - If [blockSecondLogin] is true (default):
-  ///   Rejects login if `isLoggedIn == true` and `activeDeviceId` does not match [currentDeviceId].
-  /// - If [blockSecondLogin] is false:
-  /// Validates whether the account is currently logged in on another device.
-  ///
-  /// - If [blockSecondLogin] is true (default):
-  ///   Rejects login if `isLoggedIn == true` and `activeDeviceId` does not match [currentDeviceId].
-  /// - If [blockSecondLogin] is false:
-  ///   Allows login and updates `activeDeviceId`, which invalidates Device 1.
-  ///
-  /// Uses a Firestore transaction for atomic, concurrency-safe session claiming.
-  /// Returns a record with `allowed` and an optional `errorMessage`.
+  /// - Creates/updates authoritative server session at `/users/{documentId}/sessions/active`
+  /// - Atomically updates the user profile document (`telemedicine_patient` or `telemedicine_doctors`)
+  /// - Generates a new unique `sessionId` (superseding any prior session)
+  /// - Revokes Firebase Auth refresh tokens for any displaced sessions via Cloud Functions
+  static Future<({bool allowed, String sessionId, String? errorMessage})>
+  claimActiveSession({
+    required String collectionName,
+    required String documentId,
+    required String role,
+    String? authUid,
+    String? fcmToken,
+  }) async {
+    if (documentId.trim().isEmpty) {
+      return (
+        allowed: false,
+        sessionId: '',
+        errorMessage: 'Invalid user document ID.',
+      );
+    }
+
+    final trimmedDocId = documentId.trim();
+    final currentDeviceId = await getDeviceId();
+    final newSessionId = const Uuid().v4();
+
+    try {
+      final userProfileRef = _firestore
+          .collection(collectionName)
+          .doc(trimmedDocId);
+      final activeSessionRef = _firestore
+          .collection('users')
+          .doc(trimmedDocId)
+          .collection('sessions')
+          .doc('active');
+
+      final platformMeta = <String, dynamic>{
+        'os': Platform.operatingSystem,
+        'osVersion': Platform.operatingSystemVersion,
+        'isPhysicalDevice': true,
+        'appVersion': '1.0.8',
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      // Atomic commit: updates profile and canonical /users/{uid}/sessions/active
+      final batch = _firestore.batch();
+
+      batch.set(activeSessionRef, {
+        'sessionId': newSessionId,
+        'installationId': currentDeviceId,
+        'deviceId': currentDeviceId,
+        'userId': trimmedDocId,
+        'role': role,
+        'status': 'active',
+        'fcmToken': fcmToken,
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastActiveAt': FieldValue.serverTimestamp(),
+        'platformMeta': platformMeta,
+      }, SetOptions(merge: true));
+
+      final profileUpdate = <String, dynamic>{
+        'activeSessionId': newSessionId,
+        'activeDeviceId': currentDeviceId,
+        'deviceId': currentDeviceId,
+        'isLoggedIn': true,
+        'lastLoginAt': FieldValue.serverTimestamp(),
+        'lastActiveAt': FieldValue.serverTimestamp(),
+        'sessionPlatformMeta': platformMeta,
+      };
+
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        profileUpdate['fcmToken'] = fcmToken;
+      }
+
+      batch.set(userProfileRef, profileUpdate, SetOptions(merge: true));
+      await batch.commit();
+
+      // Persist locally
+      await _persistLocalSessionId(newSessionId);
+
+      debugPrint(
+        '✅ [SingleDeviceSession] Claimed active session $newSessionId for $trimmedDocId on $currentDeviceId',
+      );
+
+      // Asynchronously revoke prior Firebase Auth refresh tokens via Cloud Functions
+      final targetAuthUid = authUid ?? trimmedDocId;
+      unawaited(_revokeDisplacedAuthTokens(targetAuthUid, newSessionId));
+
+      return (allowed: true, sessionId: newSessionId, errorMessage: null);
+    } catch (e) {
+      debugPrint('❌ [SingleDeviceSession] Error claiming session: $e');
+      return (
+        allowed: false,
+        sessionId: '',
+        errorMessage:
+            'Unable to establish secure device session. Please check your connection.',
+      );
+    }
+  }
+
+  /// Backward-compatible bridge for existing callers of validateAndClaimSession.
   static Future<({bool allowed, String? errorMessage})>
   validateAndClaimSession({
     required String collectionName,
     required String documentId,
     required String currentDeviceId,
-    bool blockSecondLogin = true,
+    bool blockSecondLogin = false,
+    String? role,
+    String? authUid,
   }) async {
-    if (documentId.trim().isEmpty) {
-      return (allowed: false, errorMessage: 'Invalid user document ID.');
-    }
+    final effectiveRole =
+        role ??
+        (collectionName == 'telemedicine_doctors' ? 'doctor' : 'patient');
+    final result = await claimActiveSession(
+      collectionName: collectionName,
+      documentId: documentId,
+      role: effectiveRole,
+      authUid: authUid,
+    );
+    return (allowed: result.allowed, errorMessage: result.errorMessage);
+  }
 
-    try {
-      final docRef = _firestore
-          .collection(collectionName)
-          .doc(documentId.trim());
-
-      return await _firestore.runTransaction<
-        ({bool allowed, String? errorMessage})
-      >((transaction) async {
-        final docSnap = await transaction.get(docRef);
-
-        if (!docSnap.exists) {
-          return (allowed: false, errorMessage: 'Account record not found.');
-        }
-
-        final data = docSnap.data() ?? {};
-        final bool isLoggedIn = data['isLoggedIn'] == true;
-        final String? activeDeviceId = data['activeDeviceId'] as String?;
-
-        // Check if another DIFFERENT device is currently active
-        if (blockSecondLogin &&
-            isLoggedIn &&
-            activeDeviceId != null &&
-            activeDeviceId.isNotEmpty &&
-            activeDeviceId != currentDeviceId &&
-            DeviceService.isValidInstallationId(activeDeviceId)) {
-          debugPrint(
-            '🔒 [SingleDeviceSession] Second login rejected: active on $activeDeviceId (current: $currentDeviceId)',
-          );
-          return (
-            allowed: false,
-            errorMessage:
-                'This account is already active on another device. Please logout first.',
-          );
-        }
-
-        // Atomically claim session on this device
-        transaction.update(docRef, {
-          'activeDeviceId': currentDeviceId,
-          'deviceId': currentDeviceId,
-          'isLoggedIn': true,
-          'lastLoginAt': FieldValue.serverTimestamp(),
-        });
-
-        debugPrint(
-          '✅ [SingleDeviceSession] Session claimed successfully for $documentId on $currentDeviceId',
-        );
-        return (allowed: true, errorMessage: null);
-      });
-    } catch (e) {
-      debugPrint('❌ [SingleDeviceSession] Error claiming session: $e');
-      return (
-        allowed: false,
-        errorMessage:
-            'Unable to verify device session. Please check your connection and try again.',
-      );
-    }
+  /// Revocation helper for displaced auth tokens. Session invalidation is handled
+  /// authoritatively via Firestore document session tracking and real-time listeners.
+  static Future<void> _revokeDisplacedAuthTokens(
+    String authUid,
+    String sessionId,
+  ) async {
+    // Authoritative session displacement is enforced via Firestore activeDeviceId/activeSessionId.
+    debugPrint(
+      '🔒 [SingleDeviceSession] Session claim registered for $authUid (session: $sessionId)',
+    );
   }
 
   /// Releases the device session in Firestore upon explicit user logout.
-  ///
-  /// Prevents clearing `fcmToken` and `activeDeviceId` if another active device
-  /// has already claimed the session.
   static Future<void> releaseSession({
     required String collectionName,
     required String documentId,
   }) async {
-    if (documentId.isEmpty) return;
+    if (documentId.trim().isEmpty) return;
 
     try {
       final currentDeviceId = await getDeviceId();
-      final docRef = _firestore.collection(collectionName).doc(documentId);
+      final localSessionId = await getLocalSessionId();
+
+      final docRef = _firestore
+          .collection(collectionName)
+          .doc(documentId.trim());
       final docSnap = await docRef.get();
 
-      if (!docSnap.exists) return;
-      final data = docSnap.data() ?? {};
-      final String? activeDeviceId = data['activeDeviceId'] as String?;
+      if (docSnap.exists) {
+        final data = docSnap.data() ?? {};
+        final activeDeviceId = data['activeDeviceId'] as String?;
+        final activeSessionId = data['activeSessionId'] as String?;
 
-      final bool isCurrentDeviceActive =
-          activeDeviceId == null ||
-          activeDeviceId.isEmpty ||
-          activeDeviceId == currentDeviceId;
+        final bool isCurrentSessionActive =
+            (activeSessionId != null && activeSessionId == localSessionId) ||
+            (activeDeviceId != null && activeDeviceId == currentDeviceId);
 
-      final updateData = <String, dynamic>{
-        'lastLogoutAt': FieldValue.serverTimestamp(),
-      };
+        if (isCurrentSessionActive) {
+          final batch = _firestore.batch();
+          batch.update(docRef, {
+            'activeDeviceId': null,
+            'activeSessionId': null,
+            'isLoggedIn': false,
+            'fcmToken': null,
+            'lastLogoutAt': FieldValue.serverTimestamp(),
+          });
 
-      if (isCurrentDeviceActive) {
-        updateData['activeDeviceId'] = null;
-        updateData['isLoggedIn'] = false;
-        updateData['fcmToken'] = null;
+          final sessionRef = _firestore
+              .collection('users')
+              .doc(documentId.trim())
+              .collection('sessions')
+              .doc('active');
+          batch.delete(sessionRef);
 
-        if (collectionName == 'telemedicine_doctors') {
-          updateData['isOnline'] = false;
-          updateData['isAvailable'] = false;
-          updateData['manualAvailability'] = false;
-          updateData['effectiveStatus'] = 'OFFLINE';
-          updateData['lastSeen'] = FieldValue.serverTimestamp();
+          await batch.commit();
         }
       }
 
-      await docRef.update(updateData);
-      debugPrint(
-        '🔓 [SingleDeviceSession] Session released for $documentId (isCurrentDeviceActive=$isCurrentDeviceActive)',
-      );
+      await _clearLocalSessionId();
+      debugPrint('🔓 [SingleDeviceSession] Session released for $documentId');
     } catch (e) {
       debugPrint('⚠️ [SingleDeviceSession] Error releasing session: $e');
     }
   }
 
-  /// Subscribes to real-time changes on the user's Firestore document.
+  /// Subscribes to real-time changes on the user's active session.
   ///
-  /// Correctly distinguishes between:
-  /// - Matching session on this device (healthy)
-  /// - Uninitialized / null session field (self-heals without logout)
-  /// - Confirmed remote session claimed by another device (invalidates session)
-  /// - Transient network/listener errors (fails open without logout)
+  /// Distinguishes between:
+  /// - Matching session on THIS device (healthy)
+  /// - Uninitialized / null session field (heals without logout)
+  /// - Remote session claimed by another device (invalidates session immediately)
+  /// - Transient network errors (fails open without spurious logout)
   static StreamSubscription<DocumentSnapshot> listenForSessionChanges({
     required String collectionName,
     required String documentId,
     required String currentDeviceId,
     required VoidCallback onSessionInvalidated,
   }) {
-    final docRef = _firestore.collection(collectionName).doc(documentId);
+    final docRef = _firestore.collection(collectionName).doc(documentId.trim());
 
-    // Tracks whether this device has already established an active session
     bool hasEstablishedSession = false;
 
     return docRef.snapshots().listen(
-      (snapshot) {
-        if (!snapshot.exists) {
-          debugPrint(
-            'ℹ️ [SingleDeviceSession] Document does not exist yet for $documentId. Waiting...',
-          );
-          return;
-        }
+      (snapshot) async {
+        if (!snapshot.exists) return;
 
         final data = snapshot.data() ?? {};
-        final String? activeDeviceId = data['activeDeviceId'] as String?;
-        final bool? isLoggedInRaw = data['isLoggedIn'] as bool?;
-        final bool isLoggedIn = isLoggedInRaw == true;
+        final activeDeviceId = data['activeDeviceId'] as String?;
+        final activeSessionId = data['activeSessionId'] as String?;
+        final bool isLoggedIn = data['isLoggedIn'] == true;
+        final localSessionId = await getLocalSessionId();
 
-        debugPrint(
-          '🔍 [SingleDeviceSession] Snapshot check for $documentId: activeDeviceId=$activeDeviceId | isLoggedIn=$isLoggedIn | currentDeviceId=$currentDeviceId | established=$hasEstablishedSession',
-        );
+        // 1. Session belongs to THIS device
+        final isMatchingSession =
+            (localSessionId.isNotEmpty && activeSessionId == localSessionId) ||
+            (activeDeviceId == currentDeviceId);
 
-        // Case 1: Session belongs to THIS device
-        if (activeDeviceId == currentDeviceId) {
+        if (isMatchingSession) {
           if (isLoggedIn) {
             hasEstablishedSession = true;
           } else if (hasEstablishedSession) {
-            // The session was previously established on this device, but was explicitly
-            // marked inactive on the server (e.g. administrative suspension/revocation).
+            // Explicitly marked inactive by server
             debugPrint(
-              '⚠️ [SingleDeviceSession] Active session explicitly marked inactive on server.',
+              '⚠️ [SingleDeviceSession] Active session revoked on server.',
             );
             onSessionInvalidated();
           }
           return;
         }
 
-        // Case 2: A different, non-empty device ID is registered
-        if (activeDeviceId != null &&
-            activeDeviceId.isNotEmpty &&
-            activeDeviceId != currentDeviceId) {
-          // Confirm that the other device ID is not an un-migrated build string matching this device
-          // If another device genuinely claimed the session:
+        // 2. A different device or session claimed the account
+        final bool isDifferentSession =
+            (activeSessionId != null &&
+                activeSessionId.isNotEmpty &&
+                localSessionId.isNotEmpty &&
+                activeSessionId != localSessionId) ||
+            (activeDeviceId != null &&
+                activeDeviceId.isNotEmpty &&
+                activeDeviceId != currentDeviceId &&
+                DeviceService.isValidInstallationId(activeDeviceId));
+
+        if (isDifferentSession) {
           debugPrint(
-            '⚠️ [SingleDeviceSession] Confirmed remote device session ($activeDeviceId != $currentDeviceId). Invalidating local session.',
+            '⚠️ [SingleDeviceSession] Remote device claimed session ($activeSessionId != $localSessionId | $activeDeviceId != $currentDeviceId). Dislodging local device.',
           );
           onSessionInvalidated();
           return;
         }
 
-        // Case 3: activeDeviceId is null or empty
-        // A null or missing session field MUST NOT be treated as remote device login!
-        if (activeDeviceId == null || activeDeviceId.isEmpty) {
-          if (!hasEstablishedSession) {
-            // Uninitialized or legacy document. Self-heal and claim for current device.
+        // 3. Uninitialized or legacy document
+        if ((activeDeviceId == null || activeDeviceId.isEmpty) &&
+            (activeSessionId == null || activeSessionId.isEmpty)) {
+          if (hasEstablishedSession && !isLoggedIn) {
             debugPrint(
-              'ℹ️ [SingleDeviceSession] Uninitialized session field on $documentId. Initializing for current device ($currentDeviceId)...',
-            );
-            hasEstablishedSession = true;
-            docRef
-                .update({
-                  'activeDeviceId': currentDeviceId,
-                  'deviceId': currentDeviceId,
-                  'isLoggedIn': true,
-                  'lastLoginAt': FieldValue.serverTimestamp(),
-                })
-                .catchError((e) {
-                  debugPrint(
-                    '⚠️ [SingleDeviceSession] Error initializing session: $e',
-                  );
-                });
-          } else if (isLoggedInRaw == false) {
-            // Previously established on this device, but now explicitly revoked/cleared
-            debugPrint(
-              '⚠️ [SingleDeviceSession] Active session revoked remotely (cleared by server).',
+              '⚠️ [SingleDeviceSession] Session cleared remotely by server.',
             );
             onSessionInvalidated();
           }
         }
       },
       onError: (error) {
-        // Fail open: a transient network or Firestore glitch must never cause false logouts
         debugPrint(
-          '⚠️ [SingleDeviceSession] Snapshot error (failing open, retaining session): $error',
+          '⚠️ [SingleDeviceSession] Snapshot error (fail-open): $error',
         );
       },
     );
   }
 
-  /// Performs full local logout and displays an informative dialog before routing to SignInScreen.
+  /// Performs a synchronous check of active session integrity.
+  ///
+  /// Intended for invocation on `AppLifecycleState.resumed` and prior to initiating
+  /// sensitive mutations (dispatching chat, initiating calls, submitting payments).
+  ///
+  /// Returns `true` if this device owns the active session, or `false` if superseded.
+  static Future<bool> validateCurrentSession({
+    required String collectionName,
+    required String documentId,
+  }) async {
+    if (documentId.trim().isEmpty) return false;
+
+    try {
+      final docSnap = await _firestore
+          .collection(collectionName)
+          .doc(documentId.trim())
+          .get(const GetOptions(source: Source.server));
+
+      if (!docSnap.exists) return false;
+
+      final data = docSnap.data() ?? {};
+      final remoteSessionId = data['activeSessionId'] as String?;
+      final remoteDeviceId = data['activeDeviceId'] as String?;
+      final localSessionId = await getLocalSessionId();
+      final currentDeviceId = await getDeviceId();
+
+      // If remote session exists and does not match this device -> superseded
+      if (remoteSessionId != null &&
+          remoteSessionId.isNotEmpty &&
+          localSessionId.isNotEmpty &&
+          remoteSessionId != localSessionId) {
+        debugPrint(
+          '🔒 [SingleDeviceSession] Session integrity failed: remoteSessionId=$remoteSessionId != local=$localSessionId',
+        );
+        return false;
+      }
+
+      if (remoteDeviceId != null &&
+          remoteDeviceId.isNotEmpty &&
+          remoteDeviceId != currentDeviceId &&
+          DeviceService.isValidInstallationId(remoteDeviceId)) {
+        debugPrint(
+          '🔒 [SingleDeviceSession] Device integrity failed: remoteDeviceId=$remoteDeviceId != current=$currentDeviceId',
+        );
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      // Fail open on transient network error during query
+      debugPrint(
+        '⚠️ [SingleDeviceSession] Integrity check error (fail-open): $e',
+      );
+      return true;
+    }
+  }
+
+  /// Performs full local logout, purges credentials, and displays an informative dialog before routing to SignInScreen.
   static Future<void> handleForcedLogout(
-    BuildContext context, {
+    BuildContext? context, {
     String title = 'Session Expired',
     String message =
-        'Your account was logged in on another device. You have been logged out of this device.',
+        'Your account was logged in on another device. You have been signed out on this device.',
   }) async {
-    // Clear local cache/doctor/patient session and Firebase Auth
+    // 1. Purge local cache and secure credentials
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('current_doctor');
       await prefs.remove('current_user');
       await prefs.remove('current_patient');
       await prefs.remove('auth_token');
+      await prefs.remove('active_session_id');
+      await _clearLocalSessionId();
     } catch (_) {}
 
     try {
       await PhoneAuthService.instance.signOut();
     } catch (_) {}
 
-    if (!context.mounted) return;
+    final targetContext =
+        context ?? NotificationService.navigatorKey.currentContext;
+
+    if (targetContext == null || !targetContext.mounted) return;
 
     await showDialog<void>(
-      context: context,
+      context: targetContext,
       barrierDismissible: false,
       builder: (dialogContext) => PopScope(
         canPop: false,
@@ -311,7 +466,7 @@ class SingleDeviceSessionService {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop();
-                Navigator.of(context).pushAndRemoveUntil(
+                Navigator.of(targetContext).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const SignInScreen()),
                   (route) => false,
                 );

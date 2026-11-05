@@ -22,7 +22,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
@@ -269,10 +268,24 @@ class IncomingCallCoordinator {
   /// incoming-call notification in the tray.
   String? _activeCallId;
 
+  /// Exposes the active incoming call ID, if any.
+  String? get activeCallId => _activeCallId;
+
   /// Guards the auto-dismiss timer so only the live call's timer is armed.
   Timer? _autoDismissTimer;
 
   String? _autoDismissForCallId;
+
+  /// Tears down any active incoming ringing state, notifications, and ringtone audio.
+  Future<void> dismissAllActiveRinging() async {
+    final callId = _activeCallId;
+    if (callId != null && callId.isNotEmpty) {
+      await dismissNotification(callId);
+    }
+    _armAutoDismissTimerCancel();
+    unawaited(CallRingtoneService.instance.stopRingtone());
+    unawaited(SystemRingtonePlayer.stopDefaultRingtone());
+  }
 
   // ─────────────────────────────────────────────────────────────────────
   // 1. INBOUND: one call event -> at most one notification + one screen
@@ -384,13 +397,14 @@ class IncomingCallCoordinator {
       _hooks?.dismiss(_activeCallId!);
     }
     _activeCallId = payload.callId;
+    unawaited(_acknowledgeCallDelivery(payload.callId));
 
     // WHAT gets *opened* must be decided by the state of the app — never by
     // which producer happened to win the claim race above.
     //
     // The Firestore "lost-push" watchers (`main.dart` and Room Chat) are local
     // listeners that fire a few hundred milliseconds after the call document is
-    // written, while the Cloud Function → FCM round trip takes a second or
+    // written, while the FCM network round trip takes a second or
     // three. The watcher therefore claims almost every call first. Routing it
     // unconditionally to the screen meant a backgrounded receiver got an
     // invisible route push instead of a tray notification — and because the
@@ -741,7 +755,9 @@ class IncomingCallCoordinator {
   /// "one call session per callId" guarantee even when both surfaces fire.
   Future<bool> acceptAndOpenCallScreen(IncomingCallPayload payload) async {
     final outcome = await accept(payload.callId);
-    if (!outcome.handled) return false;
+    final isAlreadyAccepted = outcome.reason.contains('duplicate') ||
+        outcome.reason.contains('already processed');
+    if (!outcome.handled && !isAlreadyAccepted) return false;
     if (await _hooks?.awaitAppReady() == false) return false;
 
     if (isScreenOpenFor(payload.callId)) {
@@ -868,6 +884,29 @@ class IncomingCallCoordinator {
     return '';
   }
 
+  /// Reads the primary signed-in user's display name, prioritizing the doctor session.
+  Future<String> resolveCurrentUserName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final key in const ['current_doctor', 'current_user']) {
+        final raw = prefs.getString(key);
+        if (raw == null || raw.isEmpty) continue;
+        try {
+          final map = jsonDecode(raw) as Map<String, dynamic>;
+          final name = (map['name'] ?? map['fullname'] ?? map['doctorName'] ?? '')
+              .toString()
+              .trim();
+          if (name.isNotEmpty) return name;
+        } catch (_) {
+          // Ignore a malformed blob and try the next one.
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Could not resolve the signed-in user name: $e');
+    }
+    return 'User';
+  }
+
   /// Re-reads the call document and merges it over a push payload, so a
   /// screen opened from a bare notification (or a notification action) always
   /// shows the authoritative caller name/image/room rather than the values
@@ -895,6 +934,30 @@ class IncomingCallCoordinator {
     } catch (e) {
       debugPrint('⚠️ Could not enrich call ${payload.callId}: $e');
       return payload;
+    }
+  }
+
+  /// Acknowledges incoming call delivery by writing `callStatus: ringing` and `deliveredAt`
+  /// onto Firestore, turning the caller's UI from "Calling..." to "Ringing...".
+  Future<void> _acknowledgeCallDelivery(String callId) async {
+    try {
+      final callRef = FirebaseFirestore.instance
+          .collection(FirestoreCollections.calls)
+          .doc(callId);
+      final snapshot = await callRef.get();
+      if (!snapshot.exists) return;
+      final currentStatus = snapshot.data()?['callStatus'] as String?;
+      if (currentStatus == CallStatus.calling) {
+        await callRef.update({
+          'callStatus': CallStatus.ringing,
+          'deliveredAt': FieldValue.serverTimestamp(),
+        });
+        debugPrint(
+          '📞 [DeliveryAck] Acknowledged delivery for call $callId -> transitioned to ringing',
+        );
+      }
+    } catch (e) {
+      debugPrint('⚠️ [DeliveryAck] Failed to acknowledge call delivery: $e');
     }
   }
 

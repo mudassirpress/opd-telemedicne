@@ -83,7 +83,7 @@ class _FirstSplashScreenState extends ConsumerState<FirstSplashScreen>
   }
 
   Future<void> saveUserFCMToken(String userId, String userRole) async {
-    final fcmService = FcmTokenService();
+    final fcmService = FCMServiceV2();
     await fcmService.updateToken(userId, userRole);
   }
 

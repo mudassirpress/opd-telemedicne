@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:convert';
 import 'package:hive/hive.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:telemedicine/core/services/fcm_token_service.dart';
 import 'package:telemedicine/core/services/firebase_storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -52,6 +53,7 @@ class ChatNotAvailableException implements Exception {
 
 class ChatController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FCMServiceV2 _fcm = FCMServiceV2();
 
   final Map<String, Map<String, dynamic>> _userProfileCache = {};
 
@@ -317,11 +319,31 @@ class ChatController {
 
       // Keep the offline cache consistent so returning to the chat list does
       // not flash a stale badge before the live snapshot arrives.
-      await OfflineChatService.instance.markChatAsRead(chatId, userId);
+      //
+      // A whole-conversation read clears every incoming row. A partial
+      // (viewport) read must ONLY touch the ids that were actually written;
+      // blanket-clearing Hive here made off-screen messages look read locally
+      // until the next server snapshot arrived.
+      if (messageIds == null) {
+        await OfflineChatService.instance.markChatAsRead(chatId, userId);
+      } else {
+        for (final doc in targets) {
+          await OfflineChatService.instance.updateReadStatus(
+            chatId,
+            doc.id,
+            OfflineReadStatus.read,
+          );
+        }
+      }
       await OfflineChatService.instance.setCachedChatUnreadCount(
         userId: userId,
         chatId: chatId,
-        count: messageIds == null ? 0 : await _readUnreadCount(userId, chatId),
+        count: messageIds == null
+            ? 0
+            : OfflineChatService.instance.countUnreadIncomingMessages(
+                chatId,
+                userId,
+              ),
       );
       // The badge just moved; the instance-level bootstrap memo must not
       // replay the pre-read number on the next list emission.
@@ -404,15 +426,6 @@ class ChatController {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return 0;
-  }
-
-  Future<int> _readUnreadCount(String userId, String chatId) async {
-    try {
-      final doc = await _unreadCountRef(userId, chatId).get();
-      return _toUnreadInt(doc.data()?['unreadCount']);
-    } catch (_) {
-      return 0;
-    }
   }
 
   /// Realtime unread counters for a user, keyed by `chatId`.
@@ -615,6 +628,7 @@ class ChatController {
     required String callStatus,
     int? duration,
     String? receiverRole,
+    String? callId,
   }) async {
     try {
       final chatId = getChatId(senderId, receiverId);
@@ -685,6 +699,7 @@ class ChatController {
         mediaUrl: null,
         duration: duration,
         callData: {
+          if (callId != null && callId.isNotEmpty) 'callId': callId,
           'callStatus': callStatus,
           'duration': duration,
           'callType': callType,
@@ -735,6 +750,10 @@ class ChatController {
     Map<String, dynamic>? callData,
     String? prescriptionId,
     String? prescriptionNotePreview,
+    String? pdfUrl,
+    String? previewImageUrl,
+    DateTime? prescriptionDate,
+    String? doctorName,
   }) async {
     final chatId = getChatId(senderId, receiverId);
 
@@ -886,6 +905,10 @@ class ChatController {
         callData: callData,
         prescriptionId: prescriptionId,
         prescriptionNotePreview: prescriptionNotePreview,
+        pdfUrl: pdfUrl,
+        previewImageUrl: previewImageUrl,
+        prescriptionDate: prescriptionDate,
+        doctorName: doctorName,
         deliveryStatus: isReceiverOnlineValue
             ? MessageDeliveryState.delivered
             : MessageDeliveryState.sent,
@@ -922,10 +945,16 @@ class ChatController {
             : OfflineDeliveryStatus.sent,
       );
 
-      // The chat push is sent by the `sendChatNotification` Cloud Function
-      // when this message document is created. The client must not send it
-      // too: doing so produced two notifications per message and required a
-      // service-account key inside the app.
+      unawaited(
+        _sendChatPush(
+          senderId: senderId,
+          receiverId: receiverId,
+          chatId: chatId,
+          messageId: messageId,
+          messageBody: displayMessage,
+          messageType: messageType,
+        ),
+      );
     } catch (e) {
       // The message is already durable in the local outbox, so a failed upload
       // is NOT a failed send and must not surface as one: the bubble stays on
@@ -2594,8 +2623,16 @@ class ChatController {
             : OfflineDeliveryStatus.sent,
       );
 
-      // The `sendChatNotification` Cloud Function fires on this message
-      // document's creation; the client does not send a second push.
+      unawaited(
+        _sendChatPush(
+          senderId: senderId,
+          receiverId: receiverId,
+          chatId: chatId,
+          messageId: messageId,
+          messageBody: displayMessage,
+          messageType: messageType,
+        ),
+      );
     } catch (e) {
       // Already durable in the local outbox, so this is a failed *upload*, not a
       // failed send. Stays `pending` with a clock and is retried on the next
@@ -2603,6 +2640,90 @@ class ChatController {
       // toast for a message the user could see queued.
       debugPrint('Error uploading reply $messageId, queued for retry: $e');
     }
+  }
+
+  /// Delivers a message push to the receiver's registered device.
+  ///
+  /// The receiver-side [NotificationService] suppresses the banner/sound while
+  /// that user is already inside the same chat, and the payload's `chatId` is
+  /// what the tap handler uses to deep-link into the conversation.
+  Future<void> _sendChatPush({
+    required String senderId,
+    required String receiverId,
+    required String chatId,
+    required String messageId,
+    required String messageBody,
+    String? messageType,
+  }) async {
+    try {
+      if (receiverId.trim().isEmpty) return;
+
+      final receiverProfile = await _getParticipantProfileFixed(receiverId);
+      final receiverRole = (receiverProfile?['role'] ?? 'patient')
+          .toString()
+          .toLowerCase();
+      final receiverToken = await _fetchFcmToken(receiverId, receiverRole);
+      if (receiverToken == null || receiverToken.isEmpty) {
+        debugPrint('CHAT_PUSH_SKIPPED receiver=$receiverId (no FCM token)');
+        return;
+      }
+
+      final senderProfile = await _getParticipantProfileFixed(senderId);
+      String senderName = (senderProfile?['fullname'] ??
+              senderProfile?['name'] ??
+              senderProfile?['username'] ??
+              'New message')
+          .toString();
+      String effectiveBody = messageBody;
+
+      if (messageType == 'prescription') {
+        senderName = 'New Prescription';
+        effectiveBody = 'Your doctor has shared a prescription with you.';
+      }
+
+      final senderImage = (senderProfile?['image'] ??
+              senderProfile?['profileImage'] ??
+              senderProfile?['avatar'] ??
+              '')
+          .toString();
+      final receiverName =
+          (receiverProfile?['fullname'] ?? receiverProfile?['name'] ?? '')
+              .toString();
+
+      await _fcm.sendChatNotification(
+        receiverToken: receiverToken,
+        senderName: senderName,
+        receiverName: receiverName,
+        messageBody: effectiveBody,
+        chatId: chatId,
+        senderId: senderId,
+        receiverId: receiverId,
+        messageId: messageId,
+        senderProfileImage: senderImage,
+      );
+    } catch (e) {
+      debugPrint('CHAT_PUSH_FAILED receiver=$receiverId error=$e');
+    }
+  }
+
+  Future<String?> _fetchFcmToken(String userId, String role) async {
+    final preferred = role == 'doctor'
+        ? FirestoreCollections.doctors
+        : FirestoreCollections.patients;
+    final fallback = role == 'doctor'
+        ? FirestoreCollections.patients
+        : FirestoreCollections.doctors;
+
+    for (final collection in <String>[preferred, fallback]) {
+      try {
+        final doc = await _firestore.collection(collection).doc(userId).get();
+        final token = (doc.data()?['fcmToken'] ?? '').toString().trim();
+        if (token.isNotEmpty) return token;
+      } catch (e) {
+        debugPrint('CHAT_TOKEN_LOOKUP_FAILED $collection/$userId: $e');
+      }
+    }
+    return null;
   }
 
   // Get messages with hidden messages filtered
@@ -2653,9 +2774,8 @@ class ChatController {
     required String message,
     required String chatId,
   }) async {
-    // Admin message notifications are sent by the `sendChatNotification`
-    // Cloud Function when the message document is created. The client must not
-    // read the recipients' tokens or send a second push.
+    // Admin message notifications are handled server-side when the message document is created.
+    // The client avoids reading recipients' private tokens or performing privileged FCM sends.
   }
 
   // _sendNotification removed since it's unused and notifications are handled securely by backend.
@@ -3157,8 +3277,7 @@ class ChatController {
         );
 
         if (!alreadyUploaded) {
-          // The `sendChatNotification` Cloud Function sends the push when the
-          // message document is created. Sending here as well duplicated it.
+          // Message document is created; unread count is updated locally and in Firestore.
           await _updateUnreadCount(offline.receiverId, chatId, true);
         }
 

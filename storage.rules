@@ -98,6 +98,13 @@ service firebase.storage {
       allow delete: if isOwner(userId) || isAdmin();
     }
 
+    // ── Prescriptions ────────────────────────────────────────────────────────
+    match /prescriptions/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isValidFileSize(25);
+      allow delete: if isAdmin();
+    }
+
     // ── Call Recordings ──────────────────────────────────────────────────────
     match /call_recordings/{conversationId}/{fileName} {
       allow read: if isAuthenticated();

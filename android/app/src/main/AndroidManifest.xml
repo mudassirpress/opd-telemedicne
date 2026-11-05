@@ -15,27 +15,36 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!--
-        Full-screen intent is what lets the incoming-call notification show over
-        the lock screen. It is NOT flutter_callkit_incoming (removed) and does
-        not require SYSTEM_ALERT_WINDOW, which has been removed because nothing
-        in this app draws over other apps any more.
+        Full-screen intent is what lets flutter_callkit_incoming (and the
+        fallback local notification) show over the lock screen. It does not
+        require SYSTEM_ALERT_WINDOW, which stays removed because nothing in this
+        app draws over other apps.
         On Android 14+ the platform may gate full-screen intents to calling and
         alarm apps; that policy is a Play Console / OS decision, not something
         an app manifest can bypass.
     -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!--
         API 34+ requires the type-scoped permissions for any foreground service
-        that captures media. The removed CallKit plugin used to merge these in;
-        the app (and Zego's call service) must declare them itself.
+        that captures media. flutter_callkit_incoming and Zego both rely on the
+        app declaring these.
     -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
         <application
         android:label="Telemedicine"
@@ -52,7 +61,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:launchMode="singleInstance"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
@@ -72,6 +81,10 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="FLUTTER_NOTIFICATION_CLICK" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 
@@ -111,10 +124,10 @@
         <!-- Zego Cloud configuration -->
         <meta-data
             android:name="zego_express_app_id"
-            android:value="1096707198" />
+            android:value="1368028170" />
         <meta-data
             android:name="zego_express_app_sign"
-            android:value="ce869c4f787a2690d7141a9c9505a37b517db9dba4ad6ec127de149baa3422fd" />
+            android:value="ff91b4090d669ea3ec9919a526c06fb63e1c14902e84fa585db07f423bb0dcf8" />
 
         <!-- Fallback channel for a system-rendered FCM notification that does
              not name its own channel. Chat and call sends always set theirs

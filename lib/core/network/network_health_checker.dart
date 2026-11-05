@@ -21,9 +21,9 @@ class NetworkHealthChecker {
 
   final Connectivity _connectivity = Connectivity();
 
-  /// Primary health endpoint: Dedicated Firebase Cloud Function ping endpoint.
+  /// Primary health endpoint: Standard Google connectivity check endpoint.
   static final Uri _primaryHealthEndpoint = Uri.parse(
-    'https://asia-south1-opd-telemedicine.cloudfunctions.net/pingPresenceHealth',
+    'https://connectivitycheck.gstatic.com/generate_204',
   );
 
   /// Fast fallback: Standard HTTP 204 No Content generator.
@@ -93,7 +93,7 @@ class NetworkHealthChecker {
           final response = await http
               .get(_primaryHealthEndpoint)
               .timeout(const Duration(milliseconds: 2500));
-          if (response.statusCode == 200) {
+          if (response.statusCode == 200 || response.statusCode == 204) {
             verified = true;
           }
         } catch (_) {

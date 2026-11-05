@@ -1,3 +1,4 @@
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:telemedicine/app/theme/app_theme.dart';
@@ -14,11 +15,115 @@ class ToastService {
     return _instance!;
   }
 
+  String? _lastMessage;
+  DateTime? _lastMessageTime;
+  static const Duration _throttleDuration = Duration(milliseconds: 1800);
+
+  bool _isThrottled(String msg) {
+    final now = DateTime.now();
+    if (_lastMessage == msg && _lastMessageTime != null) {
+      if (now.difference(_lastMessageTime!) < _throttleDuration) {
+        return true;
+      }
+    }
+    _lastMessage = msg;
+    _lastMessageTime = now;
+    return false;
+  }
+
+  /// Sanitizes raw exceptions, SDK error codes, and technical stack traces
+  /// so end users never see developer-internal details.
+  String sanitizeErrorMessage(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return 'An unexpected error occurred. Please try again.';
+    }
+    final trimmed = raw.trim();
+    final lower = trimmed.toLowerCase();
+
+    // Already user-friendly call states
+    if (trimmed == 'Call ended' ||
+        trimmed == 'Call declined' ||
+        trimmed == 'Call failed. Please try again.' ||
+        trimmed == 'Call disconnected' ||
+        trimmed == 'Line is busy' ||
+        trimmed == 'The call was cancelled.' ||
+        trimmed == 'Call timed out') {
+      return trimmed;
+    }
+
+    // Call status mappings
+    if (lower.contains('declined') || lower.contains('rejected')) {
+      return 'Call declined';
+    }
+    if (lower.contains('busy') || lower.contains('occupied')) {
+      return 'Line is busy';
+    }
+    if (lower.contains('missed') || lower.contains('timeout') || lower.contains('timed out')) {
+      return 'Call timed out';
+    }
+    if (lower.contains('cancelled') || lower.contains('canceled')) {
+      return 'Call cancelled';
+    }
+    if (lower.contains('ended') || lower.contains('hung up') || lower.contains('disconnected')) {
+      return 'Call ended';
+    }
+
+    // Network / connectivity issues
+    if (lower.contains('socketexception') ||
+        lower.contains('network_request_failed') ||
+        lower.contains('client-offline') ||
+        lower.contains('no internet') ||
+        lower.contains('handshakeexception') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('connection refused') ||
+        lower.contains('connection closed') ||
+        lower.contains('network error') ||
+        lower.contains('connection error')) {
+      return 'Network connection error. Please check your internet connection.';
+    }
+
+    // Permissions
+    if (lower.contains('permission') && (lower.contains('microphone') || lower.contains('record_audio'))) {
+      return 'Microphone permission is required for voice calls.';
+    }
+
+    // Technical SDK / Firebase / Zego / stack traces / code dumps
+    final isTechnical = lower.contains('exception') ||
+        lower.contains('error:') ||
+        lower.contains('zego') ||
+        lower.contains('firebase') ||
+        lower.contains('fcm') ||
+        lower.contains('token') ||
+        lower.contains('stacktrace') ||
+        lower.contains('platformexception') ||
+        lower.contains('nosuchmethod') ||
+        lower.contains('assertion') ||
+        lower.contains('typeerror') ||
+        lower.contains('null check') ||
+        lower.contains('unhandled') ||
+        lower.contains('internal error');
+
+    if (isTechnical) {
+      try {
+        FirebaseCrashlytics.instance.recordError(
+          trimmed,
+          null,
+          reason: 'Sanitized technical user toast',
+          fatal: false,
+        );
+      } catch (_) {}
+      return 'An unexpected error occurred. Please try again.';
+    }
+
+    return trimmed;
+  }
+
   // Show success toast using AppColors
   void showSuccess(
     String message, {
     ToastGravity gravity = ToastGravity.BOTTOM,
   }) {
+    if (_isThrottled(message)) return;
     Fluttertoast.showToast(
       msg: message,
       toastLength: Toast.LENGTH_SHORT,
@@ -30,10 +135,12 @@ class ToastService {
     );
   }
 
-  // Show error toast using AppColors
+  // Show error toast using AppColors with automatic sanitization and rate-limiting
   void showError(String message, {ToastGravity gravity = ToastGravity.BOTTOM}) {
+    final sanitized = sanitizeErrorMessage(message);
+    if (_isThrottled(sanitized)) return;
     Fluttertoast.showToast(
-      msg: message,
+      msg: sanitized,
       toastLength: Toast.LENGTH_SHORT,
       gravity: gravity,
       timeInSecForIosWeb: 2,
@@ -48,6 +155,7 @@ class ToastService {
     String message, {
     ToastGravity gravity = ToastGravity.BOTTOM,
   }) {
+    if (_isThrottled(message)) return;
     Fluttertoast.showToast(
       msg: message,
       toastLength: Toast.LENGTH_SHORT,
@@ -61,6 +169,7 @@ class ToastService {
 
   // Show info toast using AppColors
   void showInfo(String message, {ToastGravity gravity = ToastGravity.BOTTOM}) {
+    if (_isThrottled(message)) return;
     Fluttertoast.showToast(
       msg: message,
       toastLength: Toast.LENGTH_SHORT,
@@ -77,6 +186,7 @@ class ToastService {
     String message, {
     ToastGravity gravity = ToastGravity.BOTTOM,
   }) {
+    if (_isThrottled(message)) return;
     Fluttertoast.showToast(
       msg: message,
       toastLength: Toast.LENGTH_SHORT,
@@ -94,12 +204,11 @@ class ToastService {
     Color? backgroundColor,
     Color? textColor,
     ToastGravity gravity = ToastGravity.BOTTOM,
-
     double fontSize = 14.0,
   }) {
+    if (_isThrottled(message)) return;
     Fluttertoast.showToast(
       msg: message,
-
       gravity: gravity,
       timeInSecForIosWeb: 2,
       backgroundColor: backgroundColor ?? AppColors.grey700,
@@ -110,8 +219,10 @@ class ToastService {
 
   // Show long duration toast
   void showLong(String message, {bool isError = false}) {
+    final text = isError ? sanitizeErrorMessage(message) : message;
+    if (_isThrottled(text)) return;
     Fluttertoast.showToast(
-      msg: message,
+      msg: text,
       toastLength: Toast.LENGTH_LONG,
       gravity: ToastGravity.BOTTOM,
       timeInSecForIosWeb: 3,
@@ -125,8 +236,10 @@ class ToastService {
 
   // Show top positioned toast
   void showTop(String message, {bool isError = false}) {
+    final text = isError ? sanitizeErrorMessage(message) : message;
+    if (_isThrottled(text)) return;
     Fluttertoast.showToast(
-      msg: message,
+      msg: text,
       toastLength: Toast.LENGTH_SHORT,
       gravity: ToastGravity.TOP,
       timeInSecForIosWeb: 2,
@@ -138,8 +251,10 @@ class ToastService {
 
   // Show center positioned toast
   void showCenter(String message, {bool isError = false}) {
+    final text = isError ? sanitizeErrorMessage(message) : message;
+    if (_isThrottled(text)) return;
     Fluttertoast.showToast(
-      msg: message,
+      msg: text,
       toastLength: Toast.LENGTH_SHORT,
       gravity: ToastGravity.CENTER,
       timeInSecForIosWeb: 2,
@@ -149,12 +264,12 @@ class ToastService {
     );
   }
 
-  // Show toast with gradient background (using AppColors gradient)
+  // Show toast with gradient background
   void showGradient(String message, {bool isError = false}) {
-    // Note: Fluttertoast doesn't support gradients directly
-    // We'll use solid colors from your gradient
+    final text = isError ? sanitizeErrorMessage(message) : message;
+    if (_isThrottled(text)) return;
     Fluttertoast.showToast(
-      msg: message,
+      msg: text,
       toastLength: Toast.LENGTH_SHORT,
       gravity: ToastGravity.BOTTOM,
       timeInSecForIosWeb: 2,
@@ -170,8 +285,10 @@ class ToastService {
     required bool isDarkMode,
     bool isError = false,
   }) {
+    final text = isError ? sanitizeErrorMessage(message) : message;
+    if (_isThrottled(text)) return;
     Fluttertoast.showToast(
-      msg: message,
+      msg: text,
       toastLength: Toast.LENGTH_SHORT,
       gravity: ToastGravity.BOTTOM,
       timeInSecForIosWeb: 2,

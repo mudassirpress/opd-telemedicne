@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telemedicine/data/models/user_model.dart';
 import 'package:telemedicine/core/services/device_service.dart';
+import 'package:telemedicine/core/services/fcm_token_service.dart';
 import 'package:telemedicine/core/services/notification_dispatcher.dart';
 import 'package:telemedicine/core/services/notification_service.dart';
 import 'package:telemedicine/core/services/patient_presence_service.dart';
@@ -20,6 +21,7 @@ import 'package:telemedicine/features/auth/data/services/phone_verification_serv
 import 'package:firebase_auth/firebase_auth.dart' hide EmailAuthProvider;
 import 'package:telemedicine/features/auth/data/services/phone_auth_service.dart';
 import 'package:telemedicine/core/services/single_device_session_service.dart';
+import 'package:telemedicine/core/services/timezone_service.dart';
 import 'package:telemedicine/core/utils/subscription_calculator.dart';
 import 'package:telemedicine/data/models/patient_id_model.dart';
 import 'package:uuid/uuid.dart';
@@ -410,6 +412,12 @@ class PatientController extends ChangeNotifier {
       // this account and fetch it if it was never confirmed. A no-op when the
       // cache is already complete.
       unawaited(ChatController().recoverChatListIfNeeded());
+      unawaited(
+        TimezoneService.syncUserTimezone(
+          collectionName: 'telemedicine_patient',
+          documentId: user.id,
+        ),
+      );
       print(
         '✅ User saved – ${user.fullname}, ID: ${user.id}, '
         'Payment Status: ${user.paymentStatus}',
@@ -1338,10 +1346,17 @@ class PatientController extends ChangeNotifier {
       _setLoading(false);
       notifyListeners();
 
-      // Admins are notified by the `sendAdminPaymentProofNotifications` Cloud
-      // Function, which fires on this very `paymentStatus: pending` write.
-      // Sending a push from here as well delivered the same notification twice
-      // and required an Admin credential inside the app.
+      // Push every admin that has a registered device token. The persistent
+      // admin queue is still driven by the `paymentStatus: pending` field.
+      unawaited(
+        _notifyAdminsOfPaymentProof(
+          patientName: _currentUser!.fullname,
+          patientId: _currentUser!.id,
+          amount: amount ?? _currentUser!.totalPayment,
+          paymentId: paymentId,
+          notificationId: notificationId,
+        ),
+      );
 
       return true;
     } catch (e) {
@@ -1358,12 +1373,32 @@ class PatientController extends ChangeNotifier {
     required String paymentId,
     required String notificationId,
   }) async {
-    // Deliberately empty. Admins are notified by the
-    // `sendAdminPaymentProofNotifications` Cloud Function, which triggers on
-    // the `paymentStatus: pending` write above. Sending from the client as
-    // well produced a duplicate notification for every submission and needed a
-    // Firebase Admin credential inside the app.
-    return;
+    try {
+      final admins = await _firestore
+          .collection(FirestoreCollections.patients)
+          .where('role', isEqualTo: 'admin')
+          .get();
+
+      final amountLabel = amount == amount.roundToDouble()
+          ? amount.toStringAsFixed(0)
+          : amount.toStringAsFixed(2);
+      final fcm = FCMServiceV2();
+
+      for (final admin in admins.docs) {
+        final token = (admin.data()['fcmToken'] ?? '').toString().trim();
+        if (token.isEmpty) continue;
+        await fcm.sendPaymentProofNotification(
+          adminToken: token,
+          patientName: patientName,
+          patientId: patientId,
+          amount: amountLabel,
+          paymentId: paymentId,
+          notificationId: notificationId,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error notifying admins of payment proof: $e');
+    }
   }
 
   /// Reads the authoritative payment status straight from Firestore.
@@ -1646,7 +1681,7 @@ class PatientController extends ChangeNotifier {
         'declined': false,
       });
 
-      // The `sendPasswordResetNotifications` Cloud Function fires on this
+      // Password reset notification dispatching is handled server-side.
       // document creation and is the single sender. Pushing from the client as
       // well delivered the request twice and needed an Admin credential inside
       // the app, so the push is no longer sent here.
@@ -2115,6 +2150,7 @@ class PatientController extends ChangeNotifier {
           : (_currentUser!.totalPayment > 0
                 ? _currentUser!.totalPayment
                 : 300.0);
+      final notificationId = const Uuid().v4();
 
       final requestRef = _firestore
           .collection('patient_reactivation_requests')
@@ -2159,7 +2195,7 @@ class PatientController extends ChangeNotifier {
 
       // Update patient profile so Cloud Function and Admin screen pick up pending reactivation
       try {
-        final notifId = const Uuid().v4();
+        final notifId = notificationId;
         await _firestore
             .collection('telemedicine_patient')
             .doc(_currentUser!.id)
@@ -2185,6 +2221,15 @@ class PatientController extends ChangeNotifier {
 
       _setLoading(false);
       notifyListeners();
+      unawaited(
+        _notifyAdminsOfPaymentProof(
+          patientName: _currentUser!.fullname,
+          patientId: _currentUser!.id,
+          amount: amount,
+          paymentId: requestRef.id,
+          notificationId: notificationId,
+        ),
+      );
       return true;
     } catch (e) {
       _errorMessage = 'Failed to submit reactivation proof: ${e.toString()}';
@@ -2726,6 +2771,7 @@ class PatientController extends ChangeNotifier {
           if (_currentUser == null) return;
           print('⚠️ Session revoked remotely on another device');
           await signOut();
+          SingleDeviceSessionService.handleForcedLogout(null);
         },
       );
     });

@@ -13,7 +13,20 @@
           "package_name": "com.opdonline.telemedicine"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "161801385551-9jo9ovesla9btpu36j5vvoiin8boui43.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.opdonline.telemedicine",
+            "certificate_hash": "720e14e79789c9168497be149162188291bdedda"
+          }
+        },
+        {
+          "client_id": "161801385551-efaorga7juoaql0blbv13ruph0qjgl3d.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDHmJtdkQ3BGcpzVpPRVjJfqBMkHLPySDk"
@@ -21,7 +34,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "161801385551-efaorga7juoaql0blbv13ruph0qjgl3d.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "161801385551-nlh8brf98qvvek9kqd669q1m3a5qbo7k.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.opdonline.telemedicine"
+              }
+            }
+          ]
         }
       }
     }

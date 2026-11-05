@@ -1,17 +1,22 @@
+import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-import 'package:telemedicine/data/models/prescription_model.dart';
+import 'package:open_file/open_file.dart';
+import 'package:telemedicine/core/services/firebase_storage_service.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
+import 'package:telemedicine/core/utils/toast_utils.dart';
+import 'package:telemedicine/data/models/prescription_model.dart';
 import 'package:telemedicine/features/doctor_portal/presentation/prescriptions/prescription_controller.dart';
+import 'package:telemedicine/features/prescriptions/services/prescription_pdf_service.dart';
 import 'package:telemedicine/shared/widgets/auth_layout.dart';
 import 'package:telemedicine/shared/widgets/opd_design_system.dart';
 
-/// Read-only, print-style prescription page.
+/// Full-page professional prescription document viewer.
 ///
-/// Reachable from the prescription card in the chat. Both the prescribing
-/// doctor and the patient can open it; anyone else is refused, so a
-/// prescription belonging to a different patient can never be displayed.
+/// Single Source of Truth: Always displays the original high-resolution PNG image
+/// generated at the time of prescription creation and stored in Firebase Storage.
+/// Reachable from chat messages, consultation records, and prescription history.
 class PrescriptionDetailScreen extends ConsumerStatefulWidget {
   final String prescriptionId;
 
@@ -19,7 +24,7 @@ class PrescriptionDetailScreen extends ConsumerStatefulWidget {
   final String viewerId;
 
   /// Fallback ids used to authorise the viewer when the stored record does not
-  /// carry them (e.g. a very old document).
+  /// carry them.
   final String? expectedDoctorId;
   final String? expectedPatientId;
 
@@ -40,12 +45,22 @@ class _PrescriptionDetailScreenState
     extends ConsumerState<PrescriptionDetailScreen> {
   Object? _error;
   bool _loading = true;
+  bool _isProcessing = false;
   PrescriptionModel? _prescription;
+  int _currentPage = 0;
+  late final PageController _pageController;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -54,9 +69,68 @@ class _PrescriptionDetailScreenState
       _error = null;
     });
     try {
-      final prescription = await ref
+      var prescription = await ref
           .read(prescriptionControllerProvider)
           .fetchById(widget.prescriptionId);
+
+      // If opening a legacy prescription that did not have page images saved yet,
+      // generate and upload the permanent page PNG image(s) once so it is permanently
+      // preserved as the image single source of truth.
+      if (prescription != null &&
+          prescription.pageImageUrls.isEmpty &&
+          prescription.primaryImageUrl.isEmpty) {
+        try {
+          final pdfBytes = await PrescriptionPdfService.instance.generatePdf(
+            prescription,
+          );
+          var pages = await PrescriptionPdfService.instance
+              .generatePrescriptionPageImages(pdfBytes);
+          if (pages.isEmpty) {
+            final single = await PrescriptionPdfService.instance
+                .generatePreviewImage(pdfBytes);
+            if (single != null) pages = [single];
+          }
+          final pageUrls = <String>[];
+          final paths = <String>[];
+          for (int i = 0; i < pages.length; i++) {
+            final res = await FirebaseStorageService.instance
+                .uploadPrescriptionPageImage(
+                  patientId: prescription.patientId,
+                  prescriptionId: prescription.prescriptionId,
+                  pageIndex: i,
+                  pngBytes: pages[i],
+                );
+            if (res.downloadUrl.isNotEmpty) {
+              pageUrls.add(res.downloadUrl);
+              paths.add(res.storagePath);
+            }
+          }
+          if (pageUrls.isNotEmpty) {
+            await FirebaseFirestore.instance
+                .collection('prescriptions')
+                .doc(prescription.prescriptionId)
+                .update({
+                  'pageImageUrls': pageUrls,
+                  'imageStoragePaths': paths,
+                  'previewImageUrl': pageUrls.first,
+                  'imageUrl': pageUrls.first,
+                  'pageCount': pages.length,
+                  'updatedAt': Timestamp.now(),
+                });
+            prescription = prescription.copyWith(
+              pageImageUrls: pageUrls,
+              imageStoragePaths: paths,
+              previewImageUrl: pageUrls.first,
+              pageCount: pages.length,
+            );
+          }
+        } catch (e) {
+          debugPrint(
+            '⚠️ [PrescriptionDetailScreen] Auto-upgrade legacy image error: $e',
+          );
+        }
+      }
+
       if (!mounted) return;
       setState(() {
         _prescription = prescription;
@@ -71,16 +145,154 @@ class _PrescriptionDetailScreenState
     }
   }
 
+  /// Loads image bytes for the saved prescription images.
+  Future<List<Uint8List>> _getPrescriptionImageBytes(
+    PrescriptionModel p,
+  ) async {
+    final urls = p.pageImageUrls.isNotEmpty
+        ? p.pageImageUrls
+        : (p.primaryImageUrl.isNotEmpty ? [p.primaryImageUrl] : <String>[]);
+    if (urls.isNotEmpty) {
+      final downloaded = await PrescriptionPdfService.instance
+          .loadImagesFromUrls(urls);
+      if (downloaded.isNotEmpty) return downloaded;
+    }
+    // Fallback if network was interrupted: rasterize from original template
+    final pdfBytes = await PrescriptionPdfService.instance.generatePdf(p);
+    final raster = await PrescriptionPdfService.instance
+        .generatePrescriptionPageImages(pdfBytes);
+    if (raster.isNotEmpty) return raster;
+    final single = await PrescriptionPdfService.instance.generatePreviewImage(
+      pdfBytes,
+    );
+    return single != null ? [single] : <Uint8List>[];
+  }
+
+  /// Downloads the original saved PNG prescription image(s) to the device.
+  Future<void> _downloadImage() async {
+    final p = _prescription;
+    if (p == null || _isProcessing) return;
+
+    setState(() => _isProcessing = true);
+    try {
+      ToastService.instance.showInfo('Saving prescription image to device...');
+      final bytesList = await _getPrescriptionImageBytes(p);
+      if (bytesList.isEmpty) {
+        throw Exception('Image bytes unavailable');
+      }
+      final files = await PrescriptionPdfService.instance
+          .savePrescriptionImages(
+            imageBytesList: bytesList,
+            reference: p.reference,
+            patientName: p.patientName,
+          );
+      if (!mounted) return;
+      ToastService.instance.showSuccess('Prescription saved to device');
+
+      if (files.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved: ${files.first.uri.pathSegments.last}'),
+            action: SnackBarAction(
+              label: 'Open',
+              textColor: Colors.white,
+              onPressed: () => OpenFile.open(files.first.path),
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastService.instance.showError(
+          'Could not save prescription image: $e',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  /// Shares the original saved PNG image(s) through WhatsApp / other apps.
+  Future<void> _shareImage() async {
+    final p = _prescription;
+    if (p == null || _isProcessing) return;
+
+    setState(() => _isProcessing = true);
+    try {
+      final bytesList = await _getPrescriptionImageBytes(p);
+      if (bytesList.isEmpty) throw Exception('Image bytes unavailable');
+      await PrescriptionPdfService.instance.sharePrescriptionImages(
+        imageBytesList: bytesList,
+        reference: p.reference,
+        patientName: p.patientName,
+        doctorName: p.doctorName,
+      );
+    } catch (e) {
+      if (mounted) {
+        ToastService.instance.showError('Could not share prescription: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  /// Prints the original prescription image on A4 paper preserving aspect ratio.
+  Future<void> _printImage() async {
+    final p = _prescription;
+    if (p == null || _isProcessing) return;
+
+    setState(() => _isProcessing = true);
+    try {
+      final bytesList = await _getPrescriptionImageBytes(p);
+      if (bytesList.isEmpty) throw Exception('Image bytes unavailable');
+      await PrescriptionPdfService.instance.printPrescriptionImages(
+        imageBytesList: bytesList,
+        reference: p.reference,
+      );
+    } catch (e) {
+      if (mounted) {
+        ToastService.instance.showError('Print error: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return OpdScreenShell(
       title: 'Prescription',
-      subtitle: 'Issued through OPD Telemedicine.',
+      subtitle: 'Official OPD Telemedicine Medical Document',
       showLogo: true,
-      bottom: GradientButton(
-        text: 'Done',
-        icon: Icons.check_rounded,
-        onPressed: () => Navigator.maybePop(context),
+      bottom: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _isProcessing ? null : _shareImage,
+              icon: const Icon(Icons.share_rounded, size: 18),
+              label: const Text('Share'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF062B72),
+                side: const BorderSide(color: Color(0xFF062B72), width: 1.5),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 2,
+            child: GradientButton(
+              text: 'Download PNG',
+              icon: Icons.download_rounded,
+              isLoading: _isProcessing,
+              onPressed: _isProcessing ? null : _downloadImage,
+            ),
+          ),
+        ],
       ),
       child: _buildContent(),
     );
@@ -88,7 +300,7 @@ class _PrescriptionDetailScreenState
 
   Widget _buildContent() {
     if (_loading) {
-      return const OpdInlineLoader(label: 'Loading prescription...');
+      return const OpdInlineLoader(label: 'Loading prescription document...');
     }
 
     if (_error != null) {
@@ -128,7 +340,231 @@ class _PrescriptionDetailScreenState
       );
     }
 
-    return _buildPrescriptionPaper(prescription);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Permanent Image Surface: Displays the exact saved PNG from Firebase Storage
+        _buildPrescriptionImageDisplay(prescription),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  /// Displays the exact original stored PNG image(s) from Firebase Storage.
+  Widget _buildPrescriptionImageDisplay(PrescriptionModel p) {
+    final imageUrls = p.pageImageUrls.isNotEmpty
+        ? p.pageImageUrls
+        : (p.primaryImageUrl.isNotEmpty ? [p.primaryImageUrl] : <String>[]);
+
+    if (imageUrls.isEmpty) {
+      return Container(
+        height: 480,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFD6E2EF)),
+        ),
+        child: const OpdInlineLoader(
+          label: 'Loading prescription document image...',
+        ),
+      );
+    }
+
+    final totalPages = imageUrls.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Multi-page navigation bar if prescription has more than 1 page
+        if (totalPages > 1) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFD6E2EF)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_rounded, size: 16),
+                  color: _currentPage > 0
+                      ? const Color(0xFF062B72)
+                      : Colors.grey,
+                  onPressed: _currentPage > 0
+                      ? () => _pageController.previousPage(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeInOut,
+                        )
+                      : null,
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF062B72).withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Page ${_currentPage + 1} of $totalPages',
+                    style: TextStyle(
+                      fontSize: context.fs(12.5),
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF062B72),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  color: _currentPage < totalPages - 1
+                      ? const Color(0xFF062B72)
+                      : Colors.grey,
+                  onPressed: _currentPage < totalPages - 1
+                      ? () => _pageController.nextPage(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeInOut,
+                        )
+                      : null,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+
+        // Zoom helper badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.pinch_rounded, size: 15, color: Color(0xFF64748B)),
+              SizedBox(width: 6),
+              Text(
+                'Pinch to zoom in or out on document',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Permanent Image Surface
+        if (totalPages > 1)
+          SizedBox(
+            height: context.sh * 0.72,
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: totalPages,
+              onPageChanged: (idx) => setState(() => _currentPage = idx),
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: _buildSinglePageImage(imageUrls[index], index + 1),
+                );
+              },
+            ),
+          )
+        else
+          _buildSinglePageImage(imageUrls[0], 1),
+      ],
+    );
+  }
+
+  Widget _buildSinglePageImage(String imageUrl, int pageNum) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD6E2EF), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InteractiveViewer(
+        minScale: 0.8,
+        maxScale: 4.0,
+        clipBehavior: Clip.none,
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.contain,
+          alignment: Alignment.topCenter,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return Container(
+              height: 480,
+              color: Colors.white,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(strokeWidth: 2.5),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Loading prescription page $pageNum...',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              height: 400,
+              color: const Color(0xFFF8FAFC),
+              padding: const EdgeInsets.all(20),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.broken_image_rounded,
+                      size: 48,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Could not load stored image.',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Please check your internet connection.',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   /// Only the prescribing doctor or the prescribed patient may open it.
@@ -145,149 +581,5 @@ class _PrescriptionDetailScreenState
             .toString();
     if (doctorId.isEmpty && patientId.isEmpty) return false;
     return widget.viewerId == doctorId || widget.viewerId == patientId;
-  }
-
-  Widget _buildPrescriptionPaper(PrescriptionModel p) {
-    final doctorName = p.doctorName.toString();
-    final patientName = p.patientName.toString();
-    final age = p.patientAge.toString();
-    final date = DateFormat('dd MMM yyyy').format(p.createdAt);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 22),
-
-        // ── The prescription "paper" ──
-        OpdCard(
-          padding: EdgeInsets.fromLTRB(
-            context.rsp(20),
-            22,
-            context.rsp(20),
-            20,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildField(label: 'Doctor', value: 'Dr. $doctorName'),
-              const SizedBox(height: 14),
-              _buildField(label: 'Patient', value: patientName),
-              const SizedBox(height: 14),
-              _buildField(
-                label: 'Age',
-                value: age.isEmpty ? 'Not recorded' : '$age Years',
-              ),
-              const SizedBox(height: 14),
-              _buildField(label: 'Date', value: date),
-
-              const SizedBox(height: 20),
-              const Divider(height: 1, color: Color(0xFFDCE6F2)),
-              const SizedBox(height: 18),
-
-              Text(
-                'Prescription / Instructions',
-                style: TextStyle(
-                  fontSize: context.fs(13),
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF162B72),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // The doctor's complete, multiline note is shown verbatim.
-              SelectableText(
-                p.note.toString().trim().isEmpty
-                    ? 'No instructions were provided.'
-                    : p.note.toString().trim(),
-                style: TextStyle(
-                  fontSize: context.fs(14),
-                  height: 1.65,
-                  color: const Color(0xFF1F2F44),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 18),
-
-        // ── Footer: reference id + brand ──
-        OpdCard(
-          padding: EdgeInsets.symmetric(
-            horizontal: context.rsp(16),
-            vertical: 14,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Prescription ID',
-                      style: TextStyle(
-                        fontSize: context.fs(11.5),
-                        color: const Color(0xFF7E90A6),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      p.reference.toString(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: context.fs(13),
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF163B6E),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  'OPD Telemedicine',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.end,
-                  style: TextStyle(
-                    fontSize: context.fs(13),
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF162B72),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildField({required String label, required String value}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: context.fs(11.5),
-            fontWeight: FontWeight.w500,
-            color: const Color(0xFF7E90A6),
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          value,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: context.fs(14),
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF1F2F44),
-          ),
-        ),
-      ],
-    );
   }
 }
