@@ -63,6 +63,14 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
   int _duration = 0;
   String _connectionStatusText = 'Connected';
   Color _connectionStatusColor = const Color(0xFF1E8E5A);
+  Timer? _reconnectWatchdogTimer;
+  bool _showReconnectAction = false;
+
+  // 15-minute (900 seconds) duration limit enforcement
+  static const int maxCallDurationSeconds = 900;
+  Timer? _countdownTimer;
+  int _remainingSeconds = maxCallDurationSeconds;
+  bool _hasShownWarning = false;
 
   StreamSubscription<int>? _durationSub;
   StreamSubscription<ZegoCallConnectionStatus>? _connectionSub;
@@ -90,11 +98,16 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
 
     _startSessionTracking();
 
+    _callController.cancelRingTimeout();
+    _callController.markCallConnected(widget.callId);
+
     // Ensure call duration timer is active upon entering active call
     _duration = _callController.callDuration;
     if (!_callController.isDurationTimerRunning) {
       _callController.startCallDurationTimer();
     }
+
+    _startCallCountdownTimer();
 
     _subscribeToStreams();
   }
@@ -121,28 +134,38 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
       setState(() => _duration = d);
     });
 
-    // Zego connection status
+    // Zego connection status with watchdog timeout
     _connectionSub = _zegoService.connectionStatusStream.listen((status) {
       if (!mounted || _hasEnded) return;
       setState(() {
         switch (status) {
           case ZegoCallConnectionStatus.connected:
+            _cancelReconnectWatchdog();
+            _showReconnectAction = false;
             _connectionStatusText = 'Connected';
             _connectionStatusColor = const Color(0xFF1E8E5A);
+            if (_countdownTimer == null || !_countdownTimer!.isActive) {
+              _startCallCountdownTimer();
+            }
             break;
           case ZegoCallConnectionStatus.reconnecting:
+            _startReconnectWatchdog();
             _connectionStatusText = 'Reconnecting...';
             _connectionStatusColor = const Color(0xFFFFA000);
             break;
           case ZegoCallConnectionStatus.connecting:
+            _startReconnectWatchdog();
             _connectionStatusText = 'Connecting...';
             _connectionStatusColor = const Color(0xFF2196F3);
             break;
           case ZegoCallConnectionStatus.disconnected:
+            _cancelReconnectWatchdog();
             _connectionStatusText = 'Disconnected';
             _connectionStatusColor = const Color(0xFFE53935);
             break;
           case ZegoCallConnectionStatus.failed:
+            _cancelReconnectWatchdog();
+            _showReconnectAction = true;
             _connectionStatusText = 'Call Failed';
             _connectionStatusColor = const Color(0xFFE53935);
             _hasError = true;
@@ -217,6 +240,24 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
                   isError: false,
                 );
               } else if (status == CallingStatus.missed) {
+                // Safeguard: If the call has already connected or audio is flowing,
+                // ignore any stale/errant 'missed' status and prevent premature disconnection.
+                if (_duration > 0 ||
+                    _callController.isDurationTimerRunning ||
+                    _zegoService.isInRoom) {
+                  debugPrint(
+                    '🛡️ [ActiveCallScreen] Stale "missed" status received while call is actively connected ($_duration s). Ignoring.',
+                  );
+                  // Re-assert connected status in Firestore so both parties remain in sync
+                  FirebaseFirestore.instance
+                      .collection(FirestoreCollections.calls)
+                      .doc(trimmedId)
+                      .set({
+                    'status': CallingStatus.connected,
+                    'callStatus': CallingStatus.connected,
+                  }, SetOptions(merge: true));
+                  return;
+                }
                 _setCallTerminationState(
                   status: 'Missed Call',
                   message: 'Call timed out.',
@@ -314,6 +355,63 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
     }
   }
 
+  void _startReconnectWatchdog() {
+    _reconnectWatchdogTimer?.cancel();
+    _reconnectWatchdogTimer = Timer(const Duration(seconds: 12), () {
+      if (!mounted || _hasEnded) return;
+      setState(() {
+        _showReconnectAction = true;
+      });
+      debugPrint('⚠️ [ActiveCallScreen] Reconnection watchdog fired (12s). Surfacing retry UI.');
+    });
+  }
+
+  void _cancelReconnectWatchdog() {
+    _reconnectWatchdogTimer?.cancel();
+    _reconnectWatchdogTimer = null;
+  }
+
+  Future<void> _manualReconnect() async {
+    if (_isEnding || _hasEnded) return;
+    _cancelReconnectWatchdog();
+    setState(() {
+      _showReconnectAction = false;
+      _connectionStatusText = 'Reconnecting...';
+      _connectionStatusColor = const Color(0xFFFFA000);
+    });
+    ToastService.instance.showInfo('Attempting to re-establish call connection...');
+
+    try {
+      await _zegoService.leaveCallRoom();
+      final success = await _zegoService.joinCallRoom(
+        roomId: widget.roomId,
+        userId: widget.currentUserId,
+        userName: widget.currentUserName,
+      );
+      if (success) {
+        await _audioService.onCallConnected();
+        if (mounted) {
+          setState(() {
+            _showReconnectAction = false;
+            _connectionStatusText = 'Connected';
+            _connectionStatusColor = const Color(0xFF1E8E5A);
+          });
+        }
+        ToastService.instance.showSuccess('Call reconnected successfully.');
+      } else {
+        if (mounted) {
+          setState(() => _showReconnectAction = true);
+        }
+        ToastService.instance.showError('Reconnection failed. Please check internet connection.');
+      }
+    } catch (e) {
+      debugPrint('⚠️ [ActiveCallScreen] Manual reconnect failed: $e');
+      if (mounted) {
+        setState(() => _showReconnectAction = true);
+      }
+    }
+  }
+
   void _toggleBluetooth() {
     setState(() => _isBluetoothOn = !_isBluetoothOn);
     ToastService.instance.showInfo(
@@ -321,9 +419,65 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // 15-MINUTE DURATION LIMIT & COUNTDOWN CONTROLS
+  // ─────────────────────────────────────────────────────────────
+
+  void _startCallCountdownTimer() {
+    _countdownTimer?.cancel();
+    final elapsed = _callController.callDuration;
+    _remainingSeconds =
+        (maxCallDurationSeconds - elapsed).clamp(0, maxCallDurationSeconds);
+    _hasShownWarning = _remainingSeconds <= 30;
+
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _hasEnded || _isEnding) {
+        timer.cancel();
+        return;
+      }
+
+      if (_remainingSeconds > 0) {
+        setState(() {
+          _remainingSeconds--;
+        });
+
+        // 2. Warning Alert: When 30 seconds are remaining (at 00:30)
+        if (_remainingSeconds == 30 && !_hasShownWarning) {
+          _hasShownWarning = true;
+          _showDurationWarning();
+        }
+      } else {
+        // 3. Automatic Disconnection: When timer reaches 00:00
+        timer.cancel();
+        _onCallDurationLimitReached();
+      }
+    });
+  }
+
+  void _showDurationWarning() {
+    ToastService.instance.showWarning(
+      'Warning: Call will end in 30 seconds (15-minute limit).',
+    );
+  }
+
+  Future<void> _onCallDurationLimitReached() async {
+    if (_hasEnded || _isEnding) return;
+    debugPrint(
+      '⏱️ [ActiveCallScreen] 15-minute call duration limit reached (00:00). Disconnecting call...',
+    );
+    ToastService.instance.showInfo('Call duration limit reached (15 minutes).');
+    await _endCall();
+  }
+
+  void _cancelCountdownTimer() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+  }
+
   Future<void> _endCall() async {
     if (_isEnding || _hasEnded) return;
     _isEnding = true;
+    _cancelCountdownTimer();
 
     // Immediately handle UI teardown so buttons/screen never freeze
     _handleCallEnded();
@@ -339,6 +493,8 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
     if (_hasEnded) return;
     _hasEnded = true;
 
+    _cancelCountdownTimer();
+    _cancelReconnectWatchdog();
     IncomingCallCoordinator.instance.markScreenClosed(widget.callId);
 
     _durationSub?.cancel();
@@ -462,6 +618,8 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
 
   @override
   void dispose() {
+    _cancelCountdownTimer();
+    _cancelReconnectWatchdog();
     IncomingCallCoordinator.instance.markScreenClosed(widget.callId);
     _durationSub?.cancel();
     _connectionSub?.cancel();
@@ -581,6 +739,11 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
                         ],
                       ),
 
+                      const SizedBox(height: 14),
+
+                      // Floating Countdown Badge (Top of Call Screen)
+                      _buildCountdownBadge(),
+
                       const Spacer(),
 
                       // Active User Avatar
@@ -669,6 +832,103 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
                       // Call Duration Ticker
                       CallTimerWidget(durationSeconds: _duration),
 
+                      // Reconnect / High-Latency Fallback Action Card
+                      if (_showReconnectAction && !_hasEnded && !_hasError) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 24),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F2B5C).withValues(alpha: 0.95),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFFFFA000).withValues(alpha: 0.8),
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.25),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(
+                                    Icons.wifi_off_rounded,
+                                    color: Color(0xFFFFA000),
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Connection taking longer than expected.',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF11B7A8),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                      onPressed: _manualReconnect,
+                                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                                      label: const Text(
+                                        'Reconnect',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(color: Color(0xFFE53935)),
+                                        foregroundColor: const Color(0xFFEF5350),
+                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                      onPressed: _endCall,
+                                      icon: const Icon(Icons.call_end, size: 18),
+                                      label: const Text(
+                                        'End Call',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
                       const Spacer(),
 
                       if (_hasError || _hasEnded || _statusText != null) ...[
@@ -743,7 +1003,7 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
 
                         const SizedBox(height: 36),
 
-                        // End Call Button
+                         // End Call Button
                         EndCallButton(onPressed: _endCall, size: 72),
                         const SizedBox(height: 24),
                       ],
@@ -754,6 +1014,61 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Floating countdown badge displayed at the top of the call screen.
+  /// Shows remaining time in "Remaining: mm:ss" format.
+  /// Automatically transitions to high-visibility alert red when <= 30 seconds remain.
+  Widget _buildCountdownBadge() {
+    final minutes = (_remainingSeconds ~/ 60).toString().padLeft(2, '0');
+    final seconds = (_remainingSeconds % 60).toString().padLeft(2, '0');
+    final bool isUrgent = _remainingSeconds <= 30;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+      decoration: BoxDecoration(
+        color: isUrgent
+            ? const Color(0xFFE53935).withValues(alpha: 0.28)
+            : Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isUrgent
+              ? const Color(0xFFEF5350)
+              : Colors.white.withValues(alpha: 0.25),
+          width: isUrgent ? 1.5 : 1.0,
+        ),
+        boxShadow: isUrgent
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFE53935).withValues(alpha: 0.45),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isUrgent ? Icons.timer_outlined : Icons.hourglass_top_rounded,
+            size: 15,
+            color: isUrgent ? const Color(0xFFFF5252) : const Color(0xFF4AD6C8),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            'Remaining: $minutes:$seconds',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isUrgent ? const Color(0xFFFF8A80) : Colors.white,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
       ),
     );
   }

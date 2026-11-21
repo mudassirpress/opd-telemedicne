@@ -287,6 +287,9 @@ class IncomingCallCoordinator {
     unawaited(SystemRingtonePlayer.stopDefaultRingtone());
   }
 
+  /// Alias for clearing active incoming call state and notifications on logout or reset.
+  Future<void> clearActiveCall() => dismissAllActiveRinging();
+
   // ─────────────────────────────────────────────────────────────────────
   // 1. INBOUND: one call event -> at most one notification + one screen
   // ─────────────────────────────────────────────────────────────────────

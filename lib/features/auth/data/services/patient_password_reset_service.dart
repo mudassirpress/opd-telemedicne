@@ -76,9 +76,11 @@ class VerifyOtpResult {
 /// Firestore-backed fallback when Cloud Functions are not deployed or enabled
 /// on the Firebase project.
 class PatientPasswordResetService {
-  PatientPasswordResetService({
-    FirebaseFirestore? firestore,
-  }) : _customFirestore = firestore;
+  PatientPasswordResetService({FirebaseFirestore? firestore})
+    : _customFirestore = firestore;
+
+  static final PatientPasswordResetService instance =
+      PatientPasswordResetService();
 
   static const String _logPrefix = '[PasswordResetService]';
 
@@ -268,6 +270,19 @@ class PatientPasswordResetService {
 
     return _startOtpFirestoreFallback(
       phone,
+      countryCode: countryCode,
+      deviceFcmToken: deviceFcmToken,
+    );
+  }
+
+  /// Convenience wrapper matching `startOtp` with `phone` argument.
+  Future<StartOtpResult> requestPasswordReset({
+    required String phone,
+    String? countryCode,
+    String? deviceFcmToken,
+  }) {
+    return startOtp(
+      phoneNumber: phone,
       countryCode: countryCode,
       deviceFcmToken: deviceFcmToken,
     );

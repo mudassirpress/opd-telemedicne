@@ -157,53 +157,41 @@ class _AppointmentRequestScreenState
           const SizedBox(height: 16),
           const OpdSectionLabel('Describe your concern'),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xFFD4DCE6),
-                  Color(0xFFE8EEF5),
-                  Color(0xFFC2CDDC),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFD3DFEC),
+                width: 1.2,
               ),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFBAC6D5)),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0F1E32).withValues(alpha: 0.10),
-                  blurRadius: 12,
-                  offset: const Offset(0, 5),
+                  color: const Color(0xFF0F233C).withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
+            child: TextField(
+              controller: _message,
+              maxLines: 7,
+              minLines: 5,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText:
+                    'Mention symptoms, duration and anything the doctor '
+                    'should know before the appointment.',
+                hintStyle: TextStyle(
+                  fontSize: 13.5,
+                  color: const Color(0xFF8FA3B8),
+                ),
               ),
-              child: TextField(
-                controller: _message,
-                maxLines: 7,
-                minLines: 5,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  hintText:
-                      'Mention symptoms, duration and anything the doctor '
-                      'should know before the appointment.',
-                  hintStyle: TextStyle(
-                    fontSize: 13,
-                    color: const Color(0xFF9AACBF),
-                  ),
-                ),
-                style: TextStyle(
-                  fontSize: context.fs(13),
-                  color: const Color(0xFF1F2F44),
-                  height: 1.45,
-                ),
+              style: TextStyle(
+                fontSize: context.fs(14),
+                color: const Color(0xFF1F2F44),
+                height: 1.45,
               ),
             ),
           ),

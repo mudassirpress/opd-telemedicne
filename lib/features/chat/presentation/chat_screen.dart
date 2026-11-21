@@ -2702,17 +2702,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
-            Color(0xFF284F85),
-            Color(0xFF15386A),
-            Color(0xFF0D264E),
-            Color(0xFF081938),
+            Color(0xFF0F3260),
+            Color(0xFF0A2244),
+            Color(0xFF061830),
           ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0B2041).withValues(alpha: 0.32),
+            color: const Color(0xFF091E3B).withValues(alpha: 0.30),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -2880,17 +2879,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
-            Color(0xFF284F85),
-            Color(0xFF15386A),
-            Color(0xFF0D264E),
-            Color(0xFF081938),
+            Color(0xFF0F3260),
+            Color(0xFF0A2244),
+            Color(0xFF061830),
           ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0B2041).withValues(alpha: 0.32),
+            color: const Color(0xFF091E3B).withValues(alpha: 0.30),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -3021,17 +3019,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
-            Color(0xFF284F85),
-            Color(0xFF15386A),
-            Color(0xFF0D264E),
-            Color(0xFF081938),
+            Color(0xFF0F3260),
+            Color(0xFF0A2244),
+            Color(0xFF061830),
           ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0B2041).withValues(alpha: 0.32),
+            color: const Color(0xFF091E3B).withValues(alpha: 0.30),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -6241,72 +6238,49 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                         // Message input - metallic beveled style
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.all(3),
+                            constraints: const BoxConstraints(minHeight: 46),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFFE3EAF2),
-                                  Color(0xFFF5F8FC),
-                                  Color(0xFFE2E9F2),
-                                ],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              ),
-                              borderRadius: BorderRadius.circular(24),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(22),
                               border: Border.all(
-                                color: const Color(0xFFBAC7D8),
-                                width: 1.5,
+                                color: const Color(0xFFD3DFEC),
+                                width: 1.2,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(
-                                    0xFF0F233C,
-                                  ).withValues(alpha: 0.06),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
+                                  color: const Color(0xFF0F233C)
+                                      .withValues(alpha: 0.04),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
                                 ),
                               ],
                             ),
-                            child: Container(
-                              constraints: const BoxConstraints(minHeight: 42),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFFF3F7FB),
-                                    Colors.white,
-                                    Color(0xFFF0F4F9),
-                                  ],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                ),
-                                borderRadius: BorderRadius.circular(22),
-                              ),
-                              child: TextFormField(
-                                controller: _messageController,
-                                onChanged: _handleTyping,
-                                textInputAction: TextInputAction.send,
-                                onFieldSubmitted: (_) => _sendMessage(),
-                                decoration: InputDecoration(
-                                  hintText: _isEditingMessage
-                                      ? 'Edit message...'
-                                      : _replyToMessage != null
-                                      ? 'Reply...'
-                                      : 'Type a message...',
-                                  border: InputBorder.none,
-                                  hintStyle: TextStyle(
-                                    color: const Color(0xFF7E90A6),
-                                    fontSize: context.fs(13.5),
-                                  ),
-                                ),
-                                maxLines: 5,
-                                minLines: 1,
-                                style: TextStyle(
+                            child: TextFormField(
+                              controller: _messageController,
+                              onChanged: _handleTyping,
+                              textInputAction: TextInputAction.send,
+                              onFieldSubmitted: (_) => _sendMessage(),
+                              decoration: InputDecoration(
+                                hintText: _isEditingMessage
+                                    ? 'Edit message...'
+                                    : _replyToMessage != null
+                                    ? 'Reply...'
+                                    : 'Type a message...',
+                                border: InputBorder.none,
+                                hintStyle: TextStyle(
+                                  color: const Color(0xFF8FA3B8),
                                   fontSize: context.fs(13.5),
-                                  color: const Color(0xFF1E2F44),
                                 ),
+                              ),
+                              maxLines: 5,
+                              minLines: 1,
+                              style: TextStyle(
+                                fontSize: context.fs(14),
+                                color: const Color(0xFF1E2F44),
                               ),
                             ),
                           ),
@@ -6323,24 +6297,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
                                 colors: [
-                                  Color(0xFF284F85),
-                                  Color(0xFF15386A),
-                                  Color(0xFF0D264E),
-                                  Color(0xFF081938),
+                                  Color(0xFF0F3260),
+                                  Color(0xFF0A2244),
+                                  Color(0xFF061830),
                                 ],
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                               ),
                               shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color(0xFF132D56),
-                                width: 1,
-                              ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(
-                                    0xFF0B2041,
-                                  ).withValues(alpha: 0.32),
+                                  color: const Color(0xFF091E3B)
+                                      .withValues(alpha: 0.3),
                                   blurRadius: 10,
                                   offset: const Offset(0, 3),
                                 ),
@@ -6353,7 +6321,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                   ? Icons.check_rounded
                                   : Icons.send_rounded,
                               color: Colors.white,
-                              size: 20,
+                              size: 19,
                             ),
                           ),
                         ),

@@ -80,6 +80,7 @@ class MetallicInput extends StatefulWidget {
   final String hintText;
   final IconData icon;
   final TextInputType? keyboardType;
+  final TextCapitalization textCapitalization;
   final bool isPassword;
   final bool obscureText;
   final VoidCallback? onVisibilityToggle;
@@ -104,6 +105,7 @@ class MetallicInput extends StatefulWidget {
     required this.hintText,
     required this.icon,
     this.keyboardType,
+    this.textCapitalization = TextCapitalization.none,
     this.isPassword = false,
     this.obscureText = false,
     this.onVisibilityToggle,
@@ -197,143 +199,122 @@ class _MetallicInputState extends State<MetallicInput> {
               ),
             ],
             Container(
-              padding: const EdgeInsets.all(3),
+              height: isMultiline ? null : 52,
+              constraints: isMultiline
+                  ? BoxConstraints(
+                      minHeight: (widget.minLines ?? 3) * 22.0 + 24,
+                    )
+                  : null,
+              padding: EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: isMultiline ? 12 : 0,
+              ),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFFE3EAF2),
-                    Color(0xFFF5F8FC),
-                    Color(0xFFE2E9F2),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(isMultiline ? 18 : 28),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: hasError ? Colors.red : const Color(0xFFBAC7D8),
-                  width: 1.5,
+                  color: hasError ? Colors.red : const Color(0xFFD3DFEC),
+                  width: hasError ? 1.5 : 1.2,
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: (hasError ? Colors.red : const Color(0xFF0F233C))
-                        .withValues(alpha: 0.08),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                        .withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
-              child: Container(
-                height: isMultiline ? null : 48,
-                constraints: isMultiline
-                    ? BoxConstraints(
-                        minHeight: (widget.minLines ?? 3) * 22.0 + 24,
-                      )
-                    : null,
-                padding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: isMultiline ? 10 : 0,
-                ),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFFF3F7FB),
-                      Colors.white,
-                      Color(0xFFF0F4F9),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+              child: Row(
+                crossAxisAlignment: isMultiline
+                    ? CrossAxisAlignment.start
+                    : CrossAxisAlignment.center,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.only(top: isMultiline ? 2 : 0),
+                    child: Icon(
+                      widget.icon,
+                      color: hasError ? Colors.red : const Color(0xFF4A607A),
+                      size: 20,
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(isMultiline ? 15 : 25),
-                ),
-                child: Row(
-                  crossAxisAlignment: isMultiline
-                      ? CrossAxisAlignment.start
-                      : CrossAxisAlignment.center,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.only(top: isMultiline ? 2 : 0),
-                      child: Icon(
-                        widget.icon,
-                        color: hasError ? Colors.red : const Color(0xFF0E274D),
-                        size: 18,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _effectiveController,
+                      focusNode: widget.focusNode,
+                      keyboardType: widget.keyboardType,
+                      textCapitalization: widget.textCapitalization,
+                      obscureText: widget.isPassword ? _obscureText : false,
+                      enabled: widget.enabled,
+                      readOnly: widget.readOnly,
+                      inputFormatters: widget.inputFormatters,
+                      maxLength: widget.maxLength,
+                      maxLines: widget.maxLines,
+                      minLines: widget.minLines,
+                      onChanged: (val) {
+                        fieldState.didChange(val);
+                        widget.onChanged?.call(val);
+                      },
+                      style: TextStyle(
+                        fontSize: context.fs(14),
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF1E2F44),
+                      ),
+                      decoration: InputDecoration(
+                        hintText: widget.hintText,
+                        hintStyle: TextStyle(
+                          color: const Color(0xFF8FA3B8),
+                          fontSize: context.fs(13.5),
+                        ),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                        counterText: widget.maxLength != null ? '' : null,
+                        errorStyle: const TextStyle(fontSize: 0, height: 0),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _effectiveController,
-                        focusNode: widget.focusNode,
-                        keyboardType: widget.keyboardType,
-                        obscureText: widget.isPassword ? _obscureText : false,
-                        enabled: widget.enabled,
-                        readOnly: widget.readOnly,
-                        inputFormatters: widget.inputFormatters,
-                        maxLength: widget.maxLength,
-                        maxLines: widget.maxLines,
-                        minLines: widget.minLines,
-                        onChanged: (val) {
-                          fieldState.didChange(val);
-                          widget.onChanged?.call(val);
-                        },
-                        style: TextStyle(
-                          fontSize: context.fs(14),
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF1E2F44),
+                  ),
+                  if (widget.suffixIcon != null) ...[
+                    widget.suffixIcon!,
+                  ] else if (widget.isPassword) ...[
+                    Container(
+                      height: 24,
+                      width: 1.5,
+                      color: const Color(0xFFCAD4E0),
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _obscureText = !_obscureText;
+                        });
+                        widget.onVisibilityToggle?.call();
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 10,
                         ),
-                        decoration: InputDecoration(
-                          hintText: widget.hintText,
-                          hintStyle: TextStyle(
-                            color: const Color(0xFF7E90A6),
-                            fontSize: context.fs(13.5),
-                          ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          errorBorder: InputBorder.none,
-                          focusedErrorBorder: InputBorder.none,
-                          disabledBorder: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                          counterText: widget.maxLength != null ? '' : null,
-                          errorStyle: const TextStyle(fontSize: 0, height: 0),
+                        child: Icon(
+                          _obscureText
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: const Color(0xFF647890),
+                          size: 20,
                         ),
                       ),
                     ),
-                    if (widget.suffixIcon != null) ...[
-                      widget.suffixIcon!,
-                    ] else if (widget.isPassword) ...[
-                      Container(
-                        height: 24,
-                        width: 1.5,
-                        color: const Color(0xFFCAD4E0),
-                        margin: const EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _obscureText = !_obscureText;
-                          });
-                          widget.onVisibilityToggle?.call();
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 10,
-                          ),
-                          child: Icon(
-                            _obscureText
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                            color: const Color(0xFF647890),
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
             ),
+
             if (hasError)
               Padding(
                 padding: const EdgeInsets.only(top: 6, left: 20, right: 20),
@@ -412,94 +393,72 @@ class MetallicDropdown<T> extends StatelessWidget {
               ),
             ],
             Container(
-              padding: const EdgeInsets.all(3),
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFFE3EAF2),
-                    Color(0xFFF5F8FC),
-                    Color(0xFFE2E9F2),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(28),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: hasError ? Colors.red : const Color(0xFFBAC7D8),
-                  width: 1.5,
+                  color: hasError ? Colors.red : const Color(0xFFD3DFEC),
+                  width: hasError ? 1.5 : 1.2,
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: (hasError ? Colors.red : const Color(0xFF0F233C))
-                        .withValues(alpha: 0.08),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                        .withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
-              child: Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFFF3F7FB),
-                      Colors.white,
-                      Color(0xFFF0F4F9),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+              child: Row(
+                children: [
+                  Icon(
+                    icon,
+                    color: hasError ? Colors.red : const Color(0xFF4A607A),
+                    size: 20,
                   ),
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      icon,
-                      color: hasError ? Colors.red : const Color(0xFF0E274D),
-                      size: 18,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<T>(
-                          value: items.any((item) => item.value == value)
-                              ? value
-                              : null,
-                          isExpanded: true,
-                          hint: Text(
-                            hintText,
-                            style: TextStyle(
-                              color: const Color(0xFF7E90A6),
-                              fontSize: context.fs(13.5),
-                            ),
-                          ),
-                          icon: const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: Color(0xFF647890),
-                            size: 20,
-                          ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<T>(
+                        value: items.any((item) => item.value == value)
+                            ? value
+                            : null,
+                        isExpanded: true,
+                        hint: Text(
+                          hintText,
                           style: TextStyle(
-                            fontSize: context.fs(14),
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF1E2F44),
+                            color: const Color(0xFF8FA3B8),
+                            fontSize: context.fs(13.5),
                           ),
-                          dropdownColor: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          items: items,
-                          onChanged: enabled
-                              ? (val) {
-                                  state.didChange(val);
-                                  onChanged?.call(val);
-                                }
-                              : null,
                         ),
+                        icon: const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: Color(0xFF647890),
+                          size: 20,
+                        ),
+                        style: TextStyle(
+                          fontSize: context.fs(14),
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF1E2F44),
+                        ),
+                        dropdownColor: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        items: items,
+                        onChanged: enabled
+                            ? (val) {
+                                state.didChange(val);
+                                onChanged?.call(val);
+                              }
+                            : null,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
+
             if (hasError)
               Padding(
                 padding: const EdgeInsets.only(top: 6, left: 20, right: 20),
@@ -612,22 +571,16 @@ class GradientButton extends StatelessWidget {
       height: 52,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF284F85),
-            Color(0xFF15386A),
-            Color(0xFF0D264E),
-            Color(0xFF081938),
-          ],
+          colors: [Color(0xFF0F3260), Color(0xFF0A2244), Color(0xFF061830)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: const Color(0xFF132D56)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0B2041).withValues(alpha: 0.32),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF091E3B).withValues(alpha: 0.3),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -642,10 +595,10 @@ class GradientButton extends StatelessWidget {
         onPressed: isLoading ? null : onPressed,
         child: isLoading
             ? const SizedBox(
-                width: 24,
-                height: 24,
+                width: 22,
+                height: 22,
                 child: CircularProgressIndicator(
-                  strokeWidth: 2,
+                  strokeWidth: 2.2,
                   color: Colors.white,
                 ),
               )
@@ -658,10 +611,10 @@ class GradientButton extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: context.fs(14.5),
-                        fontWeight: FontWeight.w600,
+                        fontSize: context.fs(15),
+                        fontWeight: FontWeight.w700,
                         color: Colors.white,
-                        letterSpacing: 0.5,
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ),
@@ -685,19 +638,20 @@ class CircularBackButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      onPressed: onPressed ?? () => Navigator.pop(context),
+      onPressed: onPressed ?? () => Navigator.maybePop(context),
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
       icon: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
           color: const Color(0xFFE8EDF3),
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFDCE6F2)),
         ),
         child: const Icon(
-          Icons.arrow_back_rounded,
+          Icons.arrow_back_ios_new_rounded,
           color: Color(0xFF062B72),
-          size: 22,
+          size: 16,
         ),
       ),
     );
@@ -911,6 +865,20 @@ class AuthScreenLayout extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Enforces uppercase input formatting for codes, MRNs, and card IDs.
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
     );
   }
 }

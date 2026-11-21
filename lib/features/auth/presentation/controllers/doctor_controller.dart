@@ -147,27 +147,33 @@ class DoctorController extends ChangeNotifier {
         // Device lost internet connection
         stopPresenceTracking();
         try {
-          await _firestore.collection('telemedicine_doctors').doc(doctorId).update({
-            'isAvailable': false,
-            'effectiveStatus': 'OFFLINE',
-            'deviceReachable': false,
-            'presenceStale': true,
-            'lastStatusUpdate': FieldValue.serverTimestamp(),
-          });
+          await _firestore
+              .collection('telemedicine_doctors')
+              .doc(doctorId)
+              .update({
+                'isAvailable': false,
+                'effectiveStatus': 'OFFLINE',
+                'deviceReachable': false,
+                'presenceStale': true,
+                'lastStatusUpdate': FieldValue.serverTimestamp(),
+              });
         } catch (_) {}
       } else {
         // Interface restored - resume tracking and restore status if manual preference was ON
         if (_manualAvailability) {
           try {
-            await _firestore.collection('telemedicine_doctors').doc(doctorId).update({
-              'isOnline': true,
-              'isAvailable': true,
-              'effectiveStatus': 'ONLINE',
-              'deviceReachable': true,
-              'presenceStale': false,
-              'lastStatusUpdate': FieldValue.serverTimestamp(),
-              'lastSeen': FieldValue.serverTimestamp(),
-            });
+            await _firestore
+                .collection('telemedicine_doctors')
+                .doc(doctorId)
+                .update({
+                  'isOnline': true,
+                  'isAvailable': true,
+                  'effectiveStatus': 'ONLINE',
+                  'deviceReachable': true,
+                  'presenceStale': false,
+                  'lastStatusUpdate': FieldValue.serverTimestamp(),
+                  'lastSeen': FieldValue.serverTimestamp(),
+                });
           } catch (_) {}
           startPresenceTracking();
         }
@@ -514,6 +520,126 @@ class DoctorController extends ChangeNotifier {
       _doctorListStreamController?.close();
       _doctorListStreamController = null;
       _lastRawFirestoreSnapshot = null;
+    }
+  }
+
+  // Sign in with doctor ID or registered mobile and password
+  Future<bool> signInDoctorWithCredentials({required String identifier}) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      final cleanIdentifier = identifier.trim();
+
+      debugPrint('Attempting doctor login with identifier: $cleanIdentifier');
+
+      QuerySnapshot<Map<String, dynamic>> snapshot;
+
+      // 1. Try finding by doctorId
+      snapshot = await _firestore
+          .collection('telemedicine_doctors')
+          .where('doctorId', isEqualTo: cleanIdentifier)
+          .where('isActive', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      // 2. If not found by doctorId, search by phoneNumber
+      if (snapshot.docs.isEmpty) {
+        final variants = <String>{
+          cleanIdentifier,
+          if (cleanIdentifier.startsWith('0'))
+            '+92${cleanIdentifier.substring(1)}',
+          if (cleanIdentifier.startsWith('+92'))
+            '0${cleanIdentifier.substring(3)}',
+          if (!cleanIdentifier.startsWith('+92') &&
+              !cleanIdentifier.startsWith('0'))
+            '0$cleanIdentifier',
+          if (!cleanIdentifier.startsWith('+92') &&
+              !cleanIdentifier.startsWith('0'))
+            '+92$cleanIdentifier',
+        }.toList();
+
+        snapshot = await _firestore
+            .collection('telemedicine_doctors')
+            .where('phoneNumber', whereIn: variants)
+            .where('isActive', isEqualTo: true)
+            .limit(1)
+            .get();
+      }
+
+      if (snapshot.docs.isEmpty) {
+        _errorMessage =
+            'Doctor account not found with provided Doctor ID or Mobile Number.';
+        _setLoading(false);
+        return false;
+      }
+
+      final doctorDoc = snapshot.docs.first;
+      final doctorData = doctorDoc.data();
+
+      // Account status check
+      final accountStatus = doctorData['accountStatus'] ?? 'Active';
+      if (accountStatus == 'Blocked') {
+        _errorMessage = 'Your account has been blocked by the administrator.';
+        _setLoading(false);
+        return false;
+      }
+      if (accountStatus == 'Frozen') {
+        _errorMessage = 'Your ID has been frozen by the administrator.';
+        _setLoading(false);
+        return false;
+      }
+      if (accountStatus == 'Deleted') {
+        _errorMessage = 'This Doctor ID no longer exists.';
+        _setLoading(false);
+        return false;
+      }
+
+      final claimResult = await SingleDeviceSessionService.claimActiveSession(
+        collectionName: 'telemedicine_doctors',
+        documentId: doctorDoc.id,
+        role: 'doctor',
+      );
+      if (!claimResult.allowed) {
+        _errorMessage =
+            claimResult.errorMessage ??
+            'Unable to establish secure doctor session.';
+        _setLoading(false);
+        return false;
+      }
+      _currentSessionId = claimResult.sessionId;
+
+      _currentDoctor = UserModel.fromMap({
+        ...doctorData,
+        'id': doctorDoc.id,
+        'role': 'doctor',
+        'image': (doctorData['imageUrl'] ?? doctorData['image'] ?? '')
+            .toString(),
+        'deviceId': '',
+        'idcard': '',
+        'token': DateTime.now().millisecondsSinceEpoch.toString(),
+        'ispayment': false,
+        'totalPayment': 0.0,
+      });
+
+      await _saveDoctorToLocalStorage(_currentDoctor!);
+      _listenToDoctorSession(doctorDoc.id);
+
+      await updateDoctorPresence(true);
+      startPresenceTracking();
+      _setupConnectivityListener();
+
+      await NotificationService().saveTokenToFirestore(doctorDoc.id, 'doctor');
+      await _recordDoctorLogin(_currentDoctor!.id, _currentDoctor!.fullname);
+
+      _setLoading(false);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error in signInDoctorWithCredentials: $e');
+      _errorMessage = 'Failed to sign in: ${e.toString()}';
+      _setLoading(false);
+      return false;
     }
   }
 

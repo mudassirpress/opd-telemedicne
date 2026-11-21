@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telemedicine/features/admin/presentation/admin_bottom_nav/admin_portal_wrapper.dart';
 import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
+import 'package:telemedicine/features/auth/presentation/screens/complete_patient_profile_screen.dart';
 import 'package:telemedicine/features/auth/presentation/screens/expired_patient_screen.dart';
 import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
 import 'package:telemedicine/features/payments/presentation/screens/payment_screen.dart';
@@ -14,11 +15,14 @@ import 'package:telemedicine/features/patients/presentation/patient_portal_wrapp
 
 /// Destination screens for patient post-login and startup routing.
 enum PatientAuthDestination {
+  /// First-time card login requiring mobile number and password setup
+  completeProfile,
+
   /// Case A: Active & Valid Patient Card (`isExpired == false`) or approved patient
   /// -> Navigate directly to RoomChatScreen / PatientPortalWrapper.
   chatRoom,
 
-  /// Case B: Expired Patient Card (`isExpired == true`)
+  /// Case B: Expired Patient Card or Subscription (`isExpired == true`)
   /// -> Route to ExpiredPatientScreen to submit a renewal payment receipt.
   cardExpired,
 
@@ -34,35 +38,43 @@ class AuthRoutingService {
 
   /// Evaluates the correct destination for a patient user.
   ///
-  /// - **Case A: Active & Valid Card (`isExpired == false`):**
-  ///   Users with a valid Patient Card bypass the payment screen and land
-  ///   directly on RoomChatScreen / PatientPortalWrapper.
+  /// - **Card-Based Login User:**
+  ///   1. If first-time login without completed profile (phone + password),
+  ///      routes to `CompletePatientProfileScreen`.
+  ///   2. If expired, routes to `ExpiredPatientScreen`.
+  ///   3. Otherwise, bypasses initial payment screen completely and routes to `PatientPortalWrapper`.
   ///
-  /// - **Case B: Expired Card (`isExpired == true`):**
-  ///   Patient Card has expired. Redirects to ExpiredPatientScreen for renewal.
-  ///
-  /// - **Case C: Regular Non-Card Patient:**
-  ///   Standard patients must submit payment proof if missing (`paymentImage` empty),
-  ///   or proceed to the portal once approved.
+  /// - **Normal Sign-In User:**
+  ///   1. If expired, routes to `ExpiredPatientScreen`.
+  ///   2. If initial payment has not been completed, routes to `PaymentScreen`.
+  ///   3. Once payment approved or active, routes to `PatientPortalWrapper`.
   static PatientAuthDestination evaluatePatientDestination(UserModel user) {
     if (user.isGuest) {
       return PatientAuthDestination.chatRoom;
     }
 
-    if (user.isPatientCard) {
-      if (user.isExpired) {
-        return PatientAuthDestination.cardExpired;
-      }
-      return PatientAuthDestination.chatRoom;
+    final bool isCardUser = user.isPatientCard;
+
+    // 1. First-time Card user setup check
+    if (isCardUser && !user.isProfileCompleted) {
+      return PatientAuthDestination.completeProfile;
     }
 
-    // If regular user has an expired validity date
+    // 2. Expiration check (Applies to BOTH Normal and Card users)
     if (user.isExpired) {
       return PatientAuthDestination.cardExpired;
     }
 
-    // Standard patients (approved, pending, rejected, or not submitted) land on
-    // the portal in full or restricted mode without being trapped on PaymentScreen.
+    // 3. Card-based users BYPASS the payment screen
+    if (isCardUser) {
+      return PatientAuthDestination.chatRoom;
+    }
+
+    // 4. Normal users must complete initial payment/subscription
+    if (!user.ispayment && user.paymentStatus != 'approved') {
+      return PatientAuthDestination.paymentProof;
+    }
+
     return PatientAuthDestination.chatRoom;
   }
 
@@ -75,6 +87,21 @@ class AuthRoutingService {
     final destination = evaluatePatientDestination(user);
 
     switch (destination) {
+      case PatientAuthDestination.completeProfile:
+        ToastService.instance.showInfo(
+          'Please set up your mobile number and password to complete registration.',
+        );
+        _navigate(
+          context,
+          CompletePatientProfileScreen(
+            patientUid: user.id,
+            prefilledPhone: user.phoneNumber,
+            isPhoneAuth: false,
+          ),
+          clearStack: clearStack,
+        );
+        break;
+
       case PatientAuthDestination.chatRoom:
         ToastService.instance.showSuccess('Welcome back, ${user.fullname}!');
         _navigate(
@@ -86,7 +113,7 @@ class AuthRoutingService {
 
       case PatientAuthDestination.cardExpired:
         ToastService.instance.showError(
-          'Your Patient Card has expired. Please renew your payment to continue.',
+          'Your account subscription or card has expired. Please renew to continue.',
         );
         _navigate(
           context,
@@ -96,7 +123,7 @@ class AuthRoutingService {
         break;
 
       case PatientAuthDestination.paymentProof:
-        ToastService.instance.showInfo('Please complete payment to continue');
+        ToastService.instance.showInfo('Please complete your subscription payment.');
         _navigate(context, const PaymentScreen(), clearStack: clearStack);
         break;
     }
@@ -195,6 +222,12 @@ class AuthWrapper extends ConsumerWidget {
     if (user.role == 'patient') {
       final destination = AuthRoutingService.evaluatePatientDestination(user);
       switch (destination) {
+        case PatientAuthDestination.completeProfile:
+          return CompletePatientProfileScreen(
+            patientUid: user.id,
+            prefilledPhone: user.phoneNumber,
+            isPhoneAuth: false,
+          );
         case PatientAuthDestination.chatRoom:
           return const PatientPortalWrapper();
         case PatientAuthDestination.cardExpired:

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
 import 'package:telemedicine/features/auth/presentation/screens/complete_patient_profile_screen.dart';
+import 'package:telemedicine/features/auth/presentation/screens/reset_password_screen.dart';
 import 'package:telemedicine/core/services/auth_routing_service.dart';
 import 'package:telemedicine/app/theme/app_theme.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
@@ -16,16 +17,18 @@ import 'package:telemedicine/shared/widgets/auth_layout.dart';
 /// Screen for verifying the 6-digit SMS OTP sent via Firebase Phone Authentication.
 class OtpVerificationScreen extends ConsumerStatefulWidget {
   final String phoneNumber;
-  final String rawPhone;
+  final String? rawPhone;
   final String verificationId;
   final int? resendToken;
+  final bool isPasswordReset;
 
   const OtpVerificationScreen({
     super.key,
     required this.phoneNumber,
-    required this.rawPhone,
+    this.rawPhone,
     required this.verificationId,
     this.resendToken,
+    this.isPasswordReset = false,
   });
 
   @override
@@ -203,11 +206,27 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   }
 
   Future<void> _handlePostAuth(User firebaseUser) async {
+    if (widget.isPasswordReset) {
+      if (mounted) {
+        setState(() => _isVerifying = false);
+      }
+      ToastService.instance.showSuccess(
+        'Phone verified! Please set your new password.',
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ResetPasswordScreen(phoneNumber: widget.phoneNumber),
+        ),
+      );
+      return;
+    }
+
     final patientController = ref.read(patientControllerProvider);
 
     final result = await patientController.signInWithFirebasePhoneUser(
       firebaseUser: firebaseUser,
-      rawPhone: widget.rawPhone,
+      rawPhone: widget.rawPhone ?? widget.phoneNumber,
       normalizedPhone: widget.phoneNumber,
     );
 

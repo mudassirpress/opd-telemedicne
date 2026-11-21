@@ -4,6 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telemedicine/core/services/firebase_storage_service.dart';
+import 'package:telemedicine/core/services/call_session_manager.dart';
+import 'package:telemedicine/core/services/incoming_call_coordinator.dart';
+import 'package:telemedicine/features/calling/controllers/call_controller.dart';
+import 'package:telemedicine/features/patients/presentation/patient_portal_tab_provider.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 import 'package:telemedicine/core/utils/toast_utils.dart';
 import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
@@ -246,6 +250,7 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
   Future<void> _logout() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
@@ -267,7 +272,7 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
             child: const Text(
               'Cancel',
               style: TextStyle(
@@ -277,7 +282,7 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
             ),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text(
               'Logout',
@@ -289,29 +294,61 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
     );
 
     if (shouldLogout != true) return;
-
     if (!mounted) return;
+
+    final rootNav = Navigator.of(context, rootNavigator: true);
+
     showDialog(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
-      builder: (_) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF062B72)),
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: Center(
+          child: CircularProgressIndicator(color: Color(0xFF062B72)),
+        ),
       ),
     );
 
     try {
+      // 1. Teardown any pending call sessions
+      try {
+        await CallController.instance.resetForScreen();
+      } catch (_) {}
+      try {
+        CallSessionManager.instance.endSession();
+      } catch (_) {}
+      try {
+        await IncomingCallCoordinator.instance.clearActiveCall();
+      } catch (_) {}
+
+      // 2. Perform backend & storage sign out
       final patientController = ref.read(patientControllerProvider);
       await patientController.signOut();
-      if (mounted) {
-        Navigator.pop(context); // Dismiss spinner
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const SignInScreen()),
-          (route) => false,
-        );
-      }
+
+      // 3. Invalidate auth providers so stale profile data is purged
+      ref.invalidate(userProvider);
+      ref.invalidate(currentUserProvider);
+      ref.invalidate(patientControllerProvider);
+      try {
+        ref.read(patientPortalTabProvider.notifier).state =
+            PatientPortalTab.chat;
+      } catch (_) {}
+
+      // 4. Safely pop loading spinner
+      try {
+        rootNav.pop();
+      } catch (_) {}
+
+      // 5. Completely purge navigation stack directly to SignInScreen
+      rootNav.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const SignInScreen()),
+        (route) => false,
+      );
     } catch (e) {
-      if (mounted) Navigator.pop(context);
+      try {
+        rootNav.pop();
+      } catch (_) {}
       ToastService.instance.showError('Logout failed');
     }
   }
@@ -400,8 +437,7 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
         ToastService.instance.showSuccess(
           'Account deactivated. Records have been archived.',
         );
-        Navigator.pushAndRemoveUntil(
-          context,
+        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const SignInScreen()),
           (route) => false,
         );
@@ -417,6 +453,14 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen>
     final currentUser = ref.watch(userProvider);
 
     if (currentUser == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const SignInScreen()),
+            (route) => false,
+          );
+        }
+      });
       return const Scaffold(
         backgroundColor: Color(0xFFEDF2F8),
         body: Center(

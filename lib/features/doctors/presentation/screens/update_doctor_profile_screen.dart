@@ -567,45 +567,6 @@ class _UpdateDoctorProfileScreenState
                       return null;
                     },
                   ),
-
-                  const SizedBox(height: 18),
-
-                  Text(
-                    'Phone Number',
-                    style: TextStyle(
-                      fontSize: context.fs(13),
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF1F2F44),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  MetallicInput(
-                    hintText: 'Phone number',
-                    icon: Icons.phone_android_rounded,
-                    controller: phoneController,
-                    enabled: false,
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  Text(
-                    'Gender',
-                    style: TextStyle(
-                      fontSize: context.fs(13),
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF1F2F44),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _buildGenderChip('Male', Icons.male_rounded),
-                      const SizedBox(width: 10),
-                      _buildGenderChip('Female', Icons.female_rounded),
-                      const SizedBox(width: 10),
-                      _buildGenderChip('Other', Icons.transgender_rounded),
-                    ],
-                  ),
                 ],
               ),
             ),

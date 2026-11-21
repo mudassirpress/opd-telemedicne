@@ -29,6 +29,7 @@ class UserModel {
   final DateTime?
   expiryDate; // 6-month or plan-based expiry from activation/reactivation
   final String? cardStatus; // Card status (e.g. 'Active', 'Expired', 'Blocked')
+  final bool? isProfileComplete;
   // Persisted authentication source: 'patientId' for Patient ID users,
   // 'normal' for normal signup/login patients. Stored in Firestore + local
   // session so the bypass survives navigation and app restarts.
@@ -105,6 +106,11 @@ class UserModel {
   /// Domain-specific alias for Patient Card user check.
   bool get isPatientCard => isPatientIdUser;
 
+  /// Whether the user has completed their profile setup (phone number, password, fullname).
+  bool get isProfileCompleted =>
+      (isProfileComplete == true) ||
+      (fullname.trim().isNotEmpty && phoneNumber.trim().isNotEmpty && password.trim().isNotEmpty);
+
   /// The amount a patient is charged for one consultation.
   ///
   /// `price` wins when the document carries it; documents written before the
@@ -139,6 +145,7 @@ class UserModel {
     this.age,
     this.expiryDate,
     this.cardStatus,
+    this.isProfileComplete,
     this.loginType,
     this.subscriptionPlan,
     this.durationMonths,
@@ -205,6 +212,7 @@ class UserModel {
             map['cardValidUntil'],
       ),
       cardStatus: _asString(map['cardStatus']),
+      isProfileComplete: map['isProfileComplete'] as bool?,
       loginType: map['loginType'],
       subscriptionPlan: _asString(map['subscriptionPlan']),
       durationMonths: map['durationMonths'] is int
@@ -291,6 +299,7 @@ class UserModel {
       'age': age,
       'expiryDate': expiryDate?.toIso8601String(),
       'cardStatus': cardStatus,
+      if (isProfileComplete != null) 'isProfileComplete': isProfileComplete,
       'loginType': loginType,
       if (authUid != null) 'authUid': authUid,
       if (subscriptionPlan != null) 'subscriptionPlan': subscriptionPlan,
@@ -326,6 +335,7 @@ class UserModel {
     String? fcmToken,
     String? loginType,
     String? cardStatus,
+    bool? isProfileComplete,
     DateTime? expiryDate,
     String? authUid,
     String? subscriptionPlan,
@@ -373,6 +383,7 @@ class UserModel {
       age: age ?? this.age,
       expiryDate: expiryDate ?? this.expiryDate,
       cardStatus: cardStatus ?? this.cardStatus,
+      isProfileComplete: isProfileComplete ?? this.isProfileComplete,
       loginType: loginType ?? this.loginType,
       authUid: authUid ?? this.authUid,
       subscriptionPlan: subscriptionPlan ?? this.subscriptionPlan,

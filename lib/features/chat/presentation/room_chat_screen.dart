@@ -26,6 +26,8 @@ import 'package:telemedicine/features/complaints/presentation/submit_complaint_s
 import 'package:telemedicine/core/services/payment_complaint_visibility_service.dart';
 import 'package:telemedicine/shared/widgets/auth_layout.dart';
 import 'package:telemedicine/shared/widgets/badge_indicator.dart';
+import 'package:telemedicine/shared/widgets/opd_design_system.dart';
+import 'package:telemedicine/features/patients/presentation/patient_portal_tab_provider.dart';
 
 class ChatRoomScreen extends ConsumerStatefulWidget {
   const ChatRoomScreen({super.key});

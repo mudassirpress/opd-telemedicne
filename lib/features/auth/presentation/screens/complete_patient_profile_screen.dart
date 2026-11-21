@@ -13,6 +13,7 @@ import 'package:telemedicine/core/utils/phone_utils.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 import 'package:telemedicine/core/errors/auth_error_handler.dart';
 import 'package:telemedicine/core/services/app_feedback.dart';
+import 'package:telemedicine/features/auth/data/services/phone_verification_service.dart';
 import 'package:telemedicine/shared/widgets/auth_layout.dart';
 import 'package:telemedicine/shared/widgets/international_phone_input.dart';
 
@@ -42,10 +43,14 @@ class _CompletePatientProfileScreenState
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _mobileController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   String _selectedGender = '';
   final _ageController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   InternationalPhoneValue? _phoneValue;
   String _selectedDialCode = '+92';
@@ -163,6 +168,8 @@ class _CompletePatientProfileScreenState
   void dispose() {
     _nameController.dispose();
     _mobileController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _ageController.dispose();
     super.dispose();
   }
@@ -218,9 +225,35 @@ class _CompletePatientProfileScreenState
                   defaultDialCode: _selectedDialCode,
                 ) ??
                 rawPhone;
+
+      // Password setup validation for Card users
+      final password = _passwordController.text.trim();
+      final confirmPassword = _confirmPasswordController.text.trim();
+      if (password.length < 6) {
+        AppFeedback.showError(context, 'Password must be at least 6 characters');
+        return;
+      }
+      if (password != confirmPassword) {
+        AppFeedback.showError(context, 'Passwords do not match');
+        return;
+      }
     }
 
     final resolvedUid = _resolveActiveUid();
+
+    // Phone Duplication Check before saving
+    if (!_isPhoneAuth) {
+      final phoneCheck = await PhoneVerificationService().checkPhoneAvailability(
+        phoneToSave,
+        defaultDialCode: _selectedDialCode,
+      );
+      if (!phoneCheck.isAvailable && phoneCheck.userId != resolvedUid) {
+        if (!mounted) return;
+        AppFeedback.showError(context, 'Phone number is already registered.');
+        return;
+      }
+    }
+
     debugPrint(
       '🚀 [CompleteProfile._submitProfile] Executing registration completion:',
     );
@@ -252,6 +285,7 @@ class _CompletePatientProfileScreenState
         gender: _selectedGender,
         age: int.tryParse(_ageController.text.trim()),
         phoneNumber: phoneToSave,
+        password: !_isPhoneAuth ? _passwordController.text.trim() : null,
         patientIdModel: widget.patientIdModel,
       );
 
@@ -454,6 +488,34 @@ class _CompletePatientProfileScreenState
                                   _phoneValue = val;
                                   _selectedDialCode = val.dialCode;
                                   _selectedIsoCode = val.isoCode;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+
+                              MetallicInput(
+                                hintText: 'Create Password',
+                                icon: Icons.lock_outline_rounded,
+                                isPassword: true,
+                                controller: _passwordController,
+                                validator: (val) {
+                                  if (val == null || val.trim().length < 6) {
+                                    return 'Password must be at least 6 characters';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+
+                              MetallicInput(
+                                hintText: 'Confirm Password',
+                                icon: Icons.lock_outline_rounded,
+                                isPassword: true,
+                                controller: _confirmPasswordController,
+                                validator: (val) {
+                                  if (val != _passwordController.text) {
+                                    return 'Passwords do not match';
+                                  }
+                                  return null;
                                 },
                               ),
                               const SizedBox(height: 16),

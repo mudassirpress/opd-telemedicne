@@ -71,6 +71,22 @@ class CallController {
     }
   }
 
+  /// Resets and cleans up any active call session for screen transitions or logout.
+  Future<void> resetForScreen() async {
+    _cancelRingTimeout();
+    stopCallDurationTimer();
+    final callId = _activeCall?.callId;
+    if (callId != null && callId.isNotEmpty) {
+      try {
+        await endCall(callId, endReason: 'session_reset');
+      } catch (_) {
+        await _cleanupActiveCall();
+      }
+    } else {
+      await _cleanupActiveCall();
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────
   // PRE-CALL AVAILABILITY & ELIGIBILITY VALIDATION
   // ─────────────────────────────────────────────────────────────
@@ -96,7 +112,9 @@ class CallController {
       }
 
       final manualAvailability =
-          data['manualAvailability'] as bool? ?? data['isOnline'] as bool? ?? false;
+          data['manualAvailability'] as bool? ??
+          data['isOnline'] as bool? ??
+          false;
       final isOnline = (data['isOnline'] == true) && manualAvailability;
 
       if (!isOnline) {
@@ -124,7 +142,9 @@ class CallController {
   }
 
   /// Validates whether a Patient is reachable and ready to receive calls.
-  Future<Map<String, dynamic>> checkPatientAvailability(String patientId) async {
+  Future<Map<String, dynamic>> checkPatientAvailability(
+    String patientId,
+  ) async {
     try {
       final doc = await _firestore
           .collection(FirestoreCollections.patients)
@@ -167,8 +187,8 @@ class CallController {
     String? receiverImage,
   }) async {
     // 1. Microphone permission
-    final hasMic =
-        await _permissionService.checkAndRequestMicrophonePermission();
+    final hasMic = await _permissionService
+        .checkAndRequestMicrophonePermission();
     if (!hasMic) {
       return {
         'success': false,
@@ -205,10 +225,10 @@ class CallController {
       }
     }
 
-    // 4. Generate IDs
+    // 4. Generate collision-free IDs
     final callDoc = _firestore.collection(FirestoreCollections.calls).doc();
     final callId = callDoc.id;
-    final roomId = 'room_call_$callId';
+    final roomId = ZegoCallService.formatRoomId('room_call_$callId');
 
     final call = VoiceCallModel(
       callId: callId,
@@ -250,9 +270,7 @@ class CallController {
     );
 
     // 7. Send FCM high-priority notification to receiver
-    unawaited(
-      _dispatchCallPush(call),
-    );
+    unawaited(_dispatchCallPush(call));
 
     // 8. Start ring timeout timer (45 seconds)
     _startRingTimeout(callId);
@@ -266,12 +284,7 @@ class CallController {
       ),
     );
 
-    return {
-      'success': true,
-      'callId': callId,
-      'roomId': roomId,
-      'call': call,
-    };
+    return {'success': true, 'callId': callId, 'roomId': roomId, 'call': call};
   }
 
   Future<void> _dispatchCallPush(VoiceCallModel call) async {
@@ -299,11 +312,17 @@ class CallController {
   // ─────────────────────────────────────────────────────────────
 
   /// Accepts an incoming voice call, joins the Zego audio room, and connects audio.
-  Future<bool> acceptCall(String callId, {String? userId, String? userName}) async {
+  Future<bool> acceptCall(
+    String callId, {
+    String? userId,
+    String? userName,
+  }) async {
     if (_activeCall?.callId == callId &&
         (_activeCall?.status == CallingStatus.connected ||
             _activeCall?.status == CallingStatus.accepted)) {
-      debugPrint('ℹ️ [CallController] Call $callId is already active/connected.');
+      debugPrint(
+        'ℹ️ [CallController] Call $callId is already active/connected.',
+      );
       return true;
     }
 
@@ -311,9 +330,12 @@ class CallController {
     await _audioService.stopRingtone();
 
     // Request mic
-    final hasMic = await _permissionService.checkAndRequestMicrophonePermission();
+    final hasMic = await _permissionService
+        .checkAndRequestMicrophonePermission();
     if (!hasMic) {
-      debugPrint('❌ [CallController] Cannot accept call without microphone permission.');
+      debugPrint(
+        '❌ [CallController] Cannot accept call without microphone permission.',
+      );
       return false;
     }
 
@@ -328,7 +350,7 @@ class CallController {
 
     // Join Zego room
     final joinSuccess = await _zegoService.joinCallRoom(
-      roomId: call.roomId,
+      roomId: ZegoCallService.formatRoomId(call.roomId),
       userId: userId ?? call.receiverId,
       userName: userName ?? call.receiverName,
     );
@@ -361,7 +383,10 @@ class CallController {
     await _audioService.stopRingtone();
     await IncomingCallCoordinator.instance.dismissNotification(callId);
 
-    final success = await _repository.rejectCall(callId, rejectedBy: rejectedBy);
+    final success = await _repository.rejectCall(
+      callId,
+      rejectedBy: rejectedBy,
+    );
     await _cleanupActiveCall();
     return success;
   }
@@ -380,10 +405,12 @@ class CallController {
         preferredRole: call.receiverRole,
       );
       if (token != null) {
-        unawaited(_notificationService.sendCallCancelPush(
-          receiverToken: token,
-          callId: callId,
-        ));
+        unawaited(
+          _notificationService.sendCallCancelPush(
+            receiverToken: token,
+            callId: callId,
+          ),
+        );
       }
     }
 
@@ -396,6 +423,48 @@ class CallController {
     _cancelRingTimeout();
     await _audioService.stopRingtone();
     await IncomingCallCoordinator.instance.dismissNotification(callId);
+
+    // Safeguard 1: Do not mark as missed if the active local call is already connected or live
+    if (_activeCall?.callId == callId &&
+        (_activeCall?.status == CallingStatus.connected ||
+            _activeCall?.status == CallingStatus.accepted ||
+            CallingStatus.isLive(_activeCall?.status))) {
+      debugPrint(
+        '🛡️ [CallController] missCall aborted: Local call $callId is active (${_activeCall?.status}).',
+      );
+      return;
+    }
+
+    // Safeguard 2: Check Firestore record before writing missed state
+    try {
+      final doc = await _firestore
+          .collection(FirestoreCollections.calls)
+          .doc(callId.trim())
+          .get();
+      if (doc.exists && doc.data() != null) {
+        final currentStatus =
+            (doc.data()?['callStatus'] ?? doc.data()?['status'])
+                ?.toString()
+                .toLowerCase()
+                .trim();
+        if (CallingStatus.isLive(currentStatus) ||
+            currentStatus == CallingStatus.connected ||
+            currentStatus == CallingStatus.accepted) {
+          debugPrint(
+            '🛡️ [CallController] missCall aborted: Firestore call $callId is already $currentStatus.',
+          );
+          return;
+        }
+        if (CallingStatus.isTerminal(currentStatus)) {
+          debugPrint(
+            '🛡️ [CallController] missCall aborted: Call $callId is already terminal ($currentStatus).',
+          );
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [CallController] Error checking call status in missCall: $e');
+    }
 
     final call = _activeCall ?? await _repository.getCall(callId);
     await _repository.updateCallStatus(
@@ -413,13 +482,15 @@ class CallController {
         preferredRole: call.receiverRole,
       );
       if (token != null) {
-        unawaited(_notificationService.sendMissedCallPush(
-          receiverToken: token,
-          callId: callId,
-          callerName: call.callerName,
-          callerImage: call.callerImage,
-          callerId: call.callerId,
-        ));
+        unawaited(
+          _notificationService.sendMissedCallPush(
+            receiverToken: token,
+            callId: callId,
+            callerName: call.callerName,
+            callerImage: call.callerImage,
+            callerId: call.callerId,
+          ),
+        );
       }
     }
 
@@ -474,9 +545,17 @@ class CallController {
   void _startRingTimeout(String callId) {
     _cancelRingTimeout();
     _ringTimeoutTimer = Timer(const Duration(seconds: 45), () async {
+      // Ring timeout must NEVER trigger if the call is already connected or ticking
+      if (isDurationTimerRunning || _callDuration > 0) {
+        debugPrint(
+          '🛡️ [CallController] Ring timeout cancelled: Call $callId is actively connected ($_callDuration s).',
+        );
+        _cancelRingTimeout();
+        return;
+      }
       if (_activeCall?.callId == callId &&
           CallingStatus.isRinging(_activeCall?.status)) {
-        debugPrint('⏰ [CallController] Call $callId timed out after 45s.');
+        debugPrint('⏰ [CallController] Call $callId timed out after 45s with no answer.');
         await missCall(callId);
       }
     });
@@ -487,9 +566,26 @@ class CallController {
     _ringTimeoutTimer = null;
   }
 
+  /// Cancels the 45-second ring timeout when call connects or transitions to active.
+  void cancelRingTimeout() {
+    _cancelRingTimeout();
+  }
+
+  /// Marks the active call as connected and cancels any pending ring timers.
+  void markCallConnected(String callId) {
+    _cancelRingTimeout();
+    if (_activeCall != null && _activeCall!.callId == callId) {
+      _activeCall = _activeCall!.copyWith(status: CallingStatus.connected);
+      _activeCallController.add(_activeCall);
+    }
+  }
+
   /// Starts the call duration ticker starting from 00:00 when a call is connected.
   /// If [reset] is true, resets to 0. If already running, preserves current elapsed time.
   void startCallDurationTimer({bool reset = false}) {
+    // Critical: ensure the 45-second ring timeout is completely cancelled
+    _cancelRingTimeout();
+
     if (reset) {
       stopCallDurationTimer();
       _callDuration = 0;
@@ -502,6 +598,13 @@ class CallController {
     _durationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       _callDuration++;
       _callDurationController.add(_callDuration);
+
+      // Safeguard: Automatically enforce strict 15-minute (900 seconds) duration limit globally
+      if (_callDuration >= 900 && _activeCall != null) {
+        final currentCallId = _activeCall!.callId;
+
+        endCall(currentCallId, endReason: 'duration_limit_reached');
+      }
     });
   }
 
@@ -554,4 +657,3 @@ class CallController {
     await endCall(callId, endReason: reason);
   }
 }
-

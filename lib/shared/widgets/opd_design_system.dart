@@ -726,3 +726,514 @@ class OpdInlineLoader extends StatelessWidget {
     );
   }
 }
+
+/// Standardized top AppBar matching the authentication screens:
+/// Clean circular back chevron on the left, bold centered title, and optional actions.
+class OpdAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final String title;
+  final VoidCallback? onBack;
+  final List<Widget>? actions;
+  final bool showBackButton;
+
+  const OpdAppBar({
+    super.key,
+    required this.title,
+    this.onBack,
+    this.actions,
+    this.showBackButton = true,
+  });
+
+  @override
+  Size get preferredSize => const Size.fromHeight(56);
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: true,
+      automaticallyImplyLeading: false,
+      leading: showBackButton
+          ? IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8EDF3),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFDCE6F2)),
+                ),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 16,
+                  color: Color(0xFF062B72),
+                ),
+              ),
+              onPressed: onBack ?? () => Navigator.maybePop(context),
+            )
+          : null,
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: context.fs(17),
+          fontWeight: FontWeight.w700,
+          color: const Color(0xFF1F2F44),
+          letterSpacing: -0.3,
+        ),
+      ),
+      actions: actions,
+    );
+  }
+}
+
+/// Interactive selection card tile matching the "Sign Up Selection" card design:
+/// rounded 18, border 0xFFD6E3F0, soft shadow, leading icon badge in a
+/// soft-colored container, bold title, description, and trailing chevron arrow.
+class OpdSelectionCard extends StatelessWidget {
+  final IconData? icon;
+  final Widget? customIcon;
+  final Color iconBgColor;
+  final Color iconColor;
+  final String title;
+  final String description;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+  final Widget? bottomWidget;
+
+  const OpdSelectionCard({
+    super.key,
+    this.icon,
+    this.customIcon,
+    this.iconBgColor = const Color(0xFFE2F5F3),
+    this.iconColor = const Color(0xFF0E9A8E),
+    required this.title,
+    required this.description,
+    this.onTap,
+    this.trailing,
+    this.bottomWidget,
+  }) : assert(icon != null || customIcon != null);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFFD6E3F0),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F233C).withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    // Icon Box
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: iconBgColor,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      alignment: Alignment.center,
+                      child: customIcon ??
+                          Icon(
+                            icon,
+                            size: 24,
+                            color: iconColor,
+                          ),
+                    ),
+                    const SizedBox(width: 14),
+
+                    // Title & Description
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: context.fs(15.5),
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1F2F44),
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: context.fs(12.5),
+                              fontWeight: FontWeight.w400,
+                              color: const Color(0xFF657991),
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    // Trailing
+                    trailing ??
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 22,
+                          color: Color(0xFF7E90A6),
+                        ),
+                  ],
+                ),
+                if (bottomWidget != null) ...[
+                  const SizedBox(height: 12),
+                  bottomWidget!,
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Info / Status Card matching the "Info Notice" design from the card verification screen:
+/// soft-background rounded container with leading info icon and clean helper copy.
+class OpdNoticeCard extends StatelessWidget {
+  final String text;
+  final IconData icon;
+  final Color backgroundColor;
+  final Color borderColor;
+  final Color iconColor;
+  final Color textColor;
+  final Widget? trailing;
+
+  const OpdNoticeCard({
+    super.key,
+    required this.text,
+    this.icon = Icons.info_outline_rounded,
+    this.backgroundColor = const Color(0xFFE8F2FA),
+    this.borderColor = const Color(0xFFCCE0F2),
+    this.iconColor = const Color(0xFF0F4C81),
+    this.textColor = const Color(0xFF1F2F44),
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor, width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            size: 20,
+            color: iconColor,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: context.fs(12.5),
+                fontWeight: FontWeight.w500,
+                color: textColor,
+                height: 1.35,
+              ),
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            trailing!,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Quick Action Badge model for the 4-column services grid layout.
+class OpdQuickActionItem {
+  final String label;
+  final IconData? icon;
+  final Widget? customIcon;
+  final VoidCallback onTap;
+  final Color? iconColor;
+  final Color? bgColor;
+
+  const OpdQuickActionItem({
+    required this.label,
+    this.icon,
+    this.customIcon,
+    required this.onTap,
+    this.iconColor,
+    this.bgColor,
+  });
+}
+
+/// 4-column rounded badge card layout matching the Landing Screen services feature grid.
+class OpdQuickActionGrid extends StatelessWidget {
+  final List<OpdQuickActionItem> items;
+
+  const OpdQuickActionGrid({super.key, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: items.map((item) {
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: _buildBadge(context, item),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildBadge(BuildContext context, OpdQuickActionItem item) {
+    final bgColor = item.bgColor ?? const Color(0xFFE4F6F4);
+    final iconColor = item.iconColor ?? const Color(0xFF0E9A8E);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE0EAF3), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0F233C).withValues(alpha: 0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: item.customIcon ??
+                    Icon(
+                      item.icon,
+                      size: 19,
+                      color: iconColor,
+                    ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                item.label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: context.fs(10.5),
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF1F2F44),
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Outlined button matching secondary actions from authentication screens.
+class OpdOutlinedButton extends StatelessWidget {
+  final String text;
+  final VoidCallback? onPressed;
+  final IconData? leadingIcon;
+  final IconData? trailingIcon;
+  final Color borderColor;
+  final Color textColor;
+  final double height;
+
+  const OpdOutlinedButton({
+    super.key,
+    required this.text,
+    this.onPressed,
+    this.leadingIcon,
+    this.trailingIcon,
+    this.borderColor = const Color(0xFF062B72),
+    this.textColor = const Color(0xFF062B72),
+    this.height = 50,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(height / 2),
+        border: Border.all(color: borderColor, width: 1.3),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F233C).withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(height / 2),
+          onTap: onPressed,
+          child: Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (leadingIcon != null) ...[
+                  Icon(leadingIcon, color: textColor, size: 18),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: context.fs(14.5),
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                if (trailingIcon != null) ...[
+                  const SizedBox(width: 8),
+                  Icon(trailingIcon, color: textColor, size: 18),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Primary action button with navy gradient and right arrow (alias/wrapper for auth style).
+class OpdPrimaryButton extends StatelessWidget {
+  final String text;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+  final IconData? trailingIcon;
+  final IconData? leadingIcon;
+  final double height;
+
+  const OpdPrimaryButton({
+    super.key,
+    required this.text,
+    this.onPressed,
+    this.isLoading = false,
+    this.trailingIcon = Icons.arrow_forward_rounded,
+    this.leadingIcon,
+    this.height = 52,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F3260), Color(0xFF0A2244), Color(0xFF061830)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(height / 2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF091E3B).withValues(alpha: 0.3),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(height / 2),
+          onTap: isLoading ? null : onPressed,
+          child: Center(
+            child: isLoading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (leadingIcon != null) ...[
+                        Icon(leadingIcon, color: Colors.white, size: 19),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(
+                        text,
+                        style: TextStyle(
+                          fontSize: context.fs(15),
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      if (trailingIcon != null) ...[
+                        const SizedBox(width: 8),
+                        Icon(trailingIcon, color: Colors.white, size: 18),
+                      ],
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+

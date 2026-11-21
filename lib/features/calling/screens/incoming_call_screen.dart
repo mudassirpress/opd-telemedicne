@@ -277,6 +277,8 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     _statusSub?.cancel();
     await _audioService.stopRingtone();
     await IncomingCallCoordinator.instance.dismissNotification(widget.callId);
+    _callController.cancelRingTimeout();
+    _callController.markCallConnected(widget.callId);
 
     try {
       final success = await _callController.acceptCall(
@@ -329,6 +331,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     _statusSub?.cancel();
     await _audioService.stopRingtone();
     await IncomingCallCoordinator.instance.dismissNotification(widget.callId);
+    _callController.cancelRingTimeout();
 
     try {
       await _callController.rejectCall(

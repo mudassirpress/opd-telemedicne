@@ -182,7 +182,7 @@ class CallKitService {
         isCustomNotification: false,
         isShowLogo: true,
         isShowCallID: false,
-        ringtonePath: 'system_ringtone_default',
+        ringtonePath: 'call_ringtoun',
         backgroundColor: '#0B1220',
         actionColor: '#22C55E',
         textColor: '#FFFFFF',

@@ -304,7 +304,12 @@ class AppointmentDetailScreen extends ConsumerWidget {
           children: [
             if (joinable) ...[
               Expanded(
-                child: FilledButton.icon(
+                flex: 3,
+                child: OpdPrimaryButton(
+                  height: 48,
+                  text: 'Join',
+                  trailingIcon: Icons.arrow_forward_rounded,
+                  leadingIcon: Icons.video_call_rounded,
                   onPressed: () => _join(
                     context,
                     ref,
@@ -312,46 +317,38 @@ class AppointmentDetailScreen extends ConsumerWidget {
                     asDoctor: asDoctor,
                     user: user,
                   ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF0E7C86),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  icon: const Icon(Icons.video_call_rounded, size: 18),
-                  label: Text(
-                    'Join appointment',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
                 ),
               ),
               const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: OpdOutlinedButton(
+                  height: 48,
+                  text: 'Chat',
+                  leadingIcon: Icons.chat_bubble_outline_rounded,
+                  onPressed: () => _openChat(
+                    context,
+                    appointment,
+                    asDoctor: asDoctor,
+                    name: chatPartnerName,
+                  ),
+                ),
+              ),
+            ] else ...[
+              Expanded(
+                child: OpdOutlinedButton(
+                  height: 48,
+                  text: 'Open Chat',
+                  leadingIcon: Icons.chat_bubble_outline_rounded,
+                  onPressed: () => _openChat(
+                    context,
+                    appointment,
+                    asDoctor: asDoctor,
+                    name: chatPartnerName,
+                  ),
+                ),
+              ),
             ],
-            OutlinedButton.icon(
-              onPressed: () => _openChat(
-                context,
-                appointment,
-                asDoctor: asDoctor,
-                name: chatPartnerName,
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF062B72),
-                side: const BorderSide(color: Color(0xFFB9C9DE)),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 13,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 17),
-              label: Text(
-                'Chat',
-                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
-              ),
-            ),
           ],
         ),
       ],

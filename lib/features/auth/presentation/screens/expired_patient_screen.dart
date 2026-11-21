@@ -247,11 +247,14 @@ class _ExpiredPatientScreenState extends ConsumerState<ExpiredPatientScreen> {
   }
 
   Future<void> _logout() async {
+    final rootNav = Navigator.of(context, rootNavigator: true);
     final controller = ref.read(patientControllerProvider);
     await controller.signOut();
+    ref.invalidate(userProvider);
+    ref.invalidate(currentUserProvider);
+    ref.invalidate(patientControllerProvider);
     if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
+      rootNav.pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const SignInScreen()),
         (route) => false,
       );

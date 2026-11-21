@@ -336,7 +336,7 @@ class _DoctorPortalScreenState extends ConsumerState<DoctorPortalScreen> {
                       vertical: 8,
                     ),
                     child: MetallicInput(
-                      hintText: 'Search doctors by name...',
+                      hintText: 'Search patients or chats...',
                       icon: Icons.search_rounded,
                       controller: _searchController,
                       validator: null,

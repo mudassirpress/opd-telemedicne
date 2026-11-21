@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telemedicine/features/admin/presentation/admin_bottom_nav/admin_portal_wrapper.dart';
 import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
 import 'package:telemedicine/features/auth/presentation/screens/expired_patient_screen.dart';
+import 'package:telemedicine/features/auth/presentation/screens/complete_patient_profile_screen.dart';
 import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
 import 'package:telemedicine/features/doctors/presentation/screens/update_doctor_profile_screen.dart';
 import 'package:telemedicine/features/payments/presentation/screens/payment_screen.dart';
@@ -406,6 +407,23 @@ class _SmartDirectLaunchWrapperState
     // Patient card / payment checks
     if (userRole == 'patient' && patientUser != null) {
       final dest = AuthRoutingService.evaluatePatientDestination(patientUser);
+      if (dest == PatientAuthDestination.completeProfile) {
+        debugPrint(
+          '💳 [SMART_LAUNCH] Patient profile incomplete -> CompletePatientProfileScreen',
+        );
+        NotificationService.markAppReady();
+        if (mounted) {
+          setState(() {
+            _destination = CompletePatientProfileScreen(
+              patientUid: patientUser.id,
+              prefilledPhone: patientUser.phoneNumber,
+              isPhoneAuth: false,
+            );
+            _isLoading = false;
+          });
+        }
+        return;
+      }
       if (dest == PatientAuthDestination.cardExpired) {
         debugPrint(
           '💳 [SMART_LAUNCH] Patient card expired -> ExpiredPatientScreen',

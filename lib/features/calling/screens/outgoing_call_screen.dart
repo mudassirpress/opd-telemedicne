@@ -8,6 +8,7 @@ import 'package:telemedicine/core/services/auth_routing_service.dart';
 import 'package:telemedicine/core/utils/toast_utils.dart';
 import 'package:telemedicine/features/calling/controllers/call_controller.dart';
 import 'package:telemedicine/features/calling/domain/call_status.dart';
+import 'package:telemedicine/features/calling/services/zego_call_service.dart';
 import 'package:telemedicine/features/calling/screens/active_call_screen.dart';
 import 'package:telemedicine/features/calling/widgets/call_avatar.dart';
 import 'package:telemedicine/features/calling/widgets/call_controls.dart';
@@ -93,10 +94,12 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
             ?.toString()
             .toLowerCase()
             .trim();
-        final roomId = (data['roomId'] ??
-                data['channelId'] ??
-                'room_call_${widget.callId}')
-            .toString();
+        final roomId = ZegoCallService.formatRoomId(
+          (data['roomId'] ??
+                  data['channelId'] ??
+                  'room_call_${widget.callId}')
+              .toString(),
+        );
         final endReason = data['endReason']?.toString();
         final docError = data['error']?.toString();
 
@@ -111,6 +114,8 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
             status == CallingStatus.connected) {
           _isNavigatingToActive = true;
           _callSub?.cancel();
+          _callController.cancelRingTimeout();
+          _callController.markCallConnected(widget.callId);
           _callController.startCallDurationTimer(reset: true);
           Navigator.pushReplacement(
             context,

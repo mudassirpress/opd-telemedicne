@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 import 'package:telemedicine/core/utils/toast_utils.dart';
 import 'package:telemedicine/shared/widgets/auth_layout.dart';
+import 'package:telemedicine/shared/widgets/opd_design_system.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
@@ -213,6 +214,34 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFEDF2F8),
+      appBar: OpdAppBar(
+        title: 'Report History',
+        actions: [
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8EDF3),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFDCE6F2)),
+              ),
+              child: const Icon(
+                Icons.folder_shared_rounded,
+                color: Color(0xFF062B72),
+                size: 17,
+              ),
+            ),
+            tooltip: 'Shared Reports',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const PatientSharedReportsScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: Stack(
         children: [
           // ECG Watermark - Top Right (matching Sign In)
@@ -232,45 +261,7 @@ class _ReportHistoryScreenState extends ConsumerState<ReportHistoryScreen> {
           SafeArea(
             child: Column(
               children: [
-                // Top Bar with Back Button
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: context.rsp(18),
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    children: [
-                      const CircularBackButton(),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Report History',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: context.fs(16),
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1F2F44),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.folder_shared_rounded,
-                          color: Color(0xFF062B72),
-                        ),
-                        tooltip: 'Shared Reports',
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const PatientSharedReportsScreen(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
+                const SizedBox(height: 6),
                 // Search Bar
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: context.rsp(18)),

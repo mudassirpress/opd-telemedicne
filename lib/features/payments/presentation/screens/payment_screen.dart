@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:telemedicine/features/auth/presentation/providers/user_provider.dart';
+import 'package:telemedicine/data/models/user_model.dart';
 import 'package:telemedicine/features/patients/presentation/patient_portal_wrapper.dart';
 import 'package:telemedicine/app/theme/app_theme.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
@@ -50,21 +51,21 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     (
       planId: 'one_month',
       title: '1 Month',
-      priceText: '300 PKR',
+      priceText: '50 PKR',
       amount: 300,
       durationMonths: 1,
     ),
     (
       planId: 'six_months',
       title: '6 Months',
-      priceText: '1,000 PKR',
+      priceText: '300 PKR',
       amount: 1000,
       durationMonths: 6,
     ),
     (
       planId: 'one_year',
       title: '1 Year',
-      priceText: '1,500 PKR',
+      priceText: '600 PKR',
       amount: 1500,
       durationMonths: 12,
     ),
@@ -607,6 +608,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         ),
                         const SizedBox(height: 24),
 
+                        // ===== Payment Verification Status Notice (15-30 min delay guidance) =====
+                        if (currentUser?.paymentStatus == 'rejected')
+                          _buildRejectedVerificationNotice(currentUser)
+                        else if (currentUser?.paymentStatus == 'pending' ||
+                            (currentUser?.paymentImage != null &&
+                                currentUser!.paymentImage!.isNotEmpty &&
+                                currentUser.ispayment != true))
+                          _buildPendingVerificationNotice(currentUser),
+
                         // ===== Subscription Plan Selection Card =====
                         _buildPlanSelector(),
 
@@ -1028,5 +1038,231 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   Widget _buildDivider() {
     return Container(height: 1, color: const Color(0xFFDCE6F2));
+  }
+
+  /// Informative banner shown when the user has uploaded a receipt and verification is underway.
+  Widget _buildPendingVerificationNotice(UserModel? user) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF9E6), // Soft amber background
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFFFFB300).withValues(alpha: 0.6),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF57F17).withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFB300).withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.hourglass_top_rounded,
+                  color: Color(0xFFE65100),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Payment Verification in Progress',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFE65100),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Status: Verification Pending',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFB78103),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Your payment screenshot has been received and is currently being verified by our administration team.',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF5D4037),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.8),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFFE082)),
+            ),
+            child: const Row(
+              children: [
+                Icon(
+                  Icons.access_time_rounded,
+                  size: 16,
+                  color: Color(0xFFE65100),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Typical verification time: 15 – 30 minutes',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF8D6E63),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Need urgent consultation?',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF6D4C41),
+                ),
+              ),
+              TextButton.icon(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SubmitComplaintScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(
+                  Icons.support_agent_rounded,
+                  size: 16,
+                  color: Color(0xFF062B72),
+                ),
+                label: const Text(
+                  'Support / Help',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF062B72),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Notice shown when admin has rejected the previous payment proof.
+  Widget _buildRejectedVerificationNotice(UserModel? user) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFEBEE), // Soft red background
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFFE53935).withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Color(0x26E53935),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.highlight_off_rounded,
+                  color: Color(0xFFC62828),
+                  size: 22,
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Payment Proof Rejected',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFC62828),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Please re-upload a clear transaction screenshot',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFFB71C1C),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10),
+          Text(
+            'The uploaded receipt could not be verified by the admin team. Please ensure the transaction ID, date, and amount are clearly visible, and upload a new screenshot below.',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF7F0000),
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

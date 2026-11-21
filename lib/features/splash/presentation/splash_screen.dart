@@ -8,6 +8,7 @@ import 'package:telemedicine/features/auth/presentation/providers/user_provider.
 import 'package:telemedicine/features/auth/presentation/screens/expired_patient_screen.dart';
 import 'package:telemedicine/features/doctors/presentation/screens/update_doctor_profile_screen.dart';
 import 'package:telemedicine/features/auth/presentation/controllers/doctor_controller.dart';
+import 'package:telemedicine/features/auth/presentation/screens/welcome_screen.dart';
 import 'package:telemedicine/features/auth/presentation/screens/sign_in_screen.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 import 'package:telemedicine/features/doctor_portal/presentation/bottom_nav/doctor_portal_wrapper.dart';
@@ -17,6 +18,7 @@ import 'package:telemedicine/core/services/notification_service.dart';
 import 'package:telemedicine/app/theme/app_theme.dart';
 import 'package:telemedicine/features/payments/presentation/screens/payment_screen.dart';
 import 'package:telemedicine/core/services/auth_routing_service.dart';
+import 'package:telemedicine/features/auth/presentation/screens/complete_patient_profile_screen.dart';
 
 class FirstSplashScreen extends ConsumerStatefulWidget {
   const FirstSplashScreen({super.key});
@@ -236,10 +238,10 @@ class _FirstSplashScreenState extends ConsumerState<FirstSplashScreen>
     bool sessionValid = await _verifySession();
 
     if (!sessionValid && mounted) {
-      print('Session invalid - redirecting to login');
+      print('Session invalid - redirecting to welcome screen');
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const SignInScreen()),
+        MaterialPageRoute(builder: (context) => const WelcomeScreen()),
       );
       NotificationService.markAppReady();
       return;
@@ -268,6 +270,21 @@ class _FirstSplashScreenState extends ConsumerState<FirstSplashScreen>
           patientUser,
         );
         switch (destination) {
+          case PatientAuthDestination.completeProfile:
+            print(
+              'Patient profile incomplete – redirecting to CompletePatientProfileScreen',
+            );
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CompletePatientProfileScreen(
+                  patientUid: patientUser.id,
+                  prefilledPhone: patientUser.phoneNumber,
+                  isPhoneAuth: false,
+                ),
+              ),
+            );
+            break;
           case PatientAuthDestination.chatRoom:
             print('Navigating to Chat Room (Patient logged in)');
             Navigator.pushReplacement(
@@ -327,10 +344,10 @@ class _FirstSplashScreenState extends ConsumerState<FirstSplashScreen>
       }
       // Priority 6: No user logged in
       else {
-        print('No user logged in - Navigating to Sign In Screen');
+        print('No user logged in - Navigating to Welcome Screen');
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const SignInScreen()),
+          MaterialPageRoute(builder: (context) => const WelcomeScreen()),
         );
       }
     }

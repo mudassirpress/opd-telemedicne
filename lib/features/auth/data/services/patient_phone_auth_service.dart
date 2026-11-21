@@ -48,6 +48,13 @@ class PhoneOtpVerifyResult {
   });
 }
 
+// =============================================================================
+// Phone Number (OTP / SMS) Authentication Service
+// TODO: Re-enable for next launch / release
+// Temporarily disabled in favor of Patient Card ID login.
+// All phone authentication methods and helpers are retained below for easy re-instatement.
+// =============================================================================
+
 /// Service managing patient phone-number authentication through Firebase Phone Auth.
 class PatientPhoneAuthService {
   final FirebaseAuth? _customAuth;

@@ -8,6 +8,7 @@ import 'package:telemedicine/data/models/report_model.dart';
 import 'package:telemedicine/core/utils/responsive.dart';
 import 'package:telemedicine/core/utils/toast_utils.dart';
 import 'package:telemedicine/shared/widgets/auth_layout.dart';
+import 'package:telemedicine/shared/widgets/opd_design_system.dart';
 
 class UploadReportScreen extends ConsumerStatefulWidget {
   const UploadReportScreen({super.key});
@@ -274,6 +275,7 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEDF2F8),
+      appBar: const OpdAppBar(title: 'Upload Report'),
       body: Stack(
         children: [
           // ECG Watermark - Top Right (matching Sign In)
@@ -291,122 +293,89 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
 
           // Main Content
           SafeArea(
-            child: Column(
-              children: [
-                // Top Bar with Back Button
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: context.rsp(20),
-                    vertical: 10,
-                  ),
-                  child: Row(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.symmetric(
+                horizontal: context.rsp(20),
+                vertical: 12,
+              ),
+              child: CenteredContent(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const CircularBackButton(),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Upload Report',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: context.fs(16),
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1F2F44),
-                          ),
+                      // Title
+                      Text(
+                        'Medical Report',
+                        style: TextStyle(
+                          fontSize: context.fs(20),
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF1F2F44),
+                          letterSpacing: -0.5,
                         ),
                       ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Upload your medical report by selecting the report type, date, and file.',
+                        style: TextStyle(
+                          fontSize: context.fs(13),
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF657991),
+                          height: 1.4,
+                        ),
+                      ),
+                      SizedBox(height: context.rsp(20)),
+
+                      // Report Type Dropdown (Clean styled)
+                      _buildMetallicDropdown(
+                        value: _selectedReportType,
+                        hintText: 'Select Report Type',
+                        icon: Icons.medical_information_rounded,
+                        items: ReportType.allDisplayNames,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedReportType = value;
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please select report type';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Report Date (Clean styled)
+                      _buildMetallicDatePicker(),
+                      const SizedBox(height: 16),
+
+                      // Description
+                      MetallicInput(
+                        hintText: 'Description (optional)',
+                        icon: Icons.description_rounded,
+                        controller: _descriptionController,
+                        validator: null,
+                      ),
+                      SizedBox(height: context.rsp(16)),
+
+                      // File Upload Area (Clean styled)
+                      _buildMetallicFileUpload(),
+                      SizedBox(height: context.rsp(16)),
+
+                      // Upload Button
+                      GradientButton(
+                        text: 'Upload Report',
+                        icon: Icons.arrow_forward_rounded,
+                        isLoading: _isUploading,
+                        onPressed: _uploadReport,
+                      ),
+                      SizedBox(height: context.rsp(16)),
                     ],
                   ),
                 ),
-
-                // Scrollable Content
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: context.rsp(20),
-                      vertical: 8,
-                    ),
-                    child: CenteredContent(
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Title
-                            Text(
-                              'Medical Report',
-                              style: TextStyle(
-                                fontSize: context.fs(20),
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF1F2F44),
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Upload your medical report by selecting the report type, date, and file.',
-                              style: TextStyle(
-                                fontSize: context.fs(13),
-                                fontWeight: FontWeight.w500,
-                                color: const Color(0xFF657991),
-                                height: 1.4,
-                              ),
-                            ),
-                            SizedBox(height: context.rsp(20)),
-
-                            // Report Type Dropdown (Metallic styled)
-                            _buildMetallicDropdown(
-                              value: _selectedReportType,
-                              hintText: 'Select Report Type',
-                              icon: Icons.medical_information_rounded,
-                              items: ReportType.allDisplayNames,
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedReportType = value;
-                                });
-                              },
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please select report type';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Report Date (Metallic styled)
-                            _buildMetallicDatePicker(),
-                            const SizedBox(height: 16),
-
-                            // Description
-                            MetallicInput(
-                              hintText: 'Description (optional)',
-                              icon: Icons.description_rounded,
-                              controller: _descriptionController,
-                              validator: null,
-                            ),
-                            SizedBox(height: context.rsp(16)),
-
-                            // File Upload Area (Metallic styled)
-                            _buildMetallicFileUpload(),
-                            SizedBox(height: context.rsp(16)),
-
-                            // Upload Button
-                            GradientButton(
-                              text: 'Upload Report',
-                              icon: Icons.arrow_forward_rounded,
-                              isLoading: _isUploading,
-                              onPressed: _uploadReport,
-                            ),
-                            SizedBox(height: context.rsp(16)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],
@@ -427,92 +396,78 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          padding: const EdgeInsets.all(3),
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFE3EAF2), Color(0xFFF5F8FC), Color(0xFFE2E9F2)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: const Color(0xFFBAC7D8), width: 1.5),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFD3DFEC), width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0F233C).withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: const Color(0xFF0F233C).withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 48),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              icon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFF647890),
               ),
-              borderRadius: BorderRadius.circular(27),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: value,
-                isExpanded: true,
-                icon: const Icon(
-                  Icons.arrow_drop_down,
-                  color: Color(0xFF7E90A6),
-                ),
-                dropdownColor: Colors.white,
-                style: TextStyle(
-                  fontSize: context.fs(14),
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF1E2F44),
-                ),
-                hint: Row(
-                  children: [
-                    Icon(icon, color: const Color(0xFF0E274D), size: 18),
-                    const SizedBox(width: 12),
-                    Flexible(
-                      child: Text(
-                        hintText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: const Color(0xFF7E90A6),
-                          fontSize: context.fs(13),
-                        ),
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              style: TextStyle(
+                fontSize: context.fs(14),
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF1E2F44),
+              ),
+              hint: Row(
+                children: [
+                  Icon(icon, color: const Color(0xFF4A607A), size: 20),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      hintText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: const Color(0xFF8FA3B8),
+                        fontSize: context.fs(13.5),
                       ),
                     ),
-                  ],
-                ),
-                items: items.map((String item) {
-                  return DropdownMenuItem<String>(
-                    value: item,
-                    child: Row(
-                      children: [
-                        Icon(
-                          ReportType.fromString(item).icon,
-                          size: 18,
-                          color: const Color(0xFF0E274D),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(item),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: onChanged,
+                  ),
+                ],
               ),
+              items: items.map((String item) {
+                return DropdownMenuItem<String>(
+                  value: item,
+                  child: Row(
+                    children: [
+                      Icon(
+                        ReportType.fromString(item).icon,
+                        size: 18,
+                        color: const Color(0xFF062B72),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(item),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: onChanged,
             ),
           ),
         ),
         if (value == null && validator != null)
           Padding(
-            padding: const EdgeInsets.only(left: 24, top: 6),
+            padding: const EdgeInsets.only(left: 14, top: 5),
             child: Text(
               validator(value) ?? '',
-              style: TextStyle(color: Colors.red, fontSize: context.fs(12)),
+              style: TextStyle(color: Colors.red, fontSize: context.fs(11.5)),
             ),
           ),
       ],
@@ -528,59 +483,47 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
     return GestureDetector(
       onTap: _selectDate,
       child: Container(
-        padding: const EdgeInsets.all(3),
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFE3EAF2), Color(0xFFF5F8FC), Color(0xFFE2E9F2)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: const Color(0xFFBAC7D8), width: 1.5),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFD3DFEC), width: 1.2),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0F233C).withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: const Color(0xFF0F233C).withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 48),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+        child: Row(
+          children: [
+            const Icon(
+              Icons.calendar_today_rounded,
+              color: Color(0xFF4A607A),
+              size: 20,
             ),
-            borderRadius: BorderRadius.circular(27),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.calendar_today_rounded,
-                color: Color(0xFF0E274D),
-                size: 18,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  displayText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: context.fs(14),
-                    fontWeight: FontWeight.w500,
-                    color: hasValue
-                        ? const Color(0xFF1E2F44)
-                        : const Color(0xFF7E90A6),
-                  ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                displayText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: context.fs(14),
+                  fontWeight: FontWeight.w500,
+                  color: hasValue
+                      ? const Color(0xFF1E2F44)
+                      : const Color(0xFF8FA3B8),
                 ),
               ),
-              const Icon(Icons.arrow_drop_down, color: Color(0xFF7E90A6)),
-            ],
-          ),
+            ),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Color(0xFF647890),
+            ),
+          ],
         ),
       ),
     );
@@ -605,142 +548,123 @@ class _UploadReportScreenState extends ConsumerState<UploadReportScreen> {
         GestureDetector(
           onTap: _showFilePickerOptions,
           child: Container(
-            padding: const EdgeInsets.all(3),
+            constraints: const BoxConstraints(minHeight: 120),
+            width: double.infinity,
+            padding: EdgeInsets.all(context.rsp(16)),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xFFE3EAF2),
-                  Color(0xFFF5F8FC),
-                  Color(0xFFE2E9F2),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFBAC7D8), width: 1.5),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFD3DFEC), width: 1.2),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0F233C).withValues(alpha: 0.08),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: const Color(0xFF0F233C).withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 120),
-              width: double.infinity,
-              padding: EdgeInsets.all(context.rsp(16)),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFF3F7FB), Colors.white, Color(0xFFF0F4F9)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: _selectedFile != null
-                  ? Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: _fileType == 'pdf'
-                              ? Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.picture_as_pdf_rounded,
-                                        size: 50,
-                                        color: Color(0xFF062B72),
+            child: _selectedFile != null
+                ? Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: _fileType == 'pdf'
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.picture_as_pdf_rounded,
+                                      size: 50,
+                                      color: Color(0xFF062B72),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
                                       ),
-                                      const SizedBox(height: 8),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
+                                      child: Text(
+                                        _fileName!,
+                                        style: TextStyle(
+                                          fontSize: context.fs(13),
+                                          color: const Color(0xFF1E2F44),
                                         ),
-                                        child: Text(
-                                          _fileName!,
-                                          style: TextStyle(
-                                            fontSize: context.fs(13),
-                                            color: const Color(0xFF1E2F44),
-                                          ),
-                                          textAlign: TextAlign.center,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                    ],
-                                  ),
-                                )
-                              : Image.file(
-                                  _selectedFile!,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
+                                    ),
+                                  ],
                                 ),
-                        ),
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF0F233C,
-                                  ).withValues(alpha: 0.1),
-                                  blurRadius: 6,
-                                ),
-                              ],
-                            ),
-                            child: IconButton(
-                              icon: const Icon(
-                                Icons.close_rounded,
-                                size: 18,
-                                color: Color(0xFF0E274D),
+                              )
+                            : Image.file(
+                                _selectedFile!,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
                               ),
-                              onPressed: () {
-                                setState(() {
-                                  _selectedFile = null;
-                                  _fileName = null;
-                                  _fileType = null;
-                                });
-                              },
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF0F233C,
+                                ).withValues(alpha: 0.1),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              size: 18,
+                              color: Color(0xFF0E274D),
                             ),
+                            onPressed: () {
+                              setState(() {
+                                _selectedFile = null;
+                                _fileName = null;
+                                _fileType = null;
+                              });
+                            },
                           ),
                         ),
-                      ],
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.cloud_upload_rounded,
-                          size: 48,
-                          color: const Color(0xFF062B72).withValues(alpha: 0.4),
+                      ),
+                    ],
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.cloud_upload_rounded,
+                        size: 48,
+                        color: const Color(0xFF062B72).withValues(alpha: 0.4),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Tap to upload file',
+                        style: TextStyle(
+                          fontSize: context.fs(13),
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF6B7B8D),
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Tap to upload file',
-                          style: TextStyle(
-                            fontSize: context.fs(13),
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF6B7B8D),
-                          ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'JPG, PNG, PDF supported (Max 10MB)',
+                        style: TextStyle(
+                          fontSize: context.fs(11.5),
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF8FA4BD),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'JPG, PNG, PDF supported (Max 10MB)',
-                          style: TextStyle(
-                            fontSize: context.fs(11.5),
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF8FA4BD),
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
+                      ),
+                    ],
+                  ),
           ),
         ),
       ],

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telemedicine/data/models/user_model.dart';
 import 'package:telemedicine/core/services/device_service.dart';
@@ -16,6 +17,7 @@ import 'package:telemedicine/core/services/soft_delete_service.dart';
 import 'package:telemedicine/core/constants/app_constants.dart';
 import 'package:telemedicine/core/utils/firestore_time.dart';
 import 'package:telemedicine/features/chat/presentation/controllers/chat_controller.dart';
+import 'package:telemedicine/features/auth/data/services/patient_auth_service.dart';
 import 'package:telemedicine/features/auth/data/services/patient_password_reset_service.dart';
 import 'package:telemedicine/features/auth/data/services/phone_verification_service.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide EmailAuthProvider;
@@ -23,6 +25,7 @@ import 'package:telemedicine/features/auth/data/services/phone_auth_service.dart
 import 'package:telemedicine/core/services/single_device_session_service.dart';
 import 'package:telemedicine/core/services/timezone_service.dart';
 import 'package:telemedicine/core/utils/subscription_calculator.dart';
+import 'package:telemedicine/core/services/password_security_service.dart';
 import 'package:telemedicine/data/models/patient_id_model.dart';
 import 'package:uuid/uuid.dart';
 
@@ -430,7 +433,25 @@ class PatientController extends ChangeNotifier {
   Future<void> _clearSavedUser() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final currentUid = _currentUser?.id;
       await prefs.remove('current_user');
+      await prefs.remove('current_patient');
+      await prefs.remove('current_doctor');
+      await prefs.remove('auth_token');
+      await prefs.remove('active_session_id');
+      await prefs.remove('session_storage_key');
+      await prefs.remove('patient_session_id');
+      await prefs.remove('user_session_id');
+      if (currentUid != null && currentUid.isNotEmpty) {
+        await prefs.remove('user_$currentUid');
+        await prefs.remove('patient_$currentUid');
+      }
+      try {
+        const secureStorage = FlutterSecureStorage();
+        await secureStorage.delete(key: 'active_session_id');
+        await secureStorage.delete(key: 'auth_token');
+        await secureStorage.delete(key: 'session_token');
+      } catch (_) {}
       print('✅ User cleared from local storage');
     } catch (e) {
       print('Error clearing user: $e');
@@ -508,7 +529,7 @@ class PatientController extends ChangeNotifier {
         id: userRef.id,
         fullname: fullname,
         idcard: '',
-        password: password,
+        password: PasswordSecurityService.hashPassword(password),
         token: DateTime.now().millisecondsSinceEpoch.toString(),
         deviceId: deviceId,
         role: "patient",
@@ -703,11 +724,22 @@ class PatientController extends ChangeNotifier {
       final userDoc = querySnapshot.docs.first;
       final userData = userDoc.data();
 
-      // ── 1. Password check (always first) ──────────────────────────────────
-      if (userData['password'] != password) {
+      // ── 1. Password check (always first) with BCrypt support ─────────────
+      final storedPassword = (userData['password'] ?? '').toString();
+      if (!PasswordSecurityService.verifyPassword(password, storedPassword)) {
         _errorMessage = 'Incorrect password';
         _setLoading(false);
         return false;
+      }
+
+      // Silent upgrade: automatically upgrade legacy plain-text password to BCrypt hash
+      if (PasswordSecurityService.needsRehash(storedPassword)) {
+        unawaited(
+          userDoc.reference.update({
+            'password': PasswordSecurityService.hashPassword(password),
+            'passwordHashedAt': FieldValue.serverTimestamp(),
+          }),
+        );
       }
 
       // ── 2. Deleted-account check ──────────────────────────────────────────
@@ -928,11 +960,19 @@ class PatientController extends ChangeNotifier {
   // ───────────────────────────────────────────────────────────────────────────
 
   Future<void> signOut() async {
+    final cachedUser = _currentUser;
+    final currentId = cachedUser?.id;
+    final isPatient = cachedUser?.role == 'patient';
+    final userFullName = cachedUser?.fullname ?? '';
+
     try {
       _sessionSubscription?.cancel();
       _sessionSubscription = null;
       try {
         await PhoneAuthService.instance.signOut();
+      } catch (_) {}
+      try {
+        await FirebaseAuth.instance.signOut();
       } catch (_) {}
 
       stopPresenceTracking();
@@ -940,8 +980,7 @@ class PatientController extends ChangeNotifier {
       // Drop the session-scoped expiry-warning dismissals so a different
       // account signing in on this device starts from a clean slate.
       AccountExpiryService.resetSessionState();
-      if (_currentUser != null && _currentUser!.role == 'patient') {
-        final currentId = _currentUser!.id;
+      if (isPatient && currentId != null && currentId.isNotEmpty) {
         try {
           await SingleDeviceSessionService.releaseSession(
             collectionName: 'telemedicine_patient',
@@ -949,17 +988,21 @@ class PatientController extends ChangeNotifier {
           );
         } catch (_) {}
 
-        await SessionService.endSession(
-          userId: currentId,
-          sessionId: _currentSessionId,
-        );
+        try {
+          await SessionService.endSession(
+            userId: currentId,
+            sessionId: _currentSessionId,
+          );
+        } catch (_) {}
         _currentSessionId = null;
-        await updatePatientOnlineStatus(false);
+        try {
+          await updatePatientOnlineStatus(false);
+        } catch (_) {}
         // Record logout event
-        await _recordPatientLogout(currentId, _currentUser!.fullname);
+        try {
+          await _recordPatientLogout(currentId, userFullName);
+        } catch (_) {}
         // A signed-out account must stop receiving this device's pushes.
-        // Without this, signing into another patient account on the same
-        // phone left the previous patient's token on their profile.
         try {
           await FirebaseFirestore.instance
               .collection(FirestoreCollections.patients)
@@ -969,15 +1012,14 @@ class PatientController extends ChangeNotifier {
           print('Error clearing patient FCM token during logout: $e');
         }
       }
-      _currentUser = null;
-      await _clearSavedUser();
-      notifyListeners();
-      print('✅ User signed out successfully');
     } catch (e) {
-      print('❌ Error during signOut: $e');
+      print('❌ Error during signOut backend cleanup: $e');
+    } finally {
       _currentUser = null;
+      _currentSessionId = null;
       await _clearSavedUser();
       notifyListeners();
+      print('✅ User signed out & session completely cleared');
     }
   }
 
@@ -1892,7 +1934,25 @@ class PatientController extends ChangeNotifier {
       await _clearSavedUser();
 
       final prefs = await SharedPreferences.getInstance();
+      final currentUid = _currentUser?.id;
       await prefs.remove('current_user');
+      await prefs.remove('current_patient');
+      await prefs.remove('current_doctor');
+      await prefs.remove('auth_token');
+      await prefs.remove('active_session_id');
+      await prefs.remove('session_storage_key');
+      await prefs.remove('patient_session_id');
+      await prefs.remove('user_session_id');
+      if (currentUid != null && currentUid.isNotEmpty) {
+        await prefs.remove('user_$currentUid');
+        await prefs.remove('patient_$currentUid');
+      }
+      try {
+        const secureStorage = FlutterSecureStorage();
+        await secureStorage.delete(key: 'active_session_id');
+        await secureStorage.delete(key: 'auth_token');
+        await secureStorage.delete(key: 'session_token');
+      } catch (_) {}
       await prefs.remove('user_$userId');
 
       _setLoading(false);
@@ -2603,11 +2663,22 @@ class PatientController extends ChangeNotifier {
 
       final userData = userDoc.data()!;
 
-      // Password check
-      if (userData['password'] != password) {
+      // Password check with BCrypt support
+      final storedPassword = (userData['password'] ?? '').toString();
+      if (!PasswordSecurityService.verifyPassword(password, storedPassword)) {
         _errorMessage = 'Incorrect password';
         _setLoading(false);
         return false;
+      }
+
+      // Silent upgrade: automatically upgrade legacy plain-text password to BCrypt hash
+      if (PasswordSecurityService.needsRehash(storedPassword)) {
+        unawaited(
+          userDoc.reference.update({
+            'password': PasswordSecurityService.hashPassword(password),
+            'passwordHashedAt': FieldValue.serverTimestamp(),
+          }),
+        );
       }
 
       // Deleted check
@@ -2777,6 +2848,51 @@ class PatientController extends ChangeNotifier {
     });
   }
 
+  // ===========================================================================
+  // Patient Card ID Authentication
+  // ===========================================================================
+
+  /// Authenticates a patient directly using their alphanumeric Patient Card ID / MRN.
+  Future<PatientCardAuthResult> signInWithPatientCardId({
+    required String cardId,
+  }) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      final result = await PatientAuthService.instance.signInWithPatientCardId(cardId);
+      if (result.success && result.user != null) {
+        _currentUser = result.user;
+        await _saveUserToLocalStorage(result.user!);
+        await initializePatientPresence();
+        await _recordPatientLogin(result.user!.id, result.user!.fullname);
+        _setLoading(false);
+        notifyListeners();
+        return result;
+      } else {
+        _errorMessage = result.errorMessage ??
+            'Invalid Patient Card ID. Please verify your hospital card or contact reception.';
+        _setLoading(false);
+        notifyListeners();
+        return result;
+      }
+    } catch (e) {
+      _errorMessage = 'Failed to authenticate Patient Card: ${e.toString()}';
+      _setLoading(false);
+      notifyListeners();
+      return PatientCardAuthResult(
+        success: false,
+        errorMessage: _errorMessage,
+      );
+    }
+  }
+
+  // ===========================================================================
+  // Phone Number (OTP / SMS) Authentication
+  // TODO: Re-enable for next launch / release
+  // Temporarily disabled in favor of Patient Card ID login.
+  // Method retained below so nothing breaks and can easily be reinstated later.
+  // ===========================================================================
   /// Completes Phone OTP Sign-In with verified Firebase User.
   ///
   /// Reuses or links existing patient profile by UID or phone number.
@@ -3229,10 +3345,19 @@ class PatientController extends ChangeNotifier {
     }
   }
 
-  /// High-level adapter for 12-digit Patient Card authentication.
+  /// High-level adapter for Patient Card authentication.
   Future<Map<String, dynamic>?> validateAndAuthenticatePatientCard({
     required String patientId,
   }) async {
+    final authRes = await signInWithPatientCardId(cardId: patientId);
+    if (authRes.success && authRes.user != null) {
+      final isComplete = authRes.user!.fullname.trim().isNotEmpty;
+      return {
+        'status': 'authenticated',
+        'user': authRes.user,
+        'isProfileComplete': isComplete,
+      };
+    }
     final res = await signInWithPatientCard(cardId: patientId);
     if (!res.success) {
       final err = (res.error ?? '').toLowerCase();
@@ -3242,7 +3367,7 @@ class PatientController extends ChangeNotifier {
       if (err.contains('blocked') || err.contains('revoked')) {
         return {'status': 'blocked'};
       }
-      return {'status': 'not_found', 'error': res.error};
+      return {'status': 'not_found', 'error': authRes.errorMessage ?? res.error};
     }
     if (res.needsProfileCompletion && res.cardModel != null) {
       return {
@@ -3489,6 +3614,7 @@ class PatientController extends ChangeNotifier {
     required String gender,
     required int? age,
     required String phoneNumber,
+    String? password,
     PatientIdModel? patientIdModel,
   }) async {
     _setLoading(true);
@@ -3563,15 +3689,17 @@ class PatientController extends ChangeNotifier {
           id: userId,
           fullname: fullname.trim(),
           idcard: '',
-          password: '',
+          password: password != null && password.trim().isNotEmpty
+              ? PasswordSecurityService.hashPassword(password.trim())
+              : '',
           token: token,
           deviceId: currentDeviceId,
           role: 'patient',
           phoneNumber: phoneNumber.trim(),
-          ispayment: false,
+          ispayment: true, // Card holders bypass initial payment
           totalPayment: 0.0,
           paymentImage: null,
-          paymentStatus: null,
+          paymentStatus: 'approved',
           fcmToken: fcmToken ?? '',
           patientId: patientIdModel.patientId,
           gender: gender,
@@ -3582,6 +3710,7 @@ class PatientController extends ChangeNotifier {
           subscriptionStartDate: now,
           expiryDate: expiryDate,
           cardStatus: 'Active',
+          isProfileComplete: true,
         );
 
         await userDocRef.set(newUser.toMap(), SetOptions(merge: true));
@@ -3643,6 +3772,9 @@ class PatientController extends ChangeNotifier {
         'gender': gender,
         if (age != null) 'age': age,
         'phoneNumber': phoneNumber.trim(),
+        if (password != null && password.trim().isNotEmpty)
+          'password': PasswordSecurityService.hashPassword(password.trim()),
+        'isProfileComplete': true,
         'role': 'patient',
         'updatedAt': FieldValue.serverTimestamp(),
         if (fcmToken != null && fcmToken.isNotEmpty) 'fcmToken': fcmToken,

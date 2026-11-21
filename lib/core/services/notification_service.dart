@@ -189,7 +189,7 @@ class NotificationService {
   /// system's short "ping" instead of a ringtone), so the only way to give
   /// already-installed devices the ringtone is to DELETE the old channel and
   /// recreate it — once, gated on this version number.
-  static const int callChannelVersion = 4;
+  static const int callChannelVersion = 5;
   static const String _kCallChannelVersion = 'call_channel_version';
 
   /// v3: channel ids moved to `*_channel` and the chat channel gained
@@ -495,6 +495,7 @@ class NotificationService {
           NotificationChannels.legacyCall,
           NotificationChannels.incomingCalls,
           'incoming_calls_channel',
+          'callkit_incoming_channel_id',
         }) {
           await androidPlugin.deleteNotificationChannel(channelId: id);
         }
