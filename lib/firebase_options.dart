@@ -60,13 +60,15 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyD38AKhoGfjGE2eKYShQpmeHkPne5R_vP8',
-    appId: '1:161801385551:ios:a629dad57fa470cd899c3a',
+    appId: '1:161801385551:ios:b5f837d967a41f88899c3a',
     messagingSenderId: '161801385551',
     projectId: 'opd-telemedicine',
+    databaseURL: 'https://opd-telemedicine-default-rtdb.firebaseio.com',
     storageBucket: 'opd-telemedicine.firebasestorage.app',
-    iosBundleId: 'com.example.telemedicine',
+    androidClientId: '161801385551-2h2h6hepp2nrere77biohsenifl2ud5i.apps.googleusercontent.com',
+    iosClientId: '161801385551-nlh8brf98qvvek9kqd669q1m3a5qbo7k.apps.googleusercontent.com',
+    iosBundleId: 'com.opdonline.telemedicine',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyD38AKhoGfjGE2eKYShQpmeHkPne5R_vP8',
     appId: '1:161801385551:ios:a629dad57fa470cd899c3a',
