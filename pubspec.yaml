@@ -2,7 +2,7 @@ name: telemedicine
 description: OPD Telemedicine - patient/doctor chat, call and report management app.
 publish_to: 'none'
 
-version: 1.0.9+9
+version: 2.0.0+1
 
 environment:
   sdk: '>=3.9.0 <4.0.0'
